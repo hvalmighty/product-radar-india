@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { mutualFunds, fixedDeposits, insurance, type MutualFund, type FixedDeposit, type Insurance, type Category } from "@/lib/research-data";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -40,6 +40,7 @@ function ResearchTerminal() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [groupBy, setGroupBy] = useState<string>("none");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showCompare, setShowCompare] = useState(false);
 
   // category-specific filters
   const [mfSub, setMfSub] = useState<string>("All");
@@ -289,9 +290,18 @@ function ResearchTerminal() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
-                <button className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5">
-                  <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
-                </button>
+                <>
+                  <button onClick={() => setSelected(new Set())} className="text-[11px] px-2 py-1.5 rounded-sm border border-border hover:bg-secondary text-muted-foreground">
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => setShowCompare(true)}
+                    disabled={selected.size < 2}
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
+                  </button>
+                </>
               )}
               <button className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5">
                 <Download className="w-3 h-3" /> Export CSV
@@ -398,6 +408,16 @@ function ResearchTerminal() {
           </footer>
         </main>
       </div>
+      {showCompare && (
+        <CompareModal
+          cat={cat}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance].filter(p => selected.has(p.id))}
+          onClose={() => setShowCompare(false)}
+          onRemove={(id) => {
+            setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -551,6 +571,145 @@ function ToolbarSelect({ icon, label, value, onChange, options }: { icon: React.
           {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+      </div>
+    </div>
+  );
+}
+
+type AnyProduct = MutualFund | FixedDeposit | Insurance;
+
+function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items: AnyProduct[]; onClose: () => void; onRemove: (id: string) => void }) {
+  // Filter to current category only to keep comparison apples-to-apples
+  const products = items.filter(p => p.category === cat);
+
+  const metrics = cat === "MF"
+    ? [
+        { k: "amc", label: "AMC", type: "text" as const },
+        { k: "subCategory", label: "Sub-Category", type: "text" as const },
+        { k: "assetClass", label: "Asset Class", type: "text" as const },
+        { k: "benchmark", label: "Benchmark", type: "text" as const },
+        { k: "nav", label: "NAV (₹)", type: "num" as const, dp: 2 },
+        { k: "aum", label: "AUM (₹ Cr)", type: "num" as const, dp: 0, best: "high" as const },
+        { k: "expenseRatio", label: "Expense Ratio (%)", type: "num" as const, dp: 2, best: "low" as const },
+        { k: "returns1y", label: "1Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "returns3y", label: "3Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "returns5y", label: "5Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "sharpe", label: "Sharpe Ratio", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "alpha", label: "Alpha", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "beta", label: "Beta", type: "num" as const, dp: 2 },
+        { k: "risk", label: "Risk Level", type: "text" as const },
+        { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
+        { k: "minInvestment", label: "Min Investment (₹)", type: "inr" as const, best: "low" as const },
+        { k: "exitLoad", label: "Exit Load", type: "text" as const },
+      ]
+    : cat === "FD"
+    ? [
+        { k: "issuer", label: "Issuer", type: "text" as const },
+        { k: "subCategory", label: "Issuer Type", type: "text" as const },
+        { k: "tenureMonths", label: "Tenure (months)", type: "num" as const, dp: 0 },
+        { k: "interestRate", label: "Interest Rate (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "seniorRate", label: "Senior Rate (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "compounding", label: "Compounding", type: "text" as const },
+        { k: "minInvestment", label: "Min Investment (₹)", type: "inr" as const, best: "low" as const },
+        { k: "rating", label: "Credit Rating", type: "text" as const },
+        { k: "insuredDICGC", label: "DICGC Insured", type: "bool" as const },
+        { k: "premature", label: "Premature Withdrawal", type: "bool" as const },
+        { k: "payout", label: "Payout", type: "text" as const },
+      ]
+    : [
+        { k: "insurer", label: "Insurer", type: "text" as const },
+        { k: "subCategory", label: "Product Type", type: "text" as const },
+        { k: "sumAssured", label: "Sum Assured (₹)", type: "inr" as const, best: "high" as const },
+        { k: "premiumAnnual", label: "Premium p.a. (₹)", type: "inr" as const, best: "low" as const },
+        { k: "policyTermYears", label: "Policy Term (Y)", type: "num" as const, dp: 0 },
+        { k: "ppt", label: "PPT (Y)", type: "num" as const, dp: 0 },
+        { k: "claimSettlement", label: "Claim Settlement (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "solvencyRatio", label: "Solvency Ratio", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "irr", label: "IRR (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
+        { k: "taxBenefit", label: "Tax Benefit", type: "text" as const },
+        { k: "riders", label: "Riders", type: "list" as const },
+      ];
+
+  const bestIdxFor = (key: string, best: "high" | "low" | undefined): number | null => {
+    if (!best) return null;
+    const vals = products.map(p => (p as any)[key]).map(v => (typeof v === "number" ? v : null));
+    if (vals.some(v => v === null)) return null;
+    const target = best === "high" ? Math.max(...(vals as number[])) : Math.min(...(vals as number[]));
+    return (vals as number[]).indexOf(target);
+  };
+
+  const formatCell = (m: any, val: any) => {
+    if (val === null || val === undefined) return <span className="text-muted-foreground">—</span>;
+    switch (m.type) {
+      case "num": return <span className="mono-num">{Number(val).toFixed(m.dp ?? 2)}</span>;
+      case "pct": return <span className={`mono-num font-medium ${val >= 0 ? "text-positive" : "text-negative"}`}>{val > 0 ? "+" : ""}{Number(val).toFixed(m.dp ?? 2)}%</span>;
+      case "inr": return <span className="mono-num">{fmtINR(Number(val))}</span>;
+      case "bool": return val ? <span className="text-positive">✓ Yes</span> : <span className="text-muted-foreground">No</span>;
+      case "stars": return <Stars n={Number(val)} />;
+      case "list": return <span className="text-[11px]">{Array.isArray(val) ? val.join(", ") : String(val)}</span>;
+      default: return <span>{String(val)}</span>;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-sm shadow-2xl w-full max-w-7xl my-8" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Side-by-side Comparison</div>
+            <h2 className="text-lg font-semibold tracking-tight">{cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : "Insurance Plans"} · {products.length} selected</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-secondary"><X className="w-4 h-4" /></button>
+        </div>
+
+        {products.length < 2 ? (
+          <div className="p-12 text-center text-sm text-muted-foreground">Select at least 2 products from the same category to compare.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-surface/60">
+                  <th className="text-left px-4 py-3 text-[10px] uppercase tracking-wider text-muted-foreground w-48 sticky left-0 bg-surface/60">Metric</th>
+                  {products.map(p => (
+                    <th key={p.id} className="text-left px-4 py-3 min-w-[200px] align-top">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-semibold text-[13px] leading-tight">{p.name}</div>
+                          <div className="text-[10px] text-muted-foreground mono-num mt-0.5">{p.id}</div>
+                        </div>
+                        <button onClick={() => onRemove(p.id)} className="text-muted-foreground hover:text-foreground p-0.5"><X className="w-3 h-3" /></button>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {metrics.map((m, i) => {
+                  const bestIdx = bestIdxFor(m.k, (m as any).best);
+                  return (
+                    <tr key={m.k} className={`border-b border-border/60 ${i % 2 ? "bg-surface/30" : ""}`}>
+                      <td className="px-4 py-2.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium sticky left-0 bg-inherit">{m.label}</td>
+                      {products.map((p, idx) => (
+                        <td key={p.id} className={`px-4 py-2.5 ${bestIdx === idx ? "bg-positive/10" : ""}`}>
+                          <div className="flex items-center gap-1.5">
+                            {formatCell(m, (p as any)[m.k])}
+                            {bestIdx === idx && <Trophy className="w-3 h-3 text-positive" />}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="px-6 py-3 border-t border-border flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span><Trophy className="w-3 h-3 inline mr-1 text-positive" /> Best value highlighted per metric</span>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-sm border border-border hover:bg-secondary text-foreground normal-case tracking-normal text-[11px]">Close</button>
+        </div>
       </div>
     </div>
   );

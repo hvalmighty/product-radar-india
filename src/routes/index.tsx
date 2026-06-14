@@ -166,10 +166,11 @@ function ResearchTerminal() {
       {/* Top Bar */}
       <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
         <div className="px-6 py-3 flex items-center gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-sm bg-primary text-primary-foreground grid place-items-center font-bold text-sm">V</div>
+          <div className="flex items-center gap-3">
+            <img src={kfintechLogo.url} alt="KFintech" className="h-8 w-auto object-contain" />
+            <div className="h-8 w-px bg-border" />
             <div>
-              <h1 className="text-sm font-semibold leading-tight tracking-tight">VANTAGE RESEARCH</h1>
+              <h1 className="text-sm font-semibold leading-tight tracking-tight">mPower Wealth</h1>
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight">RM Intelligence Terminal · IN</p>
             </div>
           </div>

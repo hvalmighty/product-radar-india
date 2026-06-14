@@ -290,9 +290,18 @@ function ResearchTerminal() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
-                <button className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5">
-                  <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
-                </button>
+                <>
+                  <button onClick={() => setSelected(new Set())} className="text-[11px] px-2 py-1.5 rounded-sm border border-border hover:bg-secondary text-muted-foreground">
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => setShowCompare(true)}
+                    disabled={selected.size < 2}
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
+                  </button>
+                </>
               )}
               <button className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5">
                 <Download className="w-3 h-3" /> Export CSV

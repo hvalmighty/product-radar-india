@@ -40,6 +40,7 @@ function ResearchTerminal() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [groupBy, setGroupBy] = useState<string>("none");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showCompare, setShowCompare] = useState(false);
 
   // category-specific filters
   const [mfSub, setMfSub] = useState<string>("All");

@@ -408,6 +408,16 @@ function ResearchTerminal() {
           </footer>
         </main>
       </div>
+      {showCompare && (
+        <CompareModal
+          cat={cat}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance].filter(p => selected.has(p.id))}
+          onClose={() => setShowCompare(false)}
+          onRemove={(id) => {
+            setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
+          }}
+        />
+      )}
     </div>
   );
 }

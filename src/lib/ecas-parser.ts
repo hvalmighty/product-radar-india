@@ -100,6 +100,7 @@ function cleanNameLine(line: string, known: string[]): string {
     cleaned = `${cleaned.slice(0, found.index)} ${cleaned.slice(found.index + found.length)}`;
   }
   cleaned = cleaned
+    .replace(/\bPage \d+ of \d+\b/gi, " ")
     .replace(/[*!@$#]+/g, " ")
     .replace(/^\w{3,6}\s+-\s+/, "")
     .replace(/\s+\d[\d,]*\.\d{3}\b.*$/, "")
@@ -115,7 +116,7 @@ function cleanNameLine(line: string, known: string[]): string {
 }
 
 function looksLikeNewSecurityStart(line: string): boolean {
-  if (/^(SHARES?|EQUITY|FACE|VALUE|AFTER|SUB|DIVISION|CONSOLIDATION|LIMITED\b|NEW\b|SCHEME|PURSUANT|REGULAR|DIRECT)/i.test(line)) return false;
+  if (/^(SHARES?|EQUITY|FACE|VALUE|AFTER|SUB|DIVISION|CONSOLIDATION|LIMITED\b|NEW\b|SCHEME|PURSUANT|REGULAR|DIRECT|VEHICLES\b|METAL\b|IRON\b)/i.test(line)) return false;
   return /\b(LTD|LIMITED|BANK|ENERGY|MOTORS|POLYMER|VENTURES|POWER|CHEMICAL|DISTRIPARKS)\b/i.test(line);
 }
 
@@ -250,9 +251,10 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
     }
 
     if (inMfHolding) {
+      const currentFound = findIsin(line, allKnownIsins);
+      if (!currentFound) continue;
       const rowText = normalizeLine([line, lineMap[i + 1] || "", lineMap[i + 2] || ""].join(" "));
-      const found = findIsin(rowText, allKnownIsins);
-      if (!found) continue;
+      const found = currentFound;
       let nums = extractNumberTokens(rowText.slice(found.index + found.length));
       if (nums.length >= 6 && Number.isInteger(nums[0]) && nums[0] > 100000) nums = nums.slice(1);
       if (nums.length < 4) continue;

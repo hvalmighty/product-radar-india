@@ -883,7 +883,7 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Side-by-side Comparison</div>
-            <h2 className="text-lg font-semibold tracking-tight">{cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : "Insurance Plans"} · {products.length} selected</h2>
+            <h2 className="text-lg font-semibold tracking-tight">{cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS Strategies" : "AIF Schemes"} · {products.length} selected</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>

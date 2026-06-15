@@ -362,7 +362,7 @@ function ResearchTerminal() {
             </div>
             <ToolbarSelect icon={<Layers className="w-3 h-3" />} label="Group by" value={groupBy} onChange={setGroupBy} options={groupOptions as [string, string][]} />
             <div className="text-[11px] text-muted-foreground mono-num">
-              <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : insurance.length} results
+              <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : cat === "INS" ? insurance.length : cat === "PMS" ? pmsSchemes.length : aifSchemes.length} results
             </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (

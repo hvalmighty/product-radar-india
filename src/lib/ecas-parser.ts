@@ -50,6 +50,7 @@ function toNum(s: string): number {
 }
 
 export async function parseECasPdf(file: File, password?: string): Promise<PortfolioParseResult> {
+  const pdfjsLib = await getPdfjs();
   const buf = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: buf, password: password || undefined });
   const pdf = await loadingTask.promise;

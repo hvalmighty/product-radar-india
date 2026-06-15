@@ -18,6 +18,8 @@ type SortDir = "asc" | "desc";
 
 const CATEGORIES: { key: Category; label: string; count: number; tone: string }[] = [
   { key: "MF", label: "Mutual Funds", count: mutualFunds.length, tone: "text-mf" },
+  { key: "PMS", label: "PMS", count: pmsSchemes.length, tone: "text-pms" },
+  { key: "AIF", label: "AIF", count: aifSchemes.length, tone: "text-aif" },
   { key: "FD", label: "Fixed Deposits", count: fixedDeposits.length, tone: "text-fd" },
   { key: "INS", label: "Insurance", count: insurance.length, tone: "text-ins" },
 ];

@@ -530,7 +530,7 @@ function ResearchTerminal() {
       {showCompare && (
         <CompareModal
           cat={cat}
-          items={[...mutualFunds, ...fixedDeposits, ...insurance].filter(p => selected.has(p.id))}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes].filter(p => selected.has(p.id))}
           onClose={() => setShowCompare(false)}
           onRemove={(id) => {
             setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });

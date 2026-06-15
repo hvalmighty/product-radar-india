@@ -172,7 +172,10 @@ function PortfolioImporter() {
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">eCAS Importer · NSDL / CDSL</p>
             </div>
           </div>
-          <Link to="/" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <button onClick={() => setShowSaved(s => !s)} className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-2 py-1 border border-border rounded-sm">
+            <FolderOpen className="w-3.5 h-3.5" /> Saved ({saved.length})
+          </button>
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Research
           </Link>
         </div>

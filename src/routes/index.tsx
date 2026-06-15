@@ -314,6 +314,28 @@ function ResearchTerminal() {
                 <FilterRange label="Min Rating" value={insMinRating} onChange={setInsMinRating} min={1} max={5} step={1} format={v => `${v}★ & above`} />
               </>
             )}
+            {cat === "PMS" && (
+              <>
+                <FilterSelect label="Strategy" value={pmsStrategy} onChange={setPmsStrategy}
+                  options={["All", ...Array.from(new Set(pmsSchemes.map(p => p.strategy)))]} />
+                <FilterSelect label="Structure" value={pmsStructure} onChange={setPmsStructure}
+                  options={["All", "Discretionary", "Non-Discretionary", "Advisory"]} />
+                <FilterRange label="Min 3Y Return" value={pmsMinReturn} onChange={setPmsMinReturn} min={-5} max={30} step={0.5} suffix="%" />
+                <FilterRange label="Max Fixed Fee" value={pmsMaxFee} onChange={setPmsMaxFee} min={0.5} max={2.5} step={0.05} suffix="%" />
+                <div className="text-[10px] text-muted-foreground italic pt-1">SEBI min ticket: ₹50 Lakhs</div>
+              </>
+            )}
+            {cat === "AIF" && (
+              <>
+                <FilterSelect label="SEBI Category" value={aifCategory} onChange={setAifCategory}
+                  options={["All", "Category I", "Category II", "Category III"]} />
+                <FilterSelect label="Sub-Strategy" value={aifStrategy} onChange={setAifStrategy}
+                  options={["All", ...Array.from(new Set(aifSchemes.map(a => a.subStrategy)))]} />
+                <FilterRange label="Min Net IRR" value={aifMinIRR} onChange={setAifMinIRR} min={-5} max={30} step={0.5} suffix="%" />
+                <FilterRange label="Vintage from" value={aifVintageFrom} onChange={setAifVintageFrom} min={2018} max={2025} step={1} format={v => String(v)} />
+                <div className="text-[10px] text-muted-foreground italic pt-1">SEBI min ticket: ₹1 Crore</div>
+              </>
+            )}
 
             <div className="pt-4 border-t border-border space-y-2">
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>

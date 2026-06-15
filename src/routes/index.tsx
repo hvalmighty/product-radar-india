@@ -164,7 +164,11 @@ function ResearchTerminal() {
     ? [["none", "No Grouping"], ["amc", "AMC"], ["subCategory", "Sub-Category"], ["assetClass", "Asset Class"], ["risk", "Risk"]]
     : cat === "FD"
       ? [["none", "No Grouping"], ["issuer", "Issuer"], ["subCategory", "Issuer Type"], ["tenureMonths", "Tenure"], ["rating", "Credit Rating"]]
-      : [["none", "No Grouping"], ["insurer", "Insurer"], ["subCategory", "Product Type"], ["rating", "Rating"]];
+      : cat === "INS"
+        ? [["none", "No Grouping"], ["insurer", "Insurer"], ["subCategory", "Product Type"], ["rating", "Rating"]]
+        : cat === "PMS"
+          ? [["none", "No Grouping"], ["manager", "Manager"], ["strategy", "Strategy"], ["structure", "Structure"], ["risk", "Risk"]]
+          : [["none", "No Grouping"], ["manager", "Manager"], ["sebiCategory", "SEBI Category"], ["subStrategy", "Sub-Strategy"], ["vintage", "Vintage"], ["domicile", "Domicile"]];
 
   // Quick stats
   const stats = useMemo(() => {

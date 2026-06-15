@@ -3,8 +3,6 @@
 // Heuristic — works on most eCAS layouts but not guaranteed for every variant.
 
 import * as pdfjsLib from "pdfjs-dist";
-// Vite-friendly worker import
-// @ts-expect-error - ?url import handled by Vite
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;

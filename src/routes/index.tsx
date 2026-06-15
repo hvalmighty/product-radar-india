@@ -455,6 +455,47 @@ function ResearchTerminal() {
                           <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                         </>
                       )}
+                      {cat === "PMS" && (
+                        <>
+                          <Th label="Strategy" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Manager" k="manager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Structure" k="structure" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Category" k="strategy" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Fixed Fee" k="fixedFee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Perf Fee" k="performanceFee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Min ₹" k="minInvestment" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                        </>
+                      )}
+                      {cat === "AIF" && (
+                        <>
+                          <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Manager" k="manager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="SEBI Cat" k="sebiCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Sub-Strategy" k="subStrategy" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Structure" k="structure" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Vintage" k="vintage" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Corpus (Cr)" k="corpusTarget" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Tenure (Y)" k="tenureYears" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Drawdown %" k="drawdownStatus" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Target IRR" k="targetIRR" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Net IRR" k="netIRR" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="MOIC" k="moic" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Hurdle" k="hurdleRate" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Carry %" k="carry" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Mgmt Fee" k="managementFee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Domicile" k="domicile" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>

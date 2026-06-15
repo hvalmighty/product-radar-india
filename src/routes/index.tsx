@@ -757,7 +757,7 @@ function ToolbarSelect({ icon, label, value, onChange, options }: { icon: React.
   );
 }
 
-type AnyProduct = MutualFund | FixedDeposit | Insurance;
+type AnyProduct = MutualFund | FixedDeposit | Insurance | PMS | AIF;
 
 function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items: AnyProduct[]; onClose: () => void; onRemove: (id: string) => void }) {
   // Filter to current category only to keep comparison apples-to-apples

@@ -61,7 +61,57 @@ export interface Insurance {
   rating: number; // 1-5
 }
 
-export type Product = MutualFund | FixedDeposit | Insurance;
+export interface PMS {
+  category: "PMS";
+  id: string;
+  name: string;
+  manager: string; // PMS house
+  structure: "Discretionary" | "Non-Discretionary" | "Advisory";
+  strategy: "Multi Cap" | "Large Cap" | "Mid & Small Cap" | "Small Cap" | "Thematic" | "Sector - Banking & Financials" | "Sector - Pharma" | "Contra / Value" | "Debt" | "Hybrid";
+  benchmark: string;
+  aum: number; // in crore
+  minInvestment: number; // SEBI floor ₹50L
+  returns1y: number;
+  returns3y: number;
+  returns5y: number;
+  alpha: number;
+  sharpe: number;
+  beta: number;
+  maxDrawdown: number; // %
+  fixedFee: number; // % p.a.
+  performanceFee: string; // e.g. 20% over 10% hurdle
+  exitLoad: string;
+  inception: string;
+  risk: RiskLevel;
+  rating: number;
+}
+
+export interface AIF {
+  category: "AIF";
+  id: string;
+  name: string;
+  manager: string;
+  sebiCategory: "Category I" | "Category II" | "Category III";
+  subStrategy: "Venture Capital" | "SME Fund" | "Social Venture" | "Infrastructure" | "Private Equity" | "Real Estate" | "Private Credit / Debt" | "Distressed / Special Sit." | "Long-Short Hedge" | "Long-Only Equity";
+  structure: "Close-Ended" | "Open-Ended";
+  vintage: number;
+  corpusTarget: number; // crore
+  commitments: number; // crore
+  minInvestment: number; // SEBI floor ₹1 Cr
+  tenureYears: number;
+  drawdownStatus: number; // % capital called
+  targetIRR: number;
+  netIRR: number; // realised/MTM
+  moic: number; // multiple
+  hurdleRate: number;
+  carry: number; // %
+  managementFee: number; // %
+  domicile: "India - GIFT IFSC" | "India - Onshore";
+  risk: RiskLevel;
+  rating: number;
+}
+
+export type Product = MutualFund | FixedDeposit | Insurance | PMS | AIF;
 
 const AMCS = ["HDFC", "SBI", "ICICI Pru", "Axis", "Nippon India", "Kotak", "Mirae", "Parag Parikh", "DSP", "Aditya Birla SL", "UTI", "Quant"];
 const MF_SUB = ["Large Cap", "Mid Cap", "Small Cap", "Flexi Cap", "ELSS", "Hybrid Aggressive", "Hybrid Conservative", "Liquid", "Corporate Bond", "Gilt", "Index"];

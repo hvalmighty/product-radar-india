@@ -269,13 +269,25 @@ function PortfolioImporter() {
                 <Stat label="Holdings" value={String(result.holdings.length)} />
                 <Stat label="Asset Classes" value={String(allocation.length)} />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  placeholder={result.investor || "Portfolio name"}
+                  className="px-2 py-1.5 text-xs border border-border rounded-sm bg-background w-40 focus:outline-none focus:border-foreground/50"
+                />
+                <button onClick={saveCurrent} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5 bg-foreground text-background">
+                  <Save className="w-3.5 h-3.5" /> Save
+                </button>
                 <button onClick={exportCsv} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
                   <Download className="w-3.5 h-3.5" /> CSV
                 </button>
                 <button onClick={reset} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary">New Import</button>
               </div>
             </div>
+            {savedToast && (
+              <div className="text-xs px-3 py-2 border border-positive/40 bg-positive/10 rounded-sm inline-block">{savedToast}</div>
+            )}
 
             {/* Allocation + Top */}
             <div className="grid lg:grid-cols-2 gap-6">

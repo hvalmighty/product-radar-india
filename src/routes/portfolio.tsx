@@ -50,15 +50,19 @@ function PortfolioImporter() {
       setResult(res);
       setNeedsPwd(false);
       if (res.holdings.length === 0) {
-        setErr("Parsed PDF but found no recognizable holdings. The statement format may be unusual — try another file.");
+        setErr("Parsed the PDF but couldn't recognise any holdings. This looks like a transaction statement or an unusual layout — try a holdings/CAS PDF.");
       }
     } catch (e: any) {
+      console.error("[portfolio] parse error", e);
       const msg = String(e?.message || e);
-      if (/password/i.test(msg) || e?.name === "PasswordException") {
+      const name = String(e?.name || "");
+      if (name === "PasswordException" || /password/i.test(msg)) {
         setNeedsPwd(true);
-        setErr("This PDF is password-protected. Enter the password (typically PAN in lowercase + DDMMYYYY).");
+        if (pwd) {
+          setErr("Incorrect password. NSDL eCAS = PAN (uppercase) + DOB DDMMYYYY. CDSL CAS = PAN (uppercase). KFintech/CAMS = the password emailed with the statement.");
+        }
       } else {
-        setErr(`Failed to parse: ${msg}`);
+        setErr(`Failed to parse PDF: ${msg}`);
       }
     } finally {
       setLoading(false);
@@ -176,20 +180,25 @@ function PortfolioImporter() {
             {needsPwd && (
               <form
                 onSubmit={e => { e.preventDefault(); if (file) handleParse(file, password); }}
-                className="mt-4 p-4 border border-border rounded-md bg-surface"
+                className="mt-4 p-5 border-2 border-amber-500/60 rounded-md bg-amber-500/10"
               >
-                <div className="flex items-center gap-2 text-xs font-medium mb-2"><Lock className="w-3.5 h-3.5" /> Password required</div>
-                <input
-                  type="password"
-                  autoFocus
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="e.g. ABCPE1234F12081990"
-                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-sm focus:outline-none focus:border-foreground/50 mono-num"
-                />
-                <button type="submit" disabled={!password || loading} className="mt-2 px-3 py-1.5 text-xs font-medium bg-foreground text-background rounded-sm disabled:opacity-50">
-                  {loading ? "Unlocking…" : "Unlock & parse"}
-                </button>
+                <div className="flex items-center gap-2 text-sm font-semibold mb-1"><Lock className="w-4 h-4" /> This PDF is password-protected</div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Enter the statement password to unlock and parse. NSDL eCAS uses <span className="mono-num">PAN + DDMMYYYY</span>. CDSL CAS uses <span className="mono-num">PAN</span> (uppercase). KFintech / CAMS statements use the password emailed with the file.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    autoFocus
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter PDF password"
+                    className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-sm focus:outline-none focus:border-foreground/50 mono-num"
+                  />
+                  <button type="submit" disabled={!password || loading} className="px-4 py-2 text-xs font-semibold bg-foreground text-background rounded-sm disabled:opacity-50">
+                    {loading ? "Unlocking…" : "Unlock & parse"}
+                  </button>
+                </div>
               </form>
             )}
 

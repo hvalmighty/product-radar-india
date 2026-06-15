@@ -1,4 +1,4 @@
-export type Category = "MF" | "FD" | "INS";
+export type Category = "MF" | "FD" | "INS" | "PMS" | "AIF";
 
 export type RiskLevel = "Low" | "Low-Mod" | "Moderate" | "Mod-High" | "High" | "Very High";
 

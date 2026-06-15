@@ -6,8 +6,9 @@ let _pdfjs: any = null;
 async function getPdfjs() {
   if (_pdfjs) return _pdfjs;
   const pdfjsLib: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const workerUrl = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+  const workerModule: any = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
+  const workerUrl = workerModule.default || workerModule;
+  if (typeof workerUrl === "string") pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
   _pdfjs = pdfjsLib;
   return pdfjsLib;
 }
@@ -167,7 +168,11 @@ function aggregateHoldings(holdings: Holding[]): Holding[] {
 export async function parseECasPdf(file: File, password?: string): Promise<PortfolioParseResult> {
   const pdfjsLib = await getPdfjs();
   const buf = await file.arrayBuffer();
-  const loadingTask = pdfjsLib.getDocument({ data: buf, password: password || undefined });
+  const loadingTask = pdfjsLib.getDocument({
+    data: buf,
+    password: password || undefined,
+    disableWorker: !pdfjsLib.GlobalWorkerOptions.workerSrc,
+  });
   const pdf = await loadingTask.promise;
 
   let fullText = "";

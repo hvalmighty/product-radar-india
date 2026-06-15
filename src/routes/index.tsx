@@ -254,7 +254,7 @@ function ResearchTerminal() {
           {CATEGORIES.map(c => (
             <button
               key={c.key}
-              onClick={() => { setCat(c.key); setSortKey(c.key === "MF" ? "returns3y" : c.key === "FD" ? "interestRate" : "claimSettlement"); setGroupBy("none"); setSelected(new Set()); }}
+              onClick={() => { setCat(c.key); setSortKey(c.key === "MF" ? "returns3y" : c.key === "FD" ? "interestRate" : c.key === "INS" ? "claimSettlement" : c.key === "PMS" ? "returns3y" : "netIRR"); setGroupBy("none"); setSelected(new Set()); }}
               className={`px-4 py-2.5 text-xs font-medium tracking-wide border-b-2 -mb-px transition-colors flex items-center gap-2 ${
                 cat === c.key
                   ? `border-foreground text-foreground ${c.tone}`

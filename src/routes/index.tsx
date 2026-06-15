@@ -797,7 +797,8 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         { k: "premature", label: "Premature Withdrawal", type: "bool" as const },
         { k: "payout", label: "Payout", type: "text" as const },
       ]
-    : [
+    : cat === "INS"
+    ? [
         { k: "insurer", label: "Insurer", type: "text" as const },
         { k: "subCategory", label: "Product Type", type: "text" as const },
         { k: "sumAssured", label: "Sum Assured (₹)", type: "inr" as const, best: "high" as const },
@@ -810,6 +811,49 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
         { k: "taxBenefit", label: "Tax Benefit", type: "text" as const },
         { k: "riders", label: "Riders", type: "list" as const },
+      ]
+    : cat === "PMS"
+    ? [
+        { k: "manager", label: "Manager", type: "text" as const },
+        { k: "strategy", label: "Strategy", type: "text" as const },
+        { k: "structure", label: "Structure", type: "text" as const },
+        { k: "benchmark", label: "Benchmark", type: "text" as const },
+        { k: "aum", label: "AUM (₹ Cr)", type: "num" as const, dp: 0, best: "high" as const },
+        { k: "returns1y", label: "1Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "returns3y", label: "3Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "returns5y", label: "5Y Return (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "alpha", label: "Alpha", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "sharpe", label: "Sharpe Ratio", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "beta", label: "Beta", type: "num" as const, dp: 2 },
+        { k: "maxDrawdown", label: "Max Drawdown (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "fixedFee", label: "Fixed Fee (%)", type: "num" as const, dp: 2, best: "low" as const },
+        { k: "performanceFee", label: "Performance Fee", type: "text" as const },
+        { k: "exitLoad", label: "Exit Load", type: "text" as const },
+        { k: "minInvestment", label: "Min Investment (₹)", type: "inr" as const },
+        { k: "inception", label: "Inception", type: "text" as const },
+        { k: "risk", label: "Risk Level", type: "text" as const },
+        { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
+      ]
+    : [
+        { k: "manager", label: "Manager", type: "text" as const },
+        { k: "sebiCategory", label: "SEBI Category", type: "text" as const },
+        { k: "subStrategy", label: "Sub-Strategy", type: "text" as const },
+        { k: "structure", label: "Structure", type: "text" as const },
+        { k: "vintage", label: "Vintage", type: "num" as const, dp: 0 },
+        { k: "corpusTarget", label: "Corpus Target (₹ Cr)", type: "num" as const, dp: 0, best: "high" as const },
+        { k: "commitments", label: "Commitments (₹ Cr)", type: "num" as const, dp: 0, best: "high" as const },
+        { k: "tenureYears", label: "Tenure (Y)", type: "num" as const, dp: 0 },
+        { k: "drawdownStatus", label: "Capital Called (%)", type: "num" as const, dp: 0 },
+        { k: "targetIRR", label: "Target IRR (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "netIRR", label: "Net IRR (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "moic", label: "MOIC (x)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "hurdleRate", label: "Hurdle Rate (%)", type: "num" as const, dp: 2 },
+        { k: "carry", label: "Carry (%)", type: "num" as const, dp: 0, best: "low" as const },
+        { k: "managementFee", label: "Management Fee (%)", type: "num" as const, dp: 2, best: "low" as const },
+        { k: "minInvestment", label: "Min Investment (₹)", type: "inr" as const },
+        { k: "domicile", label: "Domicile", type: "text" as const },
+        { k: "risk", label: "Risk Level", type: "text" as const },
+        { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
       ];
 
   const bestIdxFor = (key: string, best: "high" | "low" | undefined): number | null => {

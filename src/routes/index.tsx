@@ -61,6 +61,16 @@ function ResearchTerminal() {
   const [insMinClaim, setInsMinClaim] = useState<number>(94);
   const [insMinRating, setInsMinRating] = useState<number>(1);
 
+  const [pmsStrategy, setPmsStrategy] = useState<string>("All");
+  const [pmsStructure, setPmsStructure] = useState<string>("All");
+  const [pmsMinReturn, setPmsMinReturn] = useState<number>(0);
+  const [pmsMaxFee, setPmsMaxFee] = useState<number>(2.5);
+
+  const [aifCategory, setAifCategory] = useState<string>("All");
+  const [aifStrategy, setAifStrategy] = useState<string>("All");
+  const [aifMinIRR, setAifMinIRR] = useState<number>(0);
+  const [aifVintageFrom, setAifVintageFrom] = useState<number>(2018);
+
   const data = useMemo(() => {
     if (cat === "MF") {
       return mutualFunds.filter(p => {

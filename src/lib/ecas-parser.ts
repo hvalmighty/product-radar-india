@@ -1,6 +1,6 @@
 // Lightweight NSDL / CDSL eCAS PDF parser.
-// Uses pdfjs-dist to extract text, then regex-mines ISIN-anchored holding rows.
-// Heuristic — works on most eCAS layouts but not guaranteed for every variant.
+// Uses pdfjs-dist to extract text, then mines CDSL/NSDL holding tables and MF/RTA rows.
+// Heuristic — works on common CAS/eCAS layouts but not guaranteed for every variant.
 
 let _pdfjs: any = null;
 async function getPdfjs() {
@@ -49,6 +49,121 @@ function toNum(s: string): number {
   return isNaN(n) ? 0 : n;
 }
 
+const ISIN_RE = /\b(IN[A-Z0-9]{10})\b/g;
+
+function normalizeLine(line: string): string {
+  return line.replace(/\u00ad/g, "").replace(/\s+/g, " ").trim();
+}
+
+function extractNumberTokens(text: string): number[] {
+  return text
+    .split(/\s+/)
+    .filter(token => /^-?[\d,]+(?:\.\d+)?$/.test(token))
+    .map(toNum)
+    .filter(v => Number.isFinite(v));
+}
+
+function extractLooseNumbers(text: string): number[] {
+  return (text.match(/-?[\d,]+(?:\.\d+)?/g) || []).map(toNum).filter(v => Number.isFinite(v));
+}
+
+function knownIsins(fullText: string): string[] {
+  return [...new Set([...fullText.matchAll(ISIN_RE)].map(m => m[1]))];
+}
+
+function findIsin(line: string, known: string[]): { isin: string; index: number; length: number } | null {
+  ISIN_RE.lastIndex = 0;
+  const full = ISIN_RE.exec(line);
+  if (full?.index !== undefined) return { isin: full[1], index: full.index, length: full[1].length };
+
+  // Some CDSL PDFs visually split an ISIN across lines (example: INF174KA1P + W4).
+  const partial = line.match(/\b(IN[A-Z0-9]{7,10})\b/);
+  if (!partial || partial.index === undefined) return null;
+  const matches = known.filter(isin => isin.startsWith(partial[1]));
+  if (matches.length !== 1) return null;
+  return { isin: matches[0], index: partial.index, length: partial[1].length };
+}
+
+function isNoiseLine(line: string): boolean {
+  return !line ||
+    /^(Page \d+|Central Depository|A Wing,|Lower Parel|CONSOLIDATED ACCOUNT|Summary of|Investments|Account Details|MF Details|Notes|About CDSL)$/i.test(line) ||
+    /^(ISIN|Security|Current|Frozen|Pledge|Market|Price|Face|Value|Statement of Transactions|Holding Statement|Portfolio Value|Grand Total|Load Structures)/i.test(line) ||
+    /^HARSHVARDHAN NANDLAL VISHWAKARMA$/i.test(line);
+}
+
+function cleanNameLine(line: string, known: string[]): string {
+  let cleaned = normalizeLine(line);
+  if (isNoiseLine(cleaned)) return "";
+  const found = findIsin(cleaned, known);
+  if (found) {
+    cleaned = `${cleaned.slice(0, found.index)} ${cleaned.slice(found.index + found.length)}`;
+  }
+  cleaned = cleaned
+    .replace(/[*!@$#]+/g, " ")
+    .replace(/^\w{3,6}\s+-\s+/, "")
+    .replace(/\s+\d[\d,]*\.\d{3}\b.*$/, "")
+    .replace(/\s+\d{5,}(?:\/\d+)?\s+.*$/, "")
+    .replace(/\b[A-Z][0-9]\b$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!/[A-Z]/i.test(cleaned)) return "";
+  const letters = (cleaned.match(/[A-Z]/gi) || []).length;
+  if (letters / Math.max(cleaned.length, 1) < 0.35) return "";
+  return cleaned;
+}
+
+function looksLikeNewSecurityStart(line: string): boolean {
+  if (/^(SHARES?|EQUITY|FACE|VALUE|AFTER|SUB|DIVISION|CONSOLIDATION|LIMITED\b|NEW\b|SCHEME|PURSUANT|REGULAR|DIRECT)/i.test(line)) return false;
+  return /\b(LTD|LIMITED|BANK|ENERGY|MOTORS|POLYMER|VENTURES|POWER|CHEMICAL|DISTRIPARKS)\b/i.test(line);
+}
+
+function nameAround(lines: string[], index: number, found: { isin: string; index: number; length: number }, known: string[]): string {
+  const parts: string[] = [];
+  const previous: string[] = [];
+
+  for (let j = index - 1; j >= Math.max(0, index - 3); j--) {
+    const cleaned = cleanNameLine(lines[j], known);
+    if (!cleaned) break;
+    if (previous.length > 0 && looksLikeNewSecurityStart(previous[0])) break;
+    previous.unshift(cleaned);
+  }
+
+  const current = lines[index];
+  const before = cleanNameLine(current.slice(0, found.index), known);
+  const afterRaw = current.slice(found.index + found.length).replace(/^[*!@$#\s]+/, "");
+  const firstQty = afterRaw.search(/\d[\d,]*\.\d{3}\b/);
+  const currentName = cleanNameLine(firstQty >= 0 ? afterRaw.slice(0, firstQty) : afterRaw, known);
+  parts.push(...previous, before, currentName);
+
+  for (let j = index + 1; j <= Math.min(lines.length - 1, index + 2); j++) {
+    if (findIsin(lines[j], known) || /^Portfolio Value|^DP Name|^Grand Total/i.test(lines[j])) break;
+    const cleaned = cleanNameLine(lines[j], known);
+    if (!cleaned) break;
+    if (looksLikeNewSecurityStart(cleaned)) break;
+    parts.push(cleaned);
+  }
+
+  return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 120) || found.isin;
+}
+
+function aggregateHoldings(holdings: Holding[]): Holding[] {
+  const byIsin = new Map<string, Holding>();
+  for (const h of holdings) {
+    const existing = byIsin.get(h.isin);
+    if (!existing) {
+      byIsin.set(h.isin, { ...h });
+      continue;
+    }
+    existing.quantity += h.quantity;
+    existing.value += h.value;
+    existing.price = existing.quantity > 0 ? existing.value / existing.quantity : h.price;
+    if (h.name.length > existing.name.length && h.name.length <= 120) existing.name = h.name;
+    if (existing.type !== "Mutual Fund" && h.type === "Mutual Fund") existing.type = h.type;
+  }
+  return [...byIsin.values()].sort((a, b) => b.value - a.value);
+}
+
 export async function parseECasPdf(file: File, password?: string): Promise<PortfolioParseResult> {
   const pdfjsLib = await getPdfjs();
   const buf = await file.arrayBuffer();
@@ -70,7 +185,7 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
     }
     const ys = [...rows.keys()].sort((a, b) => b - a);
     for (const y of ys) {
-      const line = rows.get(y)!.sort((a, b) => a.x - b.x).map(p => p.str).join(" ").replace(/\s+/g, " ").trim();
+      const line = normalizeLine(rows.get(y)!.sort((a, b) => a.x - b.x).map(p => p.str).join(" "));
       if (line) {
         lineMap.push(line);
         fullText += line + "\n";
@@ -88,66 +203,72 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
                     fullText.match(/Statement.*?([0-9]{1,2}[- /][A-Za-z]{3,9}[- /][0-9]{2,4})/i);
   const investorMatch = fullText.match(/(?:Name of (?:the )?(?:Investor|Holder|First Holder)|Investor Name)[:\s]+([A-Z][A-Z .]+?)(?:\s{2,}|\n|PAN)/i);
 
-  // Mine holdings: anchor on ISINs.
-  const isinRe = /\b(IN[EFA0-9][0-9A-Z]{9}[0-9])\b/g;
-  const holdings: Holding[] = [];
-  const seen = new Set<string>();
+  const allKnownIsins = knownIsins(fullText);
+  const mined: Holding[] = [];
+  let inDematHolding = false;
+  let inMfHolding = false;
 
-  for (const line of lineMap) {
-    const matches = [...line.matchAll(isinRe)];
-    if (matches.length === 0) continue;
-    for (const m of matches) {
-      const isin = m[1];
-      const idx = m.index ?? 0;
-      const before = line.slice(0, idx).trim();
-      const after = line.slice(idx + isin.length).trim();
-      // Extract trailing numbers from `after`
-      const nums = after.match(/[\d,]+\.\d{2,4}|[\d,]{2,}/g) || [];
-      const cleaned = nums.map(toNum).filter(v => v > 0);
+  for (let i = 0; i < lineMap.length; i++) {
+    const line = lineMap[i];
 
-      // Heuristic: name = `before`; pick qty, price, value from last numeric tokens.
-      // Typical CAS row: <name> <ISIN> <Qty> <NAV/Price> <Value> [<%>]
-      let qty = 0, price = 0, value = 0;
-      if (cleaned.length >= 3) {
-        // Drop possible trailing percentage value
-        const last3 = cleaned.slice(-4);
-        // Pick the largest as value
-        value = Math.max(...last3);
-        const rest = last3.filter(v => v !== value);
-        // price ~ usually middle small number, qty ~ remaining
-        if (rest.length >= 2) {
-          rest.sort((a, b) => a - b);
-          price = rest[0];
-          qty = rest[1];
-        } else if (rest.length === 1) {
-          qty = rest[0];
-          price = qty > 0 ? value / qty : 0;
-        }
-      } else if (cleaned.length === 2) {
-        qty = cleaned[0];
-        value = cleaned[1];
-        price = qty > 0 ? value / qty : 0;
-      } else if (cleaned.length === 1) {
-        value = cleaned[0];
-      }
+    if (/MUTUAL FUND UNITS HELD AS ON/i.test(line)) {
+      inMfHolding = true;
+      inDematHolding = false;
+      continue;
+    }
+    if (/HOLDING STATEMENT AS ON/i.test(line)) {
+      inDematHolding = true;
+      inMfHolding = false;
+      continue;
+    }
+    if (/^(Portfolio Value|DP Name|STATEMENT OF TRANSACTIONS|Nil Holding)/i.test(line)) inDematHolding = false;
+    if (/^(Grand Total|Load Structures)/i.test(line)) inMfHolding = false;
 
-      const name = (before || after.replace(/[\d,.%]/g, "").trim()).replace(/\s+/g, " ").slice(0, 80) || isin;
-      const key = isin + "|" + name;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      if (value <= 0 && qty <= 0) continue;
-      holdings.push({
-        isin,
+    if (inDematHolding) {
+      const found = findIsin(line, allKnownIsins);
+      if (!found) continue;
+      const nums = extractLooseNumbers(line.slice(found.index + found.length)).filter(v => v >= 0);
+      if (nums.length < 3) continue;
+      const [quantity, price, value] = nums.slice(-3);
+      if (value <= 0 && quantity <= 0) continue;
+      const name = nameAround(lineMap, i, found, allKnownIsins);
+      mined.push({
+        isin: found.isin,
         name,
-        type: classify(name, isin),
-        quantity: qty,
+        type: classify(name, found.isin),
+        quantity,
         price,
         value,
-        source: source === "Unknown" ? "NSDL" : source,
+        source: source === "Unknown" ? "CDSL" : source,
+      });
+      continue;
+    }
+
+    if (inMfHolding) {
+      const rowText = normalizeLine([line, lineMap[i + 1] || "", lineMap[i + 2] || ""].join(" "));
+      const found = findIsin(rowText, allKnownIsins);
+      if (!found) continue;
+      let nums = extractNumberTokens(rowText.slice(found.index + found.length));
+      if (nums.length >= 6 && Number.isInteger(nums[0]) && nums[0] > 100000) nums = nums.slice(1);
+      if (nums.length < 4) continue;
+      const quantity = nums[0];
+      const price = nums[1];
+      const value = nums[3];
+      if (value <= 0 && quantity <= 0) continue;
+      const name = nameAround(lineMap, i, found, allKnownIsins);
+      mined.push({
+        isin: found.isin,
+        name,
+        type: "Mutual Fund",
+        quantity,
+        price,
+        value,
+        source: source === "Unknown" ? "CDSL" : source,
       });
     }
   }
+
+  const holdings = aggregateHoldings(mined);
 
   const totalValue = holdings.reduce((s, h) => s + h.value, 0);
 

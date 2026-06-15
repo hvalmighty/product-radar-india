@@ -626,6 +626,68 @@ function INSRow({ p }: { p: Insurance }) {
   );
 }
 
+function PMSRow({ p }: { p: PMS }) {
+  return (
+    <>
+      <td className="px-3 py-2.5">
+        <div className="font-medium text-[12.5px]">{p.name}</div>
+        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Bench: {p.benchmark} · Since {p.inception}</div>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
+      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
+      <td className="px-3 py-2.5 text-[11px]">
+        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-pms" />{p.strategy}</span>
+      </td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
+      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.fixedFee.toFixed(2)}%</td>
+      <td className="px-3 py-2.5 text-[11px]">{p.performanceFee}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.minInvestment)}</td>
+      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+    </>
+  );
+}
+
+function AIFRow({ p }: { p: AIF }) {
+  const catTone = p.sebiCategory === "Category I" ? "bg-info/15 text-info"
+    : p.sebiCategory === "Category II" ? "bg-warning/20 text-warning"
+    : "bg-negative/15 text-negative";
+  return (
+    <>
+      <td className="px-3 py-2.5">
+        <div className="font-medium text-[12.5px]">{p.name}</div>
+        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Commit ₹{p.commitments.toLocaleString("en-IN")} Cr / ₹{p.corpusTarget.toLocaleString("en-IN")} Cr</div>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
+      <td className="px-3 py-2.5">
+        <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${catTone}`}>{p.sebiCategory}</span>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">
+        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-aif" />{p.subStrategy}</span>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.vintage}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.corpusTarget.toLocaleString("en-IN")}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.tenureYears}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.drawdownStatus}%</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.targetIRR.toFixed(2)}%</td>
+      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.netIRR)}`}>{p.netIRR > 0 ? "+" : ""}{p.netIRR.toFixed(2)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.moic.toFixed(2)}x</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.hurdleRate.toFixed(1)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.carry}%</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.managementFee.toFixed(2)}%</td>
+      <td className="px-3 py-2.5 text-[11px]">{p.domicile}</td>
+      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+    </>
+  );
+}
+
 function RiskPill({ r }: { r: string }) {
   const tone = r === "Low" || r === "Low-Mod" ? "bg-positive/15 text-positive"
     : r === "Moderate" ? "bg-info/15 text-info"

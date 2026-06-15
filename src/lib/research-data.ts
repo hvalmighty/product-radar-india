@@ -1,4 +1,4 @@
-export type Category = "MF" | "FD" | "INS";
+export type Category = "MF" | "FD" | "INS" | "PMS" | "AIF";
 
 export type RiskLevel = "Low" | "Low-Mod" | "Moderate" | "Mod-High" | "High" | "Very High";
 
@@ -61,7 +61,57 @@ export interface Insurance {
   rating: number; // 1-5
 }
 
-export type Product = MutualFund | FixedDeposit | Insurance;
+export interface PMS {
+  category: "PMS";
+  id: string;
+  name: string;
+  manager: string; // PMS house
+  structure: "Discretionary" | "Non-Discretionary" | "Advisory";
+  strategy: "Multi Cap" | "Large Cap" | "Mid & Small Cap" | "Small Cap" | "Thematic" | "Sector - Banking & Financials" | "Sector - Pharma" | "Contra / Value" | "Debt" | "Hybrid";
+  benchmark: string;
+  aum: number; // in crore
+  minInvestment: number; // SEBI floor ₹50L
+  returns1y: number;
+  returns3y: number;
+  returns5y: number;
+  alpha: number;
+  sharpe: number;
+  beta: number;
+  maxDrawdown: number; // %
+  fixedFee: number; // % p.a.
+  performanceFee: string; // e.g. 20% over 10% hurdle
+  exitLoad: string;
+  inception: string;
+  risk: RiskLevel;
+  rating: number;
+}
+
+export interface AIF {
+  category: "AIF";
+  id: string;
+  name: string;
+  manager: string;
+  sebiCategory: "Category I" | "Category II" | "Category III";
+  subStrategy: "Venture Capital" | "SME Fund" | "Social Venture" | "Infrastructure" | "Private Equity" | "Real Estate" | "Private Credit / Debt" | "Distressed / Special Sit." | "Long-Short Hedge" | "Long-Only Equity";
+  structure: "Close-Ended" | "Open-Ended";
+  vintage: number;
+  corpusTarget: number; // crore
+  commitments: number; // crore
+  minInvestment: number; // SEBI floor ₹1 Cr
+  tenureYears: number;
+  drawdownStatus: number; // % capital called
+  targetIRR: number;
+  netIRR: number; // realised/MTM
+  moic: number; // multiple
+  hurdleRate: number;
+  carry: number; // %
+  managementFee: number; // %
+  domicile: "India - GIFT IFSC" | "India - Onshore";
+  risk: RiskLevel;
+  rating: number;
+}
+
+export type Product = MutualFund | FixedDeposit | Insurance | PMS | AIF;
 
 const AMCS = ["HDFC", "SBI", "ICICI Pru", "Axis", "Nippon India", "Kotak", "Mirae", "Parag Parikh", "DSP", "Aditya Birla SL", "UTI", "Quant"];
 const MF_SUB = ["Large Cap", "Mid Cap", "Small Cap", "Flexi Cap", "ELSS", "Hybrid Aggressive", "Hybrid Conservative", "Liquid", "Corporate Bond", "Gilt", "Index"];
@@ -175,4 +225,94 @@ export const insurance: Insurance[] = Array.from({ length: 32 }, (_, i) => {
   };
 });
 
-export const allProducts: Product[] = [...mutualFunds, ...fixedDeposits, ...insurance];
+
+// ====================== PMS ======================
+
+const PMS_HOUSES = [
+  "Marcellus", "Motilal Oswal", "ASK Investment", "ICICI Pru PMS", "Kotak PMS", "Axis PMS",
+  "White Oak Capital", "Abakkus", "Alchemy Capital", "Sage One", "Buoyant Capital", "Carnelian Asset", "Nine Rivers Capital", "ValueQuest", "Sundaram Alternates",
+];
+const PMS_STRATEGIES: PMS["strategy"][] = [
+  "Multi Cap", "Large Cap", "Mid & Small Cap", "Small Cap", "Thematic",
+  "Sector - Banking & Financials", "Sector - Pharma", "Contra / Value", "Debt", "Hybrid",
+];
+const PMS_STRUCT: PMS["structure"][] = ["Discretionary", "Discretionary", "Discretionary", "Non-Discretionary", "Advisory"];
+const PMS_BENCH = ["NIFTY 50 TRI", "NIFTY 500 TRI", "BSE 500 TRI", "NIFTY Midcap 150 TRI", "NIFTY Smallcap 250 TRI", "NIFTY Bank TRI"];
+
+export const pmsSchemes: PMS[] = Array.from({ length: 28 }, (_, i) => {
+  const manager = pick(PMS_HOUSES);
+  const strategy = PMS_STRATEGIES[i % PMS_STRATEGIES.length];
+  const isDebt = strategy === "Debt";
+  const isSmall = strategy.includes("Small") || strategy === "Thematic";
+  return {
+    category: "PMS",
+    id: `PMS-${4000 + i}`,
+    name: `${manager} ${strategy} Strategy`,
+    manager,
+    structure: pick(PMS_STRUCT),
+    strategy,
+    benchmark: isDebt ? "CRISIL Composite Bond" : pick(PMS_BENCH),
+    aum: Math.round(r(150, 18000, 0)),
+    minInvestment: 5000000, // SEBI mandated ₹50L
+    returns1y: r(isDebt ? 6 : -5, isDebt ? 10 : 48),
+    returns3y: r(isDebt ? 6 : 8, isDebt ? 9 : 32),
+    returns5y: r(isDebt ? 6.5 : 10, isDebt ? 8.5 : 26),
+    alpha: r(-2, 9),
+    sharpe: r(0.4, 2.1),
+    beta: isDebt ? r(0.1, 0.5) : r(0.7, 1.3),
+    maxDrawdown: r(isDebt ? -6 : -38, isDebt ? -2 : -12),
+    fixedFee: r(0.5, 2.5),
+    performanceFee: pick(["20% over 10% hurdle", "15% over 8% hurdle", "20% over 12% hurdle", "Nil", "10% over benchmark"]),
+    exitLoad: pick(["1% if <1Y", "2% Y1, 1% Y2", "Nil after 1Y", "3-1-0% (Y1-Y2-Y3)"]),
+    inception: `${2010 + Math.floor(rand() * 14)}-0${1 + Math.floor(rand() * 9)}`,
+    risk: isDebt ? "Moderate" : isSmall ? "Very High" : pick(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(r(3, 5, 0)),
+  };
+});
+
+// ====================== AIF ======================
+
+const AIF_HOUSES = [
+  "Edelweiss Alt", "Kotak Alt Assets", "ICICI Pru AIF", "Avendus", "True North", "ChrysCapital", "Multiples Alt", "Nexus Ventures",
+  "Blume Ventures", "InCred Alt", "360 ONE", "Premji Invest", "Neo Asset Mgmt", "Vivriti AMC", "Axis Alternatives",
+];
+const AIF_CAT1: AIF["subStrategy"][] = ["Venture Capital", "SME Fund", "Social Venture", "Infrastructure"];
+const AIF_CAT2: AIF["subStrategy"][] = ["Private Equity", "Real Estate", "Private Credit / Debt", "Distressed / Special Sit."];
+const AIF_CAT3: AIF["subStrategy"][] = ["Long-Short Hedge", "Long-Only Equity"];
+
+export const aifSchemes: AIF[] = Array.from({ length: 30 }, (_, i) => {
+  const manager = pick(AIF_HOUSES);
+  const catRoll = i % 3;
+  const sebiCategory: AIF["sebiCategory"] = catRoll === 0 ? "Category I" : catRoll === 1 ? "Category II" : "Category III";
+  const pool = sebiCategory === "Category I" ? AIF_CAT1 : sebiCategory === "Category II" ? AIF_CAT2 : AIF_CAT3;
+  const subStrategy = pick(pool);
+  const isHedge = subStrategy === "Long-Short Hedge";
+  const isDebt = subStrategy === "Private Credit / Debt";
+  const corpus = Math.round(r(250, 8000, 0));
+  return {
+    category: "AIF",
+    id: `AIF-${5000 + i}`,
+    name: `${manager} ${subStrategy} Fund ${["I", "II", "III", "IV"][i % 4]}`,
+    manager,
+    sebiCategory,
+    subStrategy,
+    structure: sebiCategory === "Category III" && isHedge ? pick(["Open-Ended", "Close-Ended"] as const) : "Close-Ended",
+    vintage: 2018 + Math.floor(rand() * 8),
+    corpusTarget: corpus,
+    commitments: Math.round(corpus * r(0.4, 1.0)),
+    minInvestment: 10000000, // SEBI mandated ₹1 Cr
+    tenureYears: sebiCategory === "Category III" ? pick([3, 5, 7]) : pick([7, 8, 10, 12]),
+    drawdownStatus: Math.round(r(15, 100, 0)),
+    targetIRR: r(isDebt ? 11 : 16, isDebt ? 14 : 28),
+    netIRR: r(isDebt ? 8 : -3, isDebt ? 13 : 32),
+    moic: r(0.9, 3.2),
+    hurdleRate: r(8, 12),
+    carry: pick([10, 15, 20, 20, 20]),
+    managementFee: r(1.0, 2.5),
+    domicile: rand() > 0.7 ? "India - GIFT IFSC" : "India - Onshore",
+    risk: isDebt ? "Mod-High" : isHedge ? "High" : "Very High",
+    rating: Math.round(r(3, 5, 0)),
+  };
+});
+
+export const allProducts: Product[] = [...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes];

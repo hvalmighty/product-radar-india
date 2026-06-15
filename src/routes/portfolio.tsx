@@ -1,8 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseECasPdf, type Holding, type PortfolioParseResult } from "@/lib/ecas-parser";
-import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search } from "lucide-react";
+import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search, Save, FolderOpen, Trash2 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
+
+const STORAGE_KEY = "mpower.savedPortfolios.v1";
+type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult };
+
+function loadSaved(): SavedPortfolio[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+}
+function writeSaved(list: SavedPortfolio[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
 
 export const Route = createFileRoute("/portfolio")({
   head: () => ({

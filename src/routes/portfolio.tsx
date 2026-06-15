@@ -1,8 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseECasPdf, type Holding, type PortfolioParseResult } from "@/lib/ecas-parser";
-import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search } from "lucide-react";
+import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search, Save, FolderOpen, Trash2 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
+
+const STORAGE_KEY = "mpower.savedPortfolios.v1";
+type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult };
+
+function loadSaved(): SavedPortfolio[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+}
+function writeSaved(list: SavedPortfolio[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
 
 export const Route = createFileRoute("/portfolio")({
   head: () => ({
@@ -41,6 +52,29 @@ function PortfolioImporter() {
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [sortKey, setSortKey] = useState<keyof Holding>("value");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [showSaved, setShowSaved] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [savedToast, setSavedToast] = useState<string | null>(null);
+
+  useEffect(() => { setSaved(loadSaved()); }, []);
+
+  function saveCurrent() {
+    if (!result) return;
+    const name = (saveName.trim() || result.investor || file?.name?.replace(/\.pdf$/i, "") || "Portfolio").slice(0, 80);
+    const entry: SavedPortfolio = { id: `${Date.now()}`, name, savedAt: Date.now(), data: result };
+    const next = [entry, ...saved].slice(0, 50);
+    setSaved(next); writeSaved(next); setSaveName("");
+    setSavedToast(`Saved "${name}"`);
+    setTimeout(() => setSavedToast(null), 2200);
+  }
+  function loadSavedItem(s: SavedPortfolio) {
+    setResult(s.data); setFile(null); setErr(null); setNeedsPwd(false); setShowSaved(false);
+  }
+  function deleteSavedItem(id: string) {
+    const next = saved.filter(s => s.id !== id);
+    setSaved(next); writeSaved(next);
+  }
 
   async function handleParse(f: File, pwd?: string) {
     setLoading(true);
@@ -138,13 +172,44 @@ function PortfolioImporter() {
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">eCAS Importer · NSDL / CDSL</p>
             </div>
           </div>
-          <Link to="/" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <button onClick={() => setShowSaved(s => !s)} className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-2 py-1 border border-border rounded-sm">
+            <FolderOpen className="w-3.5 h-3.5" /> Saved ({saved.length})
+          </button>
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Research
           </Link>
         </div>
       </header>
 
       <main className="px-6 py-6 max-w-[1400px] mx-auto">
+        {showSaved && (
+          <div className="mb-6 border border-border rounded-md bg-surface">
+            <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <FolderOpen className="w-3.5 h-3.5" /> Saved Portfolios
+              <button onClick={() => setShowSaved(false)} className="ml-auto text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+            </div>
+            {saved.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">No saved portfolios yet. Import a statement and click <strong>Save</strong> to keep it in this browser.</div>
+            ) : (
+              <table className="w-full text-xs">
+                <tbody>
+                  {saved.map(s => (
+                    <tr key={s.id} className="border-t border-border/50 hover:bg-secondary/30">
+                      <td className="px-4 py-2">
+                        <div className="font-medium">{s.name}</div>
+                        <div className="text-[10px] text-muted-foreground mono-num">{s.data.holdings.length} holdings · {fmtINR(s.data.totalValue)} · saved {new Date(s.savedAt).toLocaleString()}</div>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <button onClick={() => loadSavedItem(s)} className="px-2.5 py-1 text-xs border border-border rounded-sm hover:bg-secondary mr-2">Open</button>
+                        <button onClick={() => deleteSavedItem(s.id)} className="px-2 py-1 text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1"><Trash2 className="w-3 h-3" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
         {!result && (
           <section className="max-w-2xl mx-auto">
             <div className="mb-6">
@@ -232,13 +297,25 @@ function PortfolioImporter() {
                 <Stat label="Holdings" value={String(result.holdings.length)} />
                 <Stat label="Asset Classes" value={String(allocation.length)} />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <input
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  placeholder={result.investor || "Portfolio name"}
+                  className="px-2 py-1.5 text-xs border border-border rounded-sm bg-background w-40 focus:outline-none focus:border-foreground/50"
+                />
+                <button onClick={saveCurrent} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5 bg-foreground text-background">
+                  <Save className="w-3.5 h-3.5" /> Save
+                </button>
                 <button onClick={exportCsv} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
                   <Download className="w-3.5 h-3.5" /> CSV
                 </button>
                 <button onClick={reset} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary">New Import</button>
               </div>
             </div>
+            {savedToast && (
+              <div className="text-xs px-3 py-2 border border-positive/40 bg-positive/10 rounded-sm inline-block">{savedToast}</div>
+            )}
 
             {/* Allocation + Top */}
             <div className="grid lg:grid-cols-2 gap-6">

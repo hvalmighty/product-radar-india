@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { mutualFunds, fixedDeposits, insurance, type MutualFund, type FixedDeposit, type Insurance, type Category } from "@/lib/research-data";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy } from "lucide-react";
@@ -177,11 +177,11 @@ function ResearchTerminal() {
             </div>
           </div>
           <nav className="hidden md:flex items-center gap-1 text-xs">
-            {["Screener", "Compare", "Portfolios", "Watchlists", "Alerts", "Reports"].map((n, i) => (
-              <button key={n} className={`px-3 py-1.5 rounded-sm transition-colors ${i === 0 ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}>
-                {n}
-              </button>
-            ))}
+            {["Screener", "Compare", "Portfolios", "Watchlists", "Alerts", "Reports"].map((n, i) => {
+              const cls = `px-3 py-1.5 rounded-sm transition-colors ${i === 0 ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`;
+              if (n === "Portfolios") return <Link key={n} to="/portfolio" className={cls}>{n}</Link>;
+              return <button key={n} className={cls}>{n}</button>;
+            })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">

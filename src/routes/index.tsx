@@ -356,7 +356,7 @@ function ResearchTerminal() {
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query} onChange={e => setQuery(e.target.value)}
-                placeholder={`Search ${cat === "MF" ? "funds, AMCs, categories" : cat === "FD" ? "issuers, schemes" : "policies, insurers"}…`}
+                placeholder={`Search ${cat === "MF" ? "funds, AMCs, categories" : cat === "FD" ? "issuers, schemes" : cat === "INS" ? "policies, insurers" : cat === "PMS" ? "PMS strategies, managers" : "AIF funds, managers"}…`}
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/70"
               />
             </div>

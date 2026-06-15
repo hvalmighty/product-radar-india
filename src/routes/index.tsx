@@ -209,7 +209,7 @@ function ResearchTerminal() {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${c.key === "MF" ? "bg-mf" : c.key === "FD" ? "bg-fd" : "bg-ins"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${c.key === "MF" ? "bg-mf" : c.key === "FD" ? "bg-fd" : c.key === "INS" ? "bg-ins" : c.key === "PMS" ? "bg-pms" : "bg-aif"}`} />
               {c.label.toUpperCase()}
               <span className="text-[10px] opacity-60 mono-num">[{c.count}]</span>
             </button>

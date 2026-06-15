@@ -93,6 +93,8 @@
   --mf: oklch(0.5 0.14 250);
   --fd: oklch(0.5 0.13 155);
   --ins: oklch(0.55 0.16 30);
+  --pms: oklch(0.5 0.16 295);
+  --aif: oklch(0.55 0.14 200);
 
   --sidebar: oklch(0.985 0.003 95);
   --sidebar-foreground: oklch(0.18 0.012 250);

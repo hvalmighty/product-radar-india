@@ -52,6 +52,29 @@ function PortfolioImporter() {
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [sortKey, setSortKey] = useState<keyof Holding>("value");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [showSaved, setShowSaved] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [savedToast, setSavedToast] = useState<string | null>(null);
+
+  useEffect(() => { setSaved(loadSaved()); }, []);
+
+  function saveCurrent() {
+    if (!result) return;
+    const name = (saveName.trim() || result.investor || file?.name?.replace(/\.pdf$/i, "") || "Portfolio").slice(0, 80);
+    const entry: SavedPortfolio = { id: `${Date.now()}`, name, savedAt: Date.now(), data: result };
+    const next = [entry, ...saved].slice(0, 50);
+    setSaved(next); writeSaved(next); setSaveName("");
+    setSavedToast(`Saved "${name}"`);
+    setTimeout(() => setSavedToast(null), 2200);
+  }
+  function loadSavedItem(s: SavedPortfolio) {
+    setResult(s.data); setFile(null); setErr(null); setNeedsPwd(false); setShowSaved(false);
+  }
+  function deleteSavedItem(id: string) {
+    const next = saved.filter(s => s.id !== id);
+    setSaved(next); writeSaved(next);
+  }
 
   async function handleParse(f: File, pwd?: string) {
     setLoading(true);

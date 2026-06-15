@@ -190,12 +190,30 @@ function ResearchTerminal() {
         { l: "DICGC Insured", v: `${a.filter(x => x.insuredDICGC).length}/${a.length}` },
       ];
     }
-    const a = sorted as Insurance[];
+    if (cat === "INS") {
+      const a = sorted as Insurance[];
+      return [
+        { l: "Policies", v: a.length },
+        { l: "Avg Claim%", v: a.length ? `${(a.reduce((s, x) => s + x.claimSettlement, 0) / a.length).toFixed(2)}%` : "—" },
+        { l: "Avg Solvency", v: a.length ? `${(a.reduce((s, x) => s + x.solvencyRatio, 0) / a.length).toFixed(2)}` : "—" },
+        { l: "5★ Plans", v: a.filter(x => x.rating === 5).length },
+      ];
+    }
+    if (cat === "PMS") {
+      const a = sorted as PMS[];
+      return [
+        { l: "Strategies", v: a.length },
+        { l: "Avg 3Y", v: a.length ? `${(a.reduce((s, x) => s + x.returns3y, 0) / a.length).toFixed(2)}%` : "—" },
+        { l: "Avg Fixed Fee", v: a.length ? `${(a.reduce((s, x) => s + x.fixedFee, 0) / a.length).toFixed(2)}%` : "—" },
+        { l: "Top AUM", v: a.length ? fmtINR(Math.max(...a.map(x => x.aum)) * 1e7) : "—" },
+      ];
+    }
+    const a = sorted as AIF[];
     return [
-      { l: "Policies", v: a.length },
-      { l: "Avg Claim%", v: a.length ? `${(a.reduce((s, x) => s + x.claimSettlement, 0) / a.length).toFixed(2)}%` : "—" },
-      { l: "Avg Solvency", v: a.length ? `${(a.reduce((s, x) => s + x.solvencyRatio, 0) / a.length).toFixed(2)}` : "—" },
-      { l: "5★ Plans", v: a.filter(x => x.rating === 5).length },
+      { l: "Funds", v: a.length },
+      { l: "Avg Net IRR", v: a.length ? `${(a.reduce((s, x) => s + x.netIRR, 0) / a.length).toFixed(2)}%` : "—" },
+      { l: "Total Corpus", v: a.length ? fmtINR(a.reduce((s, x) => s + x.corpusTarget, 0) * 1e7) : "—" },
+      { l: "Cat-III Funds", v: a.filter(x => x.sebiCategory === "Category III").length },
     ];
   }, [sorted, cat]);
 

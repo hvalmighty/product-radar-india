@@ -50,15 +50,19 @@ function PortfolioImporter() {
       setResult(res);
       setNeedsPwd(false);
       if (res.holdings.length === 0) {
-        setErr("Parsed PDF but found no recognizable holdings. The statement format may be unusual — try another file.");
+        setErr("Parsed the PDF but couldn't recognise any holdings. This looks like a transaction statement or an unusual layout — try a holdings/CAS PDF.");
       }
     } catch (e: any) {
+      console.error("[portfolio] parse error", e);
       const msg = String(e?.message || e);
-      if (/password/i.test(msg) || e?.name === "PasswordException") {
+      const name = String(e?.name || "");
+      if (name === "PasswordException" || /password/i.test(msg)) {
         setNeedsPwd(true);
-        setErr("This PDF is password-protected. Enter the password (typically PAN in lowercase + DDMMYYYY).");
+        if (pwd) {
+          setErr("Incorrect password. NSDL eCAS = PAN (uppercase) + DOB DDMMYYYY. CDSL CAS = PAN (uppercase). KFintech/CAMS = the password emailed with the statement.");
+        }
       } else {
-        setErr(`Failed to parse: ${msg}`);
+        setErr(`Failed to parse PDF: ${msg}`);
       }
     } finally {
       setLoading(false);

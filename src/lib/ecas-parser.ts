@@ -200,8 +200,8 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
   }
 
   const source: "NSDL" | "CDSL" | "Unknown" =
+    /CDSL|Central Depository Services/i.test(fullText) ? "CDSL" :
     /NSDL|National Securities Depository/i.test(fullText) ? "NSDL" :
-    /CDSL|Central Depository/i.test(fullText) ? "CDSL" :
     /Consolidated Account Statement|CAS/i.test(fullText) ? "NSDL" : "Unknown";
 
   const panMatch = fullText.match(/\b([A-Z]{5}[0-9]{4}[A-Z])\b/);

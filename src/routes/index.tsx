@@ -95,14 +95,34 @@ function ResearchTerminal() {
         return true;
       });
     }
-    return insurance.filter(p => {
-      if (insSub !== "All" && p.subCategory !== insSub) return false;
-      if (p.claimSettlement < insMinClaim) return false;
-      if (p.rating < insMinRating) return false;
-      if (query && !`${p.name} ${p.insurer} ${p.subCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (cat === "INS") {
+      return insurance.filter(p => {
+        if (insSub !== "All" && p.subCategory !== insSub) return false;
+        if (p.claimSettlement < insMinClaim) return false;
+        if (p.rating < insMinRating) return false;
+        if (query && !`${p.name} ${p.insurer} ${p.subCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+      });
+    }
+    if (cat === "PMS") {
+      return pmsSchemes.filter(p => {
+        if (pmsStrategy !== "All" && p.strategy !== pmsStrategy) return false;
+        if (pmsStructure !== "All" && p.structure !== pmsStructure) return false;
+        if (p.returns3y < pmsMinReturn) return false;
+        if (p.fixedFee > pmsMaxFee) return false;
+        if (query && !`${p.name} ${p.manager} ${p.strategy}`.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+      });
+    }
+    return aifSchemes.filter(p => {
+      if (aifCategory !== "All" && p.sebiCategory !== aifCategory) return false;
+      if (aifStrategy !== "All" && p.subStrategy !== aifStrategy) return false;
+      if (p.netIRR < aifMinIRR) return false;
+      if (p.vintage < aifVintageFrom) return false;
+      if (query && !`${p.name} ${p.manager} ${p.subStrategy} ${p.sebiCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating]);
+  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom]);
 
   const sorted = useMemo(() => {
     const arr = [...data] as any[];

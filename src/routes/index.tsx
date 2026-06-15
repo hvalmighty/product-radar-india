@@ -507,6 +507,8 @@ function ResearchTerminal() {
                         {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} />}
                         {cat === "FD" && <FDRow p={p as FixedDeposit} />}
                         {cat === "INS" && <INSRow p={p as Insurance} />}
+                        {cat === "PMS" && <PMSRow p={p as PMS} />}
+                        {cat === "AIF" && <AIFRow p={p as AIF} />}
                       </tr>
                     ))}
                     {g.items.length === 0 && (

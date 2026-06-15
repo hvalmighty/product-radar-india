@@ -2,10 +2,15 @@
 // Uses pdfjs-dist to extract text, then regex-mines ISIN-anchored holding rows.
 // Heuristic — works on most eCAS layouts but not guaranteed for every variant.
 
-import * as pdfjsLib from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+let _pdfjs: any = null;
+async function getPdfjs() {
+  if (_pdfjs) return _pdfjs;
+  const pdfjsLib: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const workerUrl = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+  _pdfjs = pdfjsLib;
+  return pdfjsLib;
+}
 
 export type HoldingType = "Equity" | "Mutual Fund" | "Bond" | "ETF" | "Other";
 

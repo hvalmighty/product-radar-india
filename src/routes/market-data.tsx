@@ -34,11 +34,11 @@ export const Route = createFileRoute("/market-data")({
   component: MarketDataPage,
 });
 
-const GROUPS: { key: string; label: string; symbols: string[] }[] = [
-  { key: "in", label: "India Indices", symbols: ["^NSEI", "^BSESN", "^NSEBANK", "NIFTY_MIDCAP_100.NS"] },
-  { key: "gl", label: "Global Indices", symbols: ["^GSPC", "^IXIC", "^DJI", "^FTSE", "^N225", "^HSI"] },
-  { key: "cm", label: "Currencies & Commodities", symbols: ["INR=X", "GC=F", "SI=F", "CL=F"] },
-  { key: "cr", label: "Crypto", symbols: ["BTC-USD", "ETH-USD"] },
+const GROUPS: { key: Quote["group"]; label: string }[] = [
+  { key: "india", label: "India Benchmark Indices" },
+  { key: "sector", label: "India Sector Indices" },
+  { key: "fx", label: "Currencies (USD base)" },
+  { key: "crypto", label: "Crypto" },
 ];
 
 const NEWS_TABS = [
@@ -182,7 +182,7 @@ function MarketDataPage() {
   });
 
   const quotes = quotesQ.data ?? [];
-  const byKey = (syms: string[]) => syms.map((s) => quotes.find((q) => q.symbol === s)).filter(Boolean) as Quote[];
+  const byGroup = (g: Quote["group"]) => quotes.filter((q) => q.group === g);
 
   return (
     <div className="min-h-screen text-foreground">
@@ -223,7 +223,9 @@ function MarketDataPage() {
         {/* Quotes */}
         <section className="space-y-4">
           {GROUPS.map((g) => {
-            const items = byKey(g.symbols);
+            const items = byGroup(g.key);
+            const isLoading = quotesQ.isLoading;
+            if (!isLoading && items.length === 0) return null;
             return (
               <div key={g.key}>
                 <div className="flex items-baseline justify-between mb-2">
@@ -235,8 +237,8 @@ function MarketDataPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-                  {quotesQ.isLoading
-                    ? Array.from({ length: g.symbols.length }).map((_, i) => (
+                  {isLoading
+                    ? Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} className="h-[120px] rounded-md border border-border bg-surface/40 animate-pulse" />
                       ))
                     : items.map((q) => <QuoteCard key={q.symbol} q={q} />)}

@@ -178,7 +178,7 @@ export const getCorporateActions = createServerFn({ method: "GET" }).handler(asy
     .sort((a, b) => b.exDate.localeCompare(a.exDate));
 
   return {
-    actions: upcoming,
+    actions: filtered,
     fetchedAt: new Date().toISOString(),
     source: usingFallback ? ("sample" as const) : ("live" as const),
   };

@@ -289,8 +289,8 @@ function AlertsPage() {
                           </td>
                           <td className="px-3 py-2 mono-num text-muted-foreground">{a.recordDate ? fmtDate(a.recordDate) : "—"}</td>
                           <td className="px-3 py-2 text-right mono-num">
-                            <span className={`px-1.5 py-0.5 rounded-sm text-[10px] ${days <= 2 ? "bg-destructive/15 text-destructive" : days <= 7 ? "bg-warning/15 text-warning" : "bg-secondary text-muted-foreground"}`}>
-                              {days <= 0 ? "Today" : `T+${days}`}
+                            <span className={`px-1.5 py-0.5 rounded-sm text-[10px] ${days < 0 ? "bg-muted/40 text-muted-foreground" : days <= 2 ? "bg-destructive/15 text-destructive" : days <= 7 ? "bg-warning/15 text-warning" : "bg-secondary text-muted-foreground"}`}>
+                              {days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? "Today" : `T+${days}`}
                             </span>
                           </td>
                         </tr>

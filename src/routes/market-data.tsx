@@ -63,8 +63,16 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function Sparkline({ data, positive }: { data?: number[]; positive: boolean }) {
-  if (!data || data.length < 2) return <div className="h-8" />;
+function Sparkline({
+  data,
+  positive,
+  className = "w-14 h-6",
+}: {
+  data?: number[];
+  positive: boolean;
+  className?: string;
+}) {
+  if (!data || data.length < 2) return <div className={className} />;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -79,15 +87,8 @@ function Sparkline({ data, positive }: { data?: number[]; positive: boolean }) {
     .join(" ");
   const color = positive ? "hsl(var(--positive))" : "hsl(var(--negative))";
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-8" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={`g-${positive}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.4" />
-      <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#g-${positive})`} />
+    <svg viewBox={`0 0 ${w} ${h}`} className={className} preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
@@ -95,30 +96,29 @@ function Sparkline({ data, positive }: { data?: number[]; positive: boolean }) {
 function QuoteCard({ q }: { q: Quote }) {
   const pos = q.changePct >= 0;
   return (
-    <div className="rounded-md border border-border bg-surface/60 hover:border-primary/40 transition-colors p-3 flex flex-col gap-1.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">
-            {q.name}
-          </div>
-          <div className="text-[10px] text-muted-foreground/70 mono-num">{q.symbol}</div>
+    <div className="group rounded-md border border-border bg-surface/60 hover:border-primary/40 hover:bg-surface transition-colors px-2.5 py-2 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="text-[11px] font-semibold truncate" title={q.name}>
+          {q.name}
         </div>
-        <div
-          className={`text-[10px] px-1.5 py-0.5 rounded mono-num flex items-center gap-0.5 ${
+        <span
+          className={`text-[10px] px-1 py-px rounded mono-num shrink-0 ${
             pos ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
           }`}
         >
-          {pos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {pos ? "+" : ""}
           {q.changePct.toFixed(2)}%
+        </span>
+      </div>
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold mono-num leading-none">{fmtNum(q.price)}</div>
+          <div className={`text-[10px] mono-num mt-0.5 ${pos ? "text-positive" : "text-negative"}`}>
+            {pos ? "▲" : "▼"} {fmtNum(Math.abs(q.change))}
+          </div>
         </div>
+        <Sparkline data={q.spark} positive={pos} className="w-14 h-6 shrink-0" />
       </div>
-      <div className="text-lg font-semibold mono-num leading-tight">{fmtNum(q.price)}</div>
-      <div className={`text-[11px] mono-num ${pos ? "text-positive" : "text-negative"}`}>
-        {pos ? "+" : ""}
-        {fmtNum(q.change)}
-      </div>
-      <Sparkline data={q.spark} positive={pos} />
     </div>
   );
 }

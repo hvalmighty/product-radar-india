@@ -52,10 +52,16 @@ async function fetchYahooChart(symbol: string): Promise<Quote | null> {
       )}?range=1d&interval=15m`,
       { headers: UA },
     );
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.error(`[yahoo] ${symbol} HTTP ${r.status}`);
+      return null;
+    }
     const j: any = await r.json();
     const res = j?.chart?.result?.[0];
-    if (!res) return null;
+    if (!res) {
+      console.error(`[yahoo] ${symbol} no result: ${JSON.stringify(j).slice(0, 200)}`);
+      return null;
+    }
     const meta = res.meta;
     const closes: number[] = (res.indicators?.quote?.[0]?.close ?? []).filter(
       (x: any) => typeof x === "number",
@@ -73,7 +79,8 @@ async function fetchYahooChart(symbol: string): Promise<Quote | null> {
       currency: meta.currency,
       spark: closes.slice(-40),
     };
-  } catch {
+  } catch (e) {
+    console.error(`[yahoo] ${symbol} threw`, e);
     return null;
   }
 }

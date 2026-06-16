@@ -194,17 +194,16 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
     const topIss = issuerMap[0];
     const equityPct = sectorMap.filter(s => !/Debt|Fixed|Hybrid/.test(s.sector)).reduce((a, b) => a + b.pct, 0);
     const debtPct = sectorMap.filter(s => /Debt|Fixed/.test(s.sector)).reduce((a, b) => a + b.pct, 0);
-    const overlapWarn = overlap.filter(o => o.pct > 50).length;
     const lines: string[] = [];
     lines.push(`The portfolio of ${holdings.length} holdings totalling ${fmtINR(total)} is tilted ${equityPct.toFixed(0)}% to equity and ${debtPct.toFixed(0)}% to debt/fixed-income exposures.`);
     if (top) lines.push(`Largest sector exposure is ${top.sector} at ${top.pct.toFixed(1)}% — ${top.pct > 30 ? "this is elevated and worth trimming for diversification." : top.pct > 20 ? "moderate concentration, acceptable but monitor." : "well within prudent limits."}`);
     if (topIss) lines.push(`Top issuer/AMC exposure is ${topIss.issuer} at ${topIss.pct.toFixed(1)}% of portfolio.`);
-    if (overlapWarn > 0) lines.push(`${overlapWarn} mutual fund pair(s) show high indicative overlap (>50%); consider consolidating overlapping schemes to reduce redundancy.`);
+    if (highOverlapCount > 0) lines.push(`${highOverlapCount} mutual fund pair(s) show high indicative overlap (>50%); consider consolidating overlapping schemes to reduce redundancy.`);
     lines.push(`Estimated annualised volatility is ${(risk.annualVol * 100).toFixed(1)}%; at 95% confidence, 1-month VaR is approximately ${fmtINR(risk.var95_1m)} (${(risk.var95_1m / total * 100).toFixed(1)}% of NAV).`);
     if (risk.annualVol > 0.20) lines.push(`Portfolio risk is on the higher side — consider adding debt/hybrid allocation to dampen drawdowns.`);
     else if (risk.annualVol < 0.08) lines.push(`Portfolio risk is conservative — capacity exists to add equity for long-horizon investors.`);
     return lines;
-  }, [sectorMap, issuerMap, overlap, risk, holdings.length, total]);
+  }, [sectorMap, issuerMap, highOverlapCount, risk, holdings.length, total]);
 
   return (
     <div className="space-y-6">

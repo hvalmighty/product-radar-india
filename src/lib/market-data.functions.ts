@@ -135,23 +135,23 @@ async function fetchFx(): Promise<Quote[]> {
     const last = rates[dates[dates.length - 1]];
     const prev = rates[dates[dates.length - 2]] ?? last;
     const ccys = ["INR", "EUR", "GBP", "JPY"] as const;
-    return ccys
-      .map((cc) => {
-        const price = Number(last[cc]);
-        const pr = Number(prev[cc]) || price;
-        if (!price) return null;
-        const change = price - pr;
-        return {
-          symbol: `USD/${cc}`,
-          name: `USD → ${cc}`,
-          price,
-          change,
-          changePct: pr ? (change / pr) * 100 : 0,
-          currency: cc,
-          group: "fx" as const,
-        };
-      })
-      .filter((x): x is Quote => !!x);
+    const out: Quote[] = [];
+    for (const cc of ccys) {
+      const price = Number(last[cc]);
+      const pr = Number(prev[cc]) || price;
+      if (!price) continue;
+      const change = price - pr;
+      out.push({
+        symbol: `USD/${cc}`,
+        name: `USD → ${cc}`,
+        price,
+        change,
+        changePct: pr ? (change / pr) * 100 : 0,
+        currency: cc,
+        group: "fx",
+      });
+    }
+    return out;
   } catch (e) {
     console.error("[frankfurter] threw", e);
     return [];

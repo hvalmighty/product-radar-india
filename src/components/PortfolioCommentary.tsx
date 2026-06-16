@@ -102,26 +102,41 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
       .slice(0, 10);
   }, [holdings, total]);
 
-  // === MF Overlap analysis (between MF schemes, indicative) ===
-  const mfs = useMemo(() => holdings.filter(h => h.type === "Mutual Fund"), [holdings]);
-  const overlap = useMemo(() => {
-    if (mfs.length < 2) return [] as Array<{ a: Holding; b: Holding; pct: number }>;
-    const rows: Array<{ a: Holding; b: Holding; pct: number }> = [];
-    for (let i = 0; i < mfs.length; i++) {
-      for (let j = i + 1; j < mfs.length; j++) {
-        const a = mfs[i], b = mfs[j];
-        const sa = classifySector(a.name, a.type);
-        const sb = classifySector(b.name, b.type);
-        let base = sa === sb ? 0.55 : 0.10;
-        if (sa.startsWith("MF · Debt") && sb.startsWith("MF · Debt")) base = 0.40;
-        if (extractIssuer(a.name, a.type) === extractIssuer(b.name, b.type)) base += 0.10;
-        const jitter = (hash(a.isin + b.isin) - 0.5) * 0.20;
-        const pct = Math.max(2, Math.min(85, (base + jitter) * 100));
-        rows.push({ a, b, pct });
-      }
-    }
-    return rows.sort((x, y) => y.pct - x.pct).slice(0, 8);
+  // === MF Overlap analysis (matrix between MF schemes, indicative) ===
+  const mfs = useMemo(() => {
+    const list = holdings.filter(h => h.type === "Mutual Fund");
+    return [...list].sort((a, b) => b.value - a.value).slice(0, 12);
+  }, [holdings]);
+
+  const overlapMatrix = useMemo(() => {
+    return mfs.map((a) => mfs.map((b) => {
+      if (a.isin === b.isin) return 100;
+      const sa = classifySector(a.name, a.type);
+      const sb = classifySector(b.name, b.type);
+      let base = sa === sb ? 0.55 : 0.10;
+      if (sa.startsWith("MF · Debt") && sb.startsWith("MF · Debt")) base = 0.40;
+      if (extractIssuer(a.name, a.type) === extractIssuer(b.name, b.type)) base += 0.10;
+      const key = a.isin < b.isin ? a.isin + b.isin : b.isin + a.isin;
+      const jitter = (hash(key) - 0.5) * 0.20;
+      return Math.max(2, Math.min(85, (base + jitter) * 100));
+    }));
   }, [mfs]);
+
+  const highOverlapCount = useMemo(() => {
+    let c = 0;
+    for (let i = 0; i < mfs.length; i++)
+      for (let j = i + 1; j < mfs.length; j++)
+        if ((overlapMatrix[i]?.[j] ?? 0) > 50) c++;
+    return c;
+  }, [mfs, overlapMatrix]);
+
+  function shortMfLabel(name: string): string {
+    return name
+      .replace(/Mutual Fund|Direct|Regular|Growth|Plan|Dividend|Reinvestment|IDCW|\(.*?\)/gi, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 28);
+  }
 
   // === Correlation matrix (top exposures) ===
   const topForCorr = useMemo(() => {

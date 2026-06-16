@@ -34,11 +34,11 @@ export const Route = createFileRoute("/market-data")({
   component: MarketDataPage,
 });
 
-const GROUPS: { key: string; label: string; symbols: string[] }[] = [
-  { key: "in", label: "India Indices", symbols: ["^NSEI", "^BSESN", "^NSEBANK", "NIFTY_MIDCAP_100.NS"] },
-  { key: "gl", label: "Global Indices", symbols: ["^GSPC", "^IXIC", "^DJI", "^FTSE", "^N225", "^HSI"] },
-  { key: "cm", label: "Currencies & Commodities", symbols: ["INR=X", "GC=F", "SI=F", "CL=F"] },
-  { key: "cr", label: "Crypto", symbols: ["BTC-USD", "ETH-USD"] },
+const GROUPS: { key: Quote["group"]; label: string }[] = [
+  { key: "india", label: "India Benchmark Indices" },
+  { key: "sector", label: "India Sector Indices" },
+  { key: "fx", label: "Currencies (USD base)" },
+  { key: "crypto", label: "Crypto" },
 ];
 
 const NEWS_TABS = [

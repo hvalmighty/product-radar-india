@@ -62,10 +62,11 @@ async function fetchBseCA(segment: "0" | "1" | "2"): Promise<CorpAction[]> {
   // segment: 0=Equity, 1=Debt, 2=MF (we use 0 & 1)
   try {
     const today = new Date();
+    const past = new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000);
     const future = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
     const fmt = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const url = `https://api.bseindia.com/BseIndiaAPI/api/DefaultData/w?Fdate=${fmt(today)}&TDate=${fmt(future)}&Purposecode=&strSearch=S&ddlcategorys=E&ddlindustrys=&segment=${segment}&strType=0`;
+    const url = `https://api.bseindia.com/BseIndiaAPI/api/DefaultData/w?Fdate=${fmt(past)}&TDate=${fmt(future)}&Purposecode=&strSearch=S&ddlcategorys=E&ddlindustrys=&segment=${segment}&strType=0`;
     const r = await fetch(url, {
       headers: { ...BROWSER_HEADERS, Referer: "https://www.bseindia.com/" },
     });
@@ -170,14 +171,14 @@ export const getCorporateActions = createServerFn({ method: "GET" }).handler(asy
     return true;
   });
 
-  // keep only today + upcoming, sort ascending
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = unique
-    .filter((a) => a.exDate && a.exDate >= today)
-    .sort((a, b) => a.exDate.localeCompare(b.exDate));
+  // keep last 45 days + upcoming, sort by ex-date descending (most recent first)
+  const cutoff = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
+  const filtered = unique
+    .filter((a) => a.exDate && a.exDate >= cutoff)
+    .sort((a, b) => b.exDate.localeCompare(a.exDate));
 
   return {
-    actions: upcoming,
+    actions: filtered,
     fetchedAt: new Date().toISOString(),
     source: usingFallback ? ("sample" as const) : ("live" as const),
   };

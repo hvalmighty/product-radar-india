@@ -7,7 +7,7 @@ import {
   type Exchange,
   type CorpAction,
 } from "@/lib/corporate-actions.functions";
-import { ArrowLeft, RefreshCw, Bell, AlertCircle, Calendar } from "lucide-react";
+import { ArrowLeft, RefreshCw, Bell, AlertCircle, Calendar, Search } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 export const Route = createFileRoute("/alerts")({
@@ -85,6 +85,7 @@ function AlertsPage() {
   const [assetClass, setAssetClass] = useState<AssetClass>("Equity");
   const [exchange, setExchange] = useState<"All" | Exchange>("All");
   const [product, setProduct] = useState<string>("All");
+  const [query, setQuery] = useState("");
 
   const { data, isLoading, isFetching, refetch, error, dataUpdatedAt } = useQuery({
     queryKey: ["corporate-actions"],
@@ -94,7 +95,7 @@ function AlertsPage() {
     refetchOnWindowFocus: false,
   });
 
-  const allActions = data?.actions ?? [];
+  const allActions: CorpAction[] = (data?.actions ?? []) as CorpAction[];
 
   const byAsset = useMemo(() => {
     const m: Record<AssetClass, CorpAction[]> = { Equity: [], Debt: [], REIT: [], InvIT: [] };
@@ -106,8 +107,17 @@ function AlertsPage() {
     let list = byAsset[assetClass];
     if (exchange !== "All") list = list.filter((a) => a.exchange === exchange);
     if (product !== "All") list = list.filter((a) => classifyProduct(a) === product);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (a) =>
+          a.symbol.toLowerCase().includes(q) ||
+          a.company.toLowerCase().includes(q) ||
+          a.purpose.toLowerCase().includes(q),
+      );
+    }
     return list;
-  }, [byAsset, assetClass, exchange, product]);
+  }, [byAsset, assetClass, exchange, product, query]);
 
   // group by product within current asset class
   const grouped = useMemo(() => {
@@ -179,6 +189,30 @@ function AlertsPage() {
       </header>
 
       <div className="px-6 py-5 space-y-5">
+        {/* Search */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search symbol, company or purpose…"
+              className="w-full pl-8 pr-8 py-1.5 text-xs bg-surface border border-border rounded-sm focus:outline-none focus:border-foreground/40"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Showing last 45 days + upcoming · {visible.length} action{visible.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Exchange</span>
@@ -201,10 +235,8 @@ function AlertsPage() {
               {p}
             </button>
           ))}
-          <div className="ml-auto text-muted-foreground">
-            {visible.length} upcoming action{visible.length === 1 ? "" : "s"}
-          </div>
         </div>
+
 
         {error && (
           <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 px-3 py-2 rounded-sm">
@@ -257,8 +289,8 @@ function AlertsPage() {
                           </td>
                           <td className="px-3 py-2 mono-num text-muted-foreground">{a.recordDate ? fmtDate(a.recordDate) : "—"}</td>
                           <td className="px-3 py-2 text-right mono-num">
-                            <span className={`px-1.5 py-0.5 rounded-sm text-[10px] ${days <= 2 ? "bg-destructive/15 text-destructive" : days <= 7 ? "bg-warning/15 text-warning" : "bg-secondary text-muted-foreground"}`}>
-                              {days <= 0 ? "Today" : `T+${days}`}
+                            <span className={`px-1.5 py-0.5 rounded-sm text-[10px] ${days < 0 ? "bg-muted/40 text-muted-foreground" : days <= 2 ? "bg-destructive/15 text-destructive" : days <= 7 ? "bg-warning/15 text-warning" : "bg-secondary text-muted-foreground"}`}>
+                              {days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? "Today" : `T+${days}`}
                             </span>
                           </td>
                         </tr>

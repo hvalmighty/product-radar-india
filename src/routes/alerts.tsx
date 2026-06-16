@@ -189,6 +189,30 @@ function AlertsPage() {
       </header>
 
       <div className="px-6 py-5 space-y-5">
+        {/* Search */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search symbol, company or purpose…"
+              className="w-full pl-8 pr-8 py-1.5 text-xs bg-surface border border-border rounded-sm focus:outline-none focus:border-foreground/40"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Showing last 45 days + upcoming · {visible.length} action{visible.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="text-muted-foreground uppercase tracking-wider text-[10px]">Exchange</span>
@@ -211,10 +235,8 @@ function AlertsPage() {
               {p}
             </button>
           ))}
-          <div className="ml-auto text-muted-foreground">
-            {visible.length} upcoming action{visible.length === 1 ? "" : "s"}
-          </div>
         </div>
+
 
         {error && (
           <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 px-3 py-2 rounded-sm">

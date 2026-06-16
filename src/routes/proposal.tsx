@@ -409,8 +409,34 @@ function ProposalPage() {
                             </td>
                           </tr>
                         );
-                      })}
+                    })}
                     </tbody>
+                    <tfoot className="sticky bottom-0 bg-surface border-t-2 border-border">
+                      <tr className="bg-secondary/30">
+                        <td className="px-2 py-2">
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio Total</div>
+                          <div className="font-semibold leading-tight mt-0.5">Weighted across {holdingsLive.length} holding{holdingsLive.length !== 1 ? "s" : ""}</div>
+                          <div className="text-[10px] text-muted-foreground">Risk: {riskLabel} · Horizon {projection.horizon}Y</div>
+                        </td>
+                        <td className="px-2 py-2 text-right mono-num font-semibold">{fmtINR(totals.allocated)}</td>
+                        <td className="px-2 py-2 text-right mono-num font-semibold">{totalCorpus > 0 ? ((totals.allocated / totalCorpus) * 100).toFixed(1) : "0.0"}</td>
+                        <td className="px-2 py-2 text-right">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="mono-num text-positive font-bold cursor-help inline-flex items-center gap-1">
+                                {totals.weightedReturn.toFixed(2)}% <Info className="w-2.5 h-2.5 opacity-60" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-sm text-[11px] leading-relaxed">
+                              <div className="font-semibold mb-1">Overall Portfolio Expected Return</div>
+                              Allocation-weighted average of each holding's expected IRR.
+                              Projected FV in {projection.horizon}Y: <span className="mono-num">{fmtINR(projection.fv)}</span> (gain {fmtINR(projection.gain)}).
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}

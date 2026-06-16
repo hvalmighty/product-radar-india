@@ -62,10 +62,11 @@ async function fetchBseCA(segment: "0" | "1" | "2"): Promise<CorpAction[]> {
   // segment: 0=Equity, 1=Debt, 2=MF (we use 0 & 1)
   try {
     const today = new Date();
+    const past = new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000);
     const future = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
     const fmt = (d: Date) =>
       `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const url = `https://api.bseindia.com/BseIndiaAPI/api/DefaultData/w?Fdate=${fmt(today)}&TDate=${fmt(future)}&Purposecode=&strSearch=S&ddlcategorys=E&ddlindustrys=&segment=${segment}&strType=0`;
+    const url = `https://api.bseindia.com/BseIndiaAPI/api/DefaultData/w?Fdate=${fmt(past)}&TDate=${fmt(future)}&Purposecode=&strSearch=S&ddlcategorys=E&ddlindustrys=&segment=${segment}&strType=0`;
     const r = await fetch(url, {
       headers: { ...BROWSER_HEADERS, Referer: "https://www.bseindia.com/" },
     });

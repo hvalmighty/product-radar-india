@@ -113,24 +113,24 @@ async function fetchCrypto(): Promise<Quote[]> {
     const byPair = new Map<string, any>(
       (Array.isArray(j) ? j : []).map((t: any) => [t.symbol, t]),
     );
-    return pairs
-      .map((p) => {
-        const t = byPair.get(p.pair);
-        if (!t) return null;
-        const price = Number(t.lastPrice) || 0;
-        const change = Number(t.priceChange) || 0;
-        const pct = Number(t.priceChangePercent) || 0;
-        return {
-          symbol: p.symbol,
-          name: p.name,
-          price,
-          change,
-          changePct: pct,
-          currency: "USD",
-          group: "crypto" as const,
-        } satisfies Quote;
-      })
-      .filter((x): x is Quote => x !== null);
+    const out: Quote[] = [];
+    for (const p of pairs) {
+      const t = byPair.get(p.pair);
+      if (!t) continue;
+      const price = Number(t.lastPrice) || 0;
+      const change = Number(t.priceChange) || 0;
+      const pct = Number(t.priceChangePercent) || 0;
+      out.push({
+        symbol: p.symbol,
+        name: p.name,
+        price,
+        change,
+        changePct: pct,
+        currency: "USD",
+        group: "crypto",
+      });
+    }
+    return out;
   } catch (e) {
     console.error("[binance] threw", e);
     return [];

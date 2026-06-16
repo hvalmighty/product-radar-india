@@ -93,31 +93,77 @@ function Sparkline({
   );
 }
 
-function QuoteCard({ q }: { q: Quote }) {
+function QuoteRow({ q }: { q: Quote }) {
   const pos = q.changePct >= 0;
   return (
-    <div className="group rounded-md border border-border bg-surface/60 hover:border-primary/40 hover:bg-surface transition-colors px-2.5 py-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <div className="text-[11px] font-semibold truncate" title={q.name}>
+    <tr className="border-b border-border/60 hover:bg-secondary/40 transition-colors">
+      <td className="px-3 py-1.5">
+        <div className="text-xs font-medium truncate max-w-[180px]" title={q.name}>
           {q.name}
         </div>
+        <div className="text-[10px] text-muted-foreground mono-num">{q.symbol}</div>
+      </td>
+      <td className="px-3 py-1.5 text-right">
+        <div className="text-xs font-semibold mono-num">{fmtNum(q.price)}</div>
+      </td>
+      <td className="px-3 py-1.5 text-right">
+        <span className={`text-xs mono-num ${pos ? "text-positive" : "text-negative"}`}>
+          {pos ? "+" : ""}{fmtNum(q.change)}
+        </span>
+      </td>
+      <td className="px-3 py-1.5 text-right">
         <span
-          className={`text-[10px] px-1 py-px rounded mono-num shrink-0 ${
+          className={`inline-block text-[11px] px-1.5 py-px rounded mono-num ${
             pos ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
           }`}
         >
-          {pos ? "+" : ""}
-          {q.changePct.toFixed(2)}%
+          {pos ? "+" : ""}{q.changePct.toFixed(2)}%
+        </span>
+      </td>
+      <td className="px-3 py-1.5 w-20">
+        <Sparkline data={q.spark} positive={pos} className="w-16 h-5" />
+      </td>
+    </tr>
+  );
+}
+
+function QuoteTable({ label, items, isLoading }: { label: string; items: Quote[]; isLoading: boolean }) {
+  if (!isLoading && items.length === 0) return null;
+  return (
+    <div className="rounded-md border border-border bg-surface/60 overflow-hidden">
+      <div className="flex items-baseline justify-between px-3 py-2 border-b border-border bg-secondary/30">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {label}
+        </h2>
+        <span className="text-[10px] text-muted-foreground/70">
+          {items.length} instruments
         </span>
       </div>
-      <div className="flex items-end justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold mono-num leading-none">{fmtNum(q.price)}</div>
-          <div className={`text-[10px] mono-num mt-0.5 ${pos ? "text-positive" : "text-negative"}`}>
-            {pos ? "▲" : "▼"} {fmtNum(Math.abs(q.change))}
-          </div>
-        </div>
-        <Sparkline data={q.spark} positive={pos} className="w-14 h-6 shrink-0" />
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-border/80 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <th className="px-3 py-1.5 font-medium">Name</th>
+              <th className="px-3 py-1.5 font-medium text-right">Price</th>
+              <th className="px-3 py-1.5 font-medium text-right">Change</th>
+              <th className="px-3 py-1.5 font-medium text-right">%</th>
+              <th className="px-3 py-1.5 font-medium w-20">Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border/60">
+                    <td className="px-3 py-1.5"><div className="h-3 w-24 bg-muted/60 rounded animate-pulse" /></td>
+                    <td className="px-3 py-1.5"><div className="h-3 w-16 bg-muted/60 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-3 py-1.5"><div className="h-3 w-12 bg-muted/60 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-3 py-1.5"><div className="h-3 w-10 bg-muted/60 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-3 py-1.5"><div className="h-3 w-14 bg-muted/60 rounded animate-pulse" /></td>
+                  </tr>
+                ))
+              : items.map((q) => <QuoteRow key={q.symbol} q={q} />)}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -221,31 +267,15 @@ function MarketDataPage() {
 
       <main className="px-6 py-5 space-y-6">
         {/* Quotes */}
-        <section className="space-y-4">
-          {GROUPS.map((g) => {
-            const items = byGroup(g.key);
-            const isLoading = quotesQ.isLoading;
-            if (!isLoading && items.length === 0) return null;
-            return (
-              <div key={g.key}>
-                <div className="flex items-baseline justify-between mb-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                    {g.label}
-                  </h2>
-                  <span className="text-[10px] text-muted-foreground/70">
-                    {items.length} instruments
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-1.5">
-                  {isLoading
-                    ? Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="h-[58px] rounded-md border border-border bg-surface/40 animate-pulse" />
-                      ))
-                    : items.map((q) => <QuoteCard key={q.symbol} q={q} />)}
-                </div>
-              </div>
-            );
-          })}
+        <section className="space-y-3">
+          {GROUPS.map((g) => (
+            <QuoteTable
+              key={g.key}
+              label={g.label}
+              items={byGroup(g.key)}
+              isLoading={quotesQ.isLoading}
+            />
+          ))}
           {quotesQ.isError && (
             <div className="text-[11px] text-negative">
               Live quotes feed temporarily unavailable. Retrying automatically.

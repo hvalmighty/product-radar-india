@@ -261,31 +261,46 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* MF Overlap */}
-        <Card title="Mutual Fund Overlap (Indicative)" icon={<Shuffle className="w-3.5 h-3.5" />}>
-          {overlap.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-4 text-center">Need at least 2 mutual fund holdings to compute overlap.</div>
-          ) : (
-            <table className="w-full text-xs">
-              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <tr><th className="text-left py-1">Scheme A</th><th className="text-left py-1">Scheme B</th><th className="text-right py-1">Overlap</th></tr>
+      {/* MF Overlap matrix (full-width heatmap, same look as correlation matrix) */}
+      <Card title="Mutual Fund Overlap (Indicative)" icon={<Shuffle className="w-3.5 h-3.5" />}>
+        {mfs.length < 2 ? (
+          <div className="text-xs text-muted-foreground py-4 text-center">Need at least 2 mutual fund holdings to compute overlap.</div>
+        ) : (
+          <div className="overflow-auto">
+            <table className="text-xs">
+              <thead>
+                <tr>
+                  <th></th>
+                  {mfs.map(m => (
+                    <th key={m.isin} className="px-2 py-1 text-[10px] font-normal text-muted-foreground -rotate-45 origin-left h-28 align-bottom whitespace-nowrap">
+                      {shortMfLabel(m.name)}
+                    </th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
-                {overlap.map((o, idx) => (
-                  <tr key={idx} className="border-t border-border/50">
-                    <td className="py-1.5 max-w-[180px] truncate">{o.a.name}</td>
-                    <td className="py-1.5 max-w-[180px] truncate">{o.b.name}</td>
-                    <td className="py-1.5 text-right mono-num">
-                      <span className={o.pct > 60 ? "text-destructive" : o.pct > 40 ? "text-amber-500" : ""}>{o.pct.toFixed(0)}%</span>
-                    </td>
+                {mfs.map((row, i) => (
+                  <tr key={row.isin}>
+                    <td className="pr-2 py-1 text-[10px] text-muted-foreground whitespace-nowrap max-w-[260px] truncate">{shortMfLabel(row.name)}</td>
+                    {overlapMatrix[i].map((v, j) => {
+                      const intensity = v / 100;
+                      const color = `rgba(239, 68, 68, ${0.10 + intensity * 0.75})`;
+                      return (
+                        <td key={j} className="text-center mono-num text-[10px] w-12 h-9" style={{ background: color }}>
+                          {v.toFixed(0)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-          <p className="text-[10px] text-muted-foreground mt-2 italic">Indicative overlap based on category & AMC similarity. For exact holdings-overlap, integrate with AMC scheme-holding feeds.</p>
-        </Card>
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-3 italic">Heat-mapped pairwise overlap (%) across top mutual fund schemes. Darker red = higher overlap. Indicative — based on category & AMC similarity; integrate AMC scheme-holding feeds for exact overlap.</p>
+      </Card>
+
+      <div className="grid lg:grid-cols-2 gap-6">
 
         {/* Risk / VaR */}
         <Card title="Portfolio Risk (Value-at-Risk)" icon={<AlertTriangle className="w-3.5 h-3.5" />}>

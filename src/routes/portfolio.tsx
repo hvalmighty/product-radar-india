@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseECasPdf, type Holding, type PortfolioParseResult } from "@/lib/ecas-parser";
+import { PortfolioCommentary } from "@/components/PortfolioCommentary";
 import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search, Save, FolderOpen, Trash2 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 

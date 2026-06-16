@@ -316,3 +316,130 @@ export const aifSchemes: AIF[] = Array.from({ length: 30 }, (_, i) => {
 });
 
 export const allProducts: Product[] = [...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes];
+
+// ====================== EQUITY STOCKS ======================
+
+export interface EquityStock {
+  category: "EQ";
+  id: string;
+  ticker: string;
+  name: string;
+  sector: string;
+  marketCap: "Large Cap" | "Mid Cap" | "Small Cap";
+  price: number;
+  pe: number;
+  pb: number;
+  dividendYield: number;
+  roe: number;
+  beta: number;
+  cagr3y: number; // historical 3Y CAGR
+  cagr5y: number;
+  expectedReturn: number; // forward estimate = earnings growth + div yield
+  risk: RiskLevel;
+}
+
+const STOCKS_SEED: { ticker: string; name: string; sector: string; cap: EquityStock["marketCap"]; price: number }[] = [
+  { ticker: "RELIANCE", name: "Reliance Industries", sector: "Energy / Conglomerate", cap: "Large Cap", price: 1298 },
+  { ticker: "TCS", name: "Tata Consultancy Services", sector: "IT Services", cap: "Large Cap", price: 4120 },
+  { ticker: "HDFCBANK", name: "HDFC Bank", sector: "Banking", cap: "Large Cap", price: 1685 },
+  { ticker: "INFY", name: "Infosys", sector: "IT Services", cap: "Large Cap", price: 1840 },
+  { ticker: "ICICIBANK", name: "ICICI Bank", sector: "Banking", cap: "Large Cap", price: 1290 },
+  { ticker: "BHARTIARTL", name: "Bharti Airtel", sector: "Telecom", cap: "Large Cap", price: 1620 },
+  { ticker: "LT", name: "Larsen & Toubro", sector: "Capital Goods", cap: "Large Cap", price: 3580 },
+  { ticker: "ITC", name: "ITC", sector: "FMCG", cap: "Large Cap", price: 472 },
+  { ticker: "ASIANPAINT", name: "Asian Paints", sector: "Consumer Durables", cap: "Large Cap", price: 2280 },
+  { ticker: "MARUTI", name: "Maruti Suzuki", sector: "Auto", cap: "Large Cap", price: 12450 },
+  { ticker: "TITAN", name: "Titan Company", sector: "Consumer Discretionary", cap: "Large Cap", price: 3540 },
+  { ticker: "SUNPHARMA", name: "Sun Pharmaceutical", sector: "Pharma", cap: "Large Cap", price: 1820 },
+  { ticker: "PERSISTENT", name: "Persistent Systems", sector: "IT Services", cap: "Mid Cap", price: 5680 },
+  { ticker: "POLYCAB", name: "Polycab India", sector: "Capital Goods", cap: "Mid Cap", price: 6720 },
+  { ticker: "TRENT", name: "Trent", sector: "Retail", cap: "Mid Cap", price: 7240 },
+  { ticker: "DIXON", name: "Dixon Technologies", sector: "Electronics Mfg", cap: "Mid Cap", price: 14820 },
+  { ticker: "KEI", name: "KEI Industries", sector: "Capital Goods", cap: "Mid Cap", price: 3960 },
+  { ticker: "CAMS", name: "Computer Age Mgmt", sector: "Financial Services", cap: "Mid Cap", price: 4380 },
+  { ticker: "CDSL", name: "Central Depository Svc", sector: "Financial Services", cap: "Small Cap", price: 1620 },
+  { ticker: "MAPMYINDIA", name: "C.E. Info Systems", sector: "Tech / Maps", cap: "Small Cap", price: 1985 },
+  { ticker: "AETHER", name: "Aether Industries", sector: "Specialty Chemicals", cap: "Small Cap", price: 845 },
+  { ticker: "RAINBOW", name: "Rainbow Children's", sector: "Healthcare", cap: "Small Cap", price: 1480 },
+];
+
+export const equityStocks: EquityStock[] = STOCKS_SEED.map((s, i) => {
+  const isLarge = s.cap === "Large Cap";
+  const cagr3 = r(isLarge ? 8 : 5, isLarge ? 26 : 42);
+  const dy = r(0.1, isLarge ? 2.4 : 1.2);
+  const eps = r(isLarge ? 8 : 12, isLarge ? 18 : 28);
+  return {
+    category: "EQ",
+    id: `EQ-${6000 + i}`,
+    ticker: s.ticker,
+    name: s.name,
+    sector: s.sector,
+    marketCap: s.cap,
+    price: s.price,
+    pe: r(15, 90),
+    pb: r(1.2, 14),
+    dividendYield: dy,
+    roe: r(10, 38),
+    beta: r(0.6, 1.4),
+    cagr3y: cagr3,
+    cagr5y: r(isLarge ? 9 : 8, isLarge ? 24 : 36),
+    expectedReturn: +(eps + dy).toFixed(2),
+    risk: isLarge ? "Mod-High" : s.cap === "Mid Cap" ? "High" : "Very High",
+  };
+});
+
+// ====================== BONDS ======================
+
+export interface Bond {
+  category: "BOND";
+  id: string;
+  name: string;
+  issuer: string;
+  bondType: "G-Sec" | "State Dev Loan" | "PSU Bond" | "Corporate Bond" | "Tax-Free Bond" | "Perpetual / AT1";
+  rating: string;
+  couponRate: number;
+  ytm: number; // yield to maturity = expected return
+  residualTenorYears: number;
+  faceValue: number;
+  minInvestment: number;
+  payout: "Annual" | "Semi-Annual" | "Quarterly" | "Cumulative";
+  taxable: boolean;
+  risk: RiskLevel;
+}
+
+const BOND_SEED: { issuer: string; type: Bond["bondType"]; rating: string; coupon: number; tenor: number; taxable: boolean }[] = [
+  { issuer: "Govt of India", type: "G-Sec", rating: "Sovereign", coupon: 7.18, tenor: 10, taxable: true },
+  { issuer: "Govt of India", type: "G-Sec", rating: "Sovereign", coupon: 7.34, tenor: 30, taxable: true },
+  { issuer: "Govt of India", type: "G-Sec", rating: "Sovereign", coupon: 6.79, tenor: 5, taxable: true },
+  { issuer: "Maharashtra SDL", type: "State Dev Loan", rating: "Sovereign", coupon: 7.45, tenor: 12, taxable: true },
+  { issuer: "Tamil Nadu SDL", type: "State Dev Loan", rating: "Sovereign", coupon: 7.42, tenor: 10, taxable: true },
+  { issuer: "NHAI", type: "PSU Bond", rating: "AAA", coupon: 7.65, tenor: 15, taxable: true },
+  { issuer: "PFC", type: "PSU Bond", rating: "AAA", coupon: 7.78, tenor: 10, taxable: true },
+  { issuer: "REC", type: "PSU Bond", rating: "AAA", coupon: 7.72, tenor: 7, taxable: true },
+  { issuer: "IRFC", type: "Tax-Free Bond", rating: "AAA", coupon: 7.35, tenor: 10, taxable: false },
+  { issuer: "NHAI", type: "Tax-Free Bond", rating: "AAA", coupon: 7.39, tenor: 15, taxable: false },
+  { issuer: "HDFC Ltd", type: "Corporate Bond", rating: "AAA", coupon: 7.95, tenor: 5, taxable: true },
+  { issuer: "Bajaj Finance", type: "Corporate Bond", rating: "AAA", coupon: 8.15, tenor: 5, taxable: true },
+  { issuer: "L&T Finance", type: "Corporate Bond", rating: "AA+", coupon: 8.45, tenor: 3, taxable: true },
+  { issuer: "Shriram Finance", type: "Corporate Bond", rating: "AA+", coupon: 9.05, tenor: 5, taxable: true },
+  { issuer: "Muthoot Finance", type: "Corporate Bond", rating: "AA+", coupon: 9.25, tenor: 3, taxable: true },
+  { issuer: "SBI", type: "Perpetual / AT1", rating: "AA+", coupon: 8.75, tenor: 5, taxable: true },
+  { issuer: "HDFC Bank", type: "Perpetual / AT1", rating: "AA+", coupon: 8.55, tenor: 5, taxable: true },
+];
+
+export const bonds: Bond[] = BOND_SEED.map((b, i) => ({
+  category: "BOND",
+  id: `BD-${7000 + i}`,
+  name: `${b.issuer} ${b.coupon}% ${b.tenor}Y`,
+  issuer: b.issuer,
+  bondType: b.type,
+  rating: b.rating,
+  couponRate: b.coupon,
+  ytm: +(b.coupon + r(-0.25, 0.6)).toFixed(2),
+  residualTenorYears: b.tenor,
+  faceValue: 1000,
+  minInvestment: b.type === "G-Sec" || b.type === "State Dev Loan" ? 10000 : 100000,
+  payout: b.type === "Tax-Free Bond" ? "Annual" : "Semi-Annual",
+  taxable: b.taxable,
+  risk: b.rating === "Sovereign" ? "Low" : b.rating === "AAA" ? "Low-Mod" : b.type === "Perpetual / AT1" ? "Mod-High" : "Moderate",
+}));

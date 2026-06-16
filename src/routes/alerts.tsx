@@ -85,6 +85,7 @@ function AlertsPage() {
   const [assetClass, setAssetClass] = useState<AssetClass>("Equity");
   const [exchange, setExchange] = useState<"All" | Exchange>("All");
   const [product, setProduct] = useState<string>("All");
+  const [query, setQuery] = useState("");
 
   const { data, isLoading, isFetching, refetch, error, dataUpdatedAt } = useQuery({
     queryKey: ["corporate-actions"],
@@ -94,7 +95,7 @@ function AlertsPage() {
     refetchOnWindowFocus: false,
   });
 
-  const allActions = data?.actions ?? [];
+  const allActions: CorpAction[] = (data?.actions ?? []) as CorpAction[];
 
   const byAsset = useMemo(() => {
     const m: Record<AssetClass, CorpAction[]> = { Equity: [], Debt: [], REIT: [], InvIT: [] };
@@ -106,8 +107,17 @@ function AlertsPage() {
     let list = byAsset[assetClass];
     if (exchange !== "All") list = list.filter((a) => a.exchange === exchange);
     if (product !== "All") list = list.filter((a) => classifyProduct(a) === product);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (a) =>
+          a.symbol.toLowerCase().includes(q) ||
+          a.company.toLowerCase().includes(q) ||
+          a.purpose.toLowerCase().includes(q),
+      );
+    }
     return list;
-  }, [byAsset, assetClass, exchange, product]);
+  }, [byAsset, assetClass, exchange, product, query]);
 
   // group by product within current asset class
   const grouped = useMemo(() => {

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
+import { Route as MarketDataRouteImport } from './routes/market-data'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ProposalRoute = ProposalRouteImport.update({
@@ -23,6 +24,11 @@ const PortfolioRoute = PortfolioRouteImport.update({
   path: '/portfolio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MarketDataRoute = MarketDataRouteImport.update({
+  id: '/market-data',
+  path: '/market-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/portfolio' | '/proposal'
+  fullPaths: '/' | '/market-data' | '/portfolio' | '/proposal'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/portfolio' | '/proposal'
-  id: '__root__' | '/' | '/portfolio' | '/proposal'
+  to: '/' | '/market-data' | '/portfolio' | '/proposal'
+  id: '__root__' | '/' | '/market-data' | '/portfolio' | '/proposal'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MarketDataRoute: typeof MarketDataRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/market-data': {
+      id: '/market-data'
+      path: '/market-data'
+      fullPath: '/market-data'
+      preLoaderRoute: typeof MarketDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MarketDataRoute: MarketDataRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,
 }

@@ -7,7 +7,7 @@ import {
   type Exchange,
   type CorpAction,
 } from "@/lib/corporate-actions.functions";
-import { ArrowLeft, RefreshCw, Bell, AlertCircle, Calendar } from "lucide-react";
+import { ArrowLeft, RefreshCw, Bell, AlertCircle, Calendar, Search } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 export const Route = createFileRoute("/alerts")({

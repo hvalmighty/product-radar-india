@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseECasPdf, type Holding, type PortfolioParseResult } from "@/lib/ecas-parser";
+import { PortfolioCommentary } from "@/components/PortfolioCommentary";
 import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search, Save, FolderOpen, Trash2 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
@@ -415,6 +416,11 @@ function PortfolioImporter() {
                 </table>
               </div>
             </Card>
+
+            {/* Portfolio Commentary & Analytics */}
+            <PortfolioCommentary result={result} />
+
+
 
             {err && (
               <div className="p-3 border border-amber-500/40 bg-amber-500/10 rounded-md text-xs flex gap-2">

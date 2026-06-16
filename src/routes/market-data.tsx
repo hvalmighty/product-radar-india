@@ -182,7 +182,7 @@ function MarketDataPage() {
   });
 
   const quotes = quotesQ.data ?? [];
-  const byKey = (syms: string[]) => syms.map((s) => quotes.find((q) => q.symbol === s)).filter(Boolean) as Quote[];
+  const byGroup = (g: Quote["group"]) => quotes.filter((q) => q.group === g);
 
   return (
     <div className="min-h-screen text-foreground">

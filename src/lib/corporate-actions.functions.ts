@@ -171,11 +171,11 @@ export const getCorporateActions = createServerFn({ method: "GET" }).handler(asy
     return true;
   });
 
-  // keep only today + upcoming, sort ascending
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = unique
-    .filter((a) => a.exDate && a.exDate >= today)
-    .sort((a, b) => a.exDate.localeCompare(b.exDate));
+  // keep last 45 days + upcoming, sort by ex-date descending (most recent first)
+  const cutoff = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
+  const filtered = unique
+    .filter((a) => a.exDate && a.exDate >= cutoff)
+    .sort((a, b) => b.exDate.localeCompare(a.exDate));
 
   return {
     actions: upcoming,

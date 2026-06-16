@@ -267,31 +267,15 @@ function MarketDataPage() {
 
       <main className="px-6 py-5 space-y-6">
         {/* Quotes */}
-        <section className="space-y-4">
-          {GROUPS.map((g) => {
-            const items = byGroup(g.key);
-            const isLoading = quotesQ.isLoading;
-            if (!isLoading && items.length === 0) return null;
-            return (
-              <div key={g.key}>
-                <div className="flex items-baseline justify-between mb-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                    {g.label}
-                  </h2>
-                  <span className="text-[10px] text-muted-foreground/70">
-                    {items.length} instruments
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-1.5">
-                  {isLoading
-                    ? Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="h-[58px] rounded-md border border-border bg-surface/40 animate-pulse" />
-                      ))
-                    : items.map((q) => <QuoteCard key={q.symbol} q={q} />)}
-                </div>
-              </div>
-            );
-          })}
+        <section className="space-y-3">
+          {GROUPS.map((g) => (
+            <QuoteTable
+              key={g.key}
+              label={g.label}
+              items={byGroup(g.key)}
+              isLoading={quotesQ.isLoading}
+            />
+          ))}
           {quotesQ.isError && (
             <div className="text-[11px] text-negative">
               Live quotes feed temporarily unavailable. Retrying automatically.

@@ -223,7 +223,9 @@ function MarketDataPage() {
         {/* Quotes */}
         <section className="space-y-4">
           {GROUPS.map((g) => {
-            const items = byKey(g.symbols);
+            const items = byGroup(g.key);
+            const isLoading = quotesQ.isLoading;
+            if (!isLoading && items.length === 0) return null;
             return (
               <div key={g.key}>
                 <div className="flex items-baseline justify-between mb-2">
@@ -235,8 +237,8 @@ function MarketDataPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
-                  {quotesQ.isLoading
-                    ? Array.from({ length: g.symbols.length }).map((_, i) => (
+                  {isLoading
+                    ? Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} className="h-[120px] rounded-md border border-border bg-surface/40 animate-pulse" />
                       ))
                     : items.map((q) => <QuoteCard key={q.symbol} q={q} />)}

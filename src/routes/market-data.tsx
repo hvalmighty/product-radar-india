@@ -236,10 +236,10 @@ function MarketDataPage() {
                     {items.length} instruments
                   </span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-1.5">
                   {isLoading
-                    ? Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="h-[120px] rounded-md border border-border bg-surface/40 animate-pulse" />
+                    ? Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="h-[58px] rounded-md border border-border bg-surface/40 animate-pulse" />
                       ))
                     : items.map((q) => <QuoteCard key={q.symbol} q={q} />)}
                 </div>

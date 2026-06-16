@@ -102,26 +102,41 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
       .slice(0, 10);
   }, [holdings, total]);
 
-  // === MF Overlap analysis (between MF schemes, indicative) ===
-  const mfs = useMemo(() => holdings.filter(h => h.type === "Mutual Fund"), [holdings]);
-  const overlap = useMemo(() => {
-    if (mfs.length < 2) return [] as Array<{ a: Holding; b: Holding; pct: number }>;
-    const rows: Array<{ a: Holding; b: Holding; pct: number }> = [];
-    for (let i = 0; i < mfs.length; i++) {
-      for (let j = i + 1; j < mfs.length; j++) {
-        const a = mfs[i], b = mfs[j];
-        const sa = classifySector(a.name, a.type);
-        const sb = classifySector(b.name, b.type);
-        let base = sa === sb ? 0.55 : 0.10;
-        if (sa.startsWith("MF · Debt") && sb.startsWith("MF · Debt")) base = 0.40;
-        if (extractIssuer(a.name, a.type) === extractIssuer(b.name, b.type)) base += 0.10;
-        const jitter = (hash(a.isin + b.isin) - 0.5) * 0.20;
-        const pct = Math.max(2, Math.min(85, (base + jitter) * 100));
-        rows.push({ a, b, pct });
-      }
-    }
-    return rows.sort((x, y) => y.pct - x.pct).slice(0, 8);
+  // === MF Overlap analysis (matrix between MF schemes, indicative) ===
+  const mfs = useMemo(() => {
+    const list = holdings.filter(h => h.type === "Mutual Fund");
+    return [...list].sort((a, b) => b.value - a.value).slice(0, 12);
+  }, [holdings]);
+
+  const overlapMatrix = useMemo(() => {
+    return mfs.map((a) => mfs.map((b) => {
+      if (a.isin === b.isin) return 100;
+      const sa = classifySector(a.name, a.type);
+      const sb = classifySector(b.name, b.type);
+      let base = sa === sb ? 0.55 : 0.10;
+      if (sa.startsWith("MF · Debt") && sb.startsWith("MF · Debt")) base = 0.40;
+      if (extractIssuer(a.name, a.type) === extractIssuer(b.name, b.type)) base += 0.10;
+      const key = a.isin < b.isin ? a.isin + b.isin : b.isin + a.isin;
+      const jitter = (hash(key) - 0.5) * 0.20;
+      return Math.max(2, Math.min(85, (base + jitter) * 100));
+    }));
   }, [mfs]);
+
+  const highOverlapCount = useMemo(() => {
+    let c = 0;
+    for (let i = 0; i < mfs.length; i++)
+      for (let j = i + 1; j < mfs.length; j++)
+        if ((overlapMatrix[i]?.[j] ?? 0) > 50) c++;
+    return c;
+  }, [mfs, overlapMatrix]);
+
+  function shortMfLabel(name: string): string {
+    return name
+      .replace(/Mutual Fund|Direct|Regular|Growth|Plan|Dividend|Reinvestment|IDCW|\(.*?\)/gi, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 28);
+  }
 
   // === Correlation matrix (top exposures) ===
   const topForCorr = useMemo(() => {
@@ -179,17 +194,16 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
     const topIss = issuerMap[0];
     const equityPct = sectorMap.filter(s => !/Debt|Fixed|Hybrid/.test(s.sector)).reduce((a, b) => a + b.pct, 0);
     const debtPct = sectorMap.filter(s => /Debt|Fixed/.test(s.sector)).reduce((a, b) => a + b.pct, 0);
-    const overlapWarn = overlap.filter(o => o.pct > 50).length;
     const lines: string[] = [];
     lines.push(`The portfolio of ${holdings.length} holdings totalling ${fmtINR(total)} is tilted ${equityPct.toFixed(0)}% to equity and ${debtPct.toFixed(0)}% to debt/fixed-income exposures.`);
     if (top) lines.push(`Largest sector exposure is ${top.sector} at ${top.pct.toFixed(1)}% — ${top.pct > 30 ? "this is elevated and worth trimming for diversification." : top.pct > 20 ? "moderate concentration, acceptable but monitor." : "well within prudent limits."}`);
     if (topIss) lines.push(`Top issuer/AMC exposure is ${topIss.issuer} at ${topIss.pct.toFixed(1)}% of portfolio.`);
-    if (overlapWarn > 0) lines.push(`${overlapWarn} mutual fund pair(s) show high indicative overlap (>50%); consider consolidating overlapping schemes to reduce redundancy.`);
+    if (highOverlapCount > 0) lines.push(`${highOverlapCount} mutual fund pair(s) show high indicative overlap (>50%); consider consolidating overlapping schemes to reduce redundancy.`);
     lines.push(`Estimated annualised volatility is ${(risk.annualVol * 100).toFixed(1)}%; at 95% confidence, 1-month VaR is approximately ${fmtINR(risk.var95_1m)} (${(risk.var95_1m / total * 100).toFixed(1)}% of NAV).`);
     if (risk.annualVol > 0.20) lines.push(`Portfolio risk is on the higher side — consider adding debt/hybrid allocation to dampen drawdowns.`);
     else if (risk.annualVol < 0.08) lines.push(`Portfolio risk is conservative — capacity exists to add equity for long-horizon investors.`);
     return lines;
-  }, [sectorMap, issuerMap, overlap, risk, holdings.length, total]);
+  }, [sectorMap, issuerMap, highOverlapCount, risk, holdings.length, total]);
 
   return (
     <div className="space-y-6">
@@ -247,31 +261,46 @@ export function PortfolioCommentary({ result }: { result: PortfolioParseResult }
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* MF Overlap */}
-        <Card title="Mutual Fund Overlap (Indicative)" icon={<Shuffle className="w-3.5 h-3.5" />}>
-          {overlap.length === 0 ? (
-            <div className="text-xs text-muted-foreground py-4 text-center">Need at least 2 mutual fund holdings to compute overlap.</div>
-          ) : (
-            <table className="w-full text-xs">
-              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <tr><th className="text-left py-1">Scheme A</th><th className="text-left py-1">Scheme B</th><th className="text-right py-1">Overlap</th></tr>
+      {/* MF Overlap matrix (full-width heatmap, same look as correlation matrix) */}
+      <Card title="Mutual Fund Overlap (Indicative)" icon={<Shuffle className="w-3.5 h-3.5" />}>
+        {mfs.length < 2 ? (
+          <div className="text-xs text-muted-foreground py-4 text-center">Need at least 2 mutual fund holdings to compute overlap.</div>
+        ) : (
+          <div className="overflow-auto">
+            <table className="text-xs">
+              <thead>
+                <tr>
+                  <th></th>
+                  {mfs.map(m => (
+                    <th key={m.isin} className="px-2 py-1 text-[10px] font-normal text-muted-foreground -rotate-45 origin-left h-28 align-bottom whitespace-nowrap">
+                      {shortMfLabel(m.name)}
+                    </th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
-                {overlap.map((o, idx) => (
-                  <tr key={idx} className="border-t border-border/50">
-                    <td className="py-1.5 max-w-[180px] truncate">{o.a.name}</td>
-                    <td className="py-1.5 max-w-[180px] truncate">{o.b.name}</td>
-                    <td className="py-1.5 text-right mono-num">
-                      <span className={o.pct > 60 ? "text-destructive" : o.pct > 40 ? "text-amber-500" : ""}>{o.pct.toFixed(0)}%</span>
-                    </td>
+                {mfs.map((row, i) => (
+                  <tr key={row.isin}>
+                    <td className="pr-2 py-1 text-[10px] text-muted-foreground whitespace-nowrap max-w-[260px] truncate">{shortMfLabel(row.name)}</td>
+                    {overlapMatrix[i].map((v, j) => {
+                      const intensity = v / 100;
+                      const color = `rgba(239, 68, 68, ${0.10 + intensity * 0.75})`;
+                      return (
+                        <td key={j} className="text-center mono-num text-[10px] w-12 h-9" style={{ background: color }}>
+                          {v.toFixed(0)}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-          <p className="text-[10px] text-muted-foreground mt-2 italic">Indicative overlap based on category & AMC similarity. For exact holdings-overlap, integrate with AMC scheme-holding feeds.</p>
-        </Card>
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-3 italic">Heat-mapped pairwise overlap (%) across top mutual fund schemes. Darker red = higher overlap. Indicative — based on category & AMC similarity; integrate AMC scheme-holding feeds for exact overlap.</p>
+      </Card>
+
+      <div className="grid lg:grid-cols-2 gap-6">
 
         {/* Risk / VaR */}
         <Card title="Portfolio Risk (Value-at-Risk)" icon={<AlertTriangle className="w-3.5 h-3.5" />}>

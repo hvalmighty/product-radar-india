@@ -417,6 +417,11 @@ function PortfolioImporter() {
               </div>
             </Card>
 
+            {/* Portfolio Commentary & Analytics */}
+            <PortfolioCommentary result={result} />
+
+
+
             {err && (
               <div className="p-3 border border-amber-500/40 bg-amber-500/10 rounded-md text-xs flex gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" /><span>{err}</span>

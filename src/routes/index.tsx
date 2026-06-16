@@ -231,9 +231,10 @@ function ResearchTerminal() {
             </div>
           </div>
           <nav className="hidden md:flex items-center gap-1 text-xs">
-            {["Screener", "Portfolios", "Watchlists", "Alerts", "Reports"].map((n, i) => {
+            {["Screener", "Proposal", "Portfolios", "Watchlists", "Alerts", "Reports"].map((n, i) => {
               const cls = `px-3 py-1.5 rounded-sm transition-colors ${i === 0 ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`;
               if (n === "Portfolios") return <Link key={n} to="/portfolio" className={cls}>{n}</Link>;
+              if (n === "Proposal") return <Link key={n} to="/proposal" className={cls}>{n}</Link>;
               return <button key={n} className={cls}>{n}</button>;
             })}
           </nav>

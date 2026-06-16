@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as MarketDataRouteImport } from './routes/market-data'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ProposalRoute = ProposalRouteImport.update({
@@ -29,6 +30,11 @@ const MarketDataRoute = MarketDataRouteImport.update({
   path: '/market-data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/market-data' | '/portfolio' | '/proposal'
+  fullPaths: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/market-data' | '/portfolio' | '/proposal'
-  id: '__root__' | '/' | '/market-data' | '/portfolio' | '/proposal'
+  to: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
+  id: '__root__' | '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertsRoute: typeof AlertsRoute
   MarketDataRoute: typeof MarketDataRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertsRoute: AlertsRoute,
   MarketDataRoute: MarketDataRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,

@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const UA = {
+const BROWSER_HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-  Accept: "*/*",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  Referer: "https://www.nseindia.com/",
 };
 
 export type Quote = {
@@ -14,6 +16,7 @@ export type Quote = {
   changePct: number;
   currency?: string;
   spark?: number[];
+  group: "india" | "crypto" | "fx" | "sector";
 };
 
 export type NewsItem = {
@@ -25,85 +28,156 @@ export type NewsItem = {
   description?: string;
 };
 
-const INDEX_SYMBOLS: Record<string, string> = {
-  "^NSEI": "NIFTY 50",
-  "^BSESN": "SENSEX",
-  "^NSEBANK": "BANK NIFTY",
-  "NIFTY_MIDCAP_100.NS": "NIFTY MIDCAP 100",
-  "^GSPC": "S&P 500",
-  "^IXIC": "NASDAQ",
-  "^DJI": "DOW JONES",
-  "^FTSE": "FTSE 100",
-  "^N225": "NIKKEI 225",
-  "^HSI": "HANG SENG",
-  "INR=X": "USD/INR",
-  "GC=F": "GOLD (USD/oz)",
-  "SI=F": "SILVER (USD/oz)",
-  "CL=F": "CRUDE OIL (WTI)",
-  "BTC-USD": "BITCOIN",
-  "ETH-USD": "ETHEREUM",
-};
-
-async function fetchYahooChart(symbol: string): Promise<Quote | null> {
+// === NSE India (indices + sector indices) ===
+// Free, no key — primary source for Indian markets.
+async function fetchNseIndices(): Promise<Quote[]> {
   try {
-    const r = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-        symbol,
-      )}?range=1d&interval=15m`,
-      { headers: UA },
-    );
+    const r = await fetch("https://www.nseindia.com/api/allIndices", {
+      headers: BROWSER_HEADERS,
+    });
     if (!r.ok) {
-      console.error(`[yahoo] ${symbol} HTTP ${r.status}`);
-      return null;
+      console.error(`[nse] HTTP ${r.status}`);
+      return [];
     }
     const j: any = await r.json();
-    const res = j?.chart?.result?.[0];
-    if (!res) {
-      console.error(`[yahoo] ${symbol} no result: ${JSON.stringify(j).slice(0, 200)}`);
-      return null;
+    const wanted = new Set([
+      "NIFTY 50",
+      "NIFTY NEXT 50",
+      "NIFTY BANK",
+      "NIFTY MIDCAP 100",
+      "NIFTY SMALLCAP 100",
+      "NIFTY 500",
+      "INDIA VIX",
+    ]);
+    const sectors = new Set([
+      "NIFTY IT",
+      "NIFTY AUTO",
+      "NIFTY PHARMA",
+      "NIFTY FMCG",
+      "NIFTY METAL",
+      "NIFTY REALTY",
+      "NIFTY ENERGY",
+      "NIFTY FINANCIAL SERVICES",
+    ]);
+    const out: Quote[] = [];
+    for (const row of j.data ?? []) {
+      const name: string = row.index ?? row.indexSymbol;
+      const isBenchmark = wanted.has(name);
+      const isSector = sectors.has(name);
+      if (!isBenchmark && !isSector) continue;
+      const price = Number(row.last) || 0;
+      const prev = Number(row.previousClose) || price;
+      const change = price - prev;
+      const pct = Number(row.percentChange);
+      out.push({
+        symbol: name,
+        name,
+        price,
+        change,
+        changePct: Number.isFinite(pct) ? pct : prev ? (change / prev) * 100 : 0,
+        currency: "INR",
+        group: isSector ? "sector" : "india",
+      });
     }
-    const meta = res.meta;
-    const closes: number[] = (res.indicators?.quote?.[0]?.close ?? []).filter(
-      (x: any) => typeof x === "number",
-    );
-    const price = meta.regularMarketPrice ?? closes[closes.length - 1] ?? 0;
-    const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
-    const change = price - prev;
-    const changePct = prev ? (change / prev) * 100 : 0;
-    return {
-      symbol,
-      name: INDEX_SYMBOLS[symbol] ?? symbol,
-      price,
-      change,
-      changePct,
-      currency: meta.currency,
-      spark: closes.slice(-40),
-    };
+    return out;
   } catch (e) {
-    console.error(`[yahoo] ${symbol} threw`, e);
-    return null;
+    console.error("[nse] threw", e);
+    return [];
+  }
+}
+
+// === CoinGecko (crypto) ===
+async function fetchCrypto(): Promise<Quote[]> {
+  try {
+    const r = await fetch(
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple,binancecoin&sparkline=true&price_change_percentage=24h",
+      { headers: { Accept: "application/json" } },
+    );
+    if (!r.ok) {
+      console.error(`[coingecko] HTTP ${r.status}`);
+      return [];
+    }
+    const j: any = await r.json();
+    return (Array.isArray(j) ? j : []).map((c: any) => ({
+      symbol: String(c.symbol ?? "").toUpperCase(),
+      name: c.name,
+      price: Number(c.current_price) || 0,
+      change: Number(c.price_change_24h) || 0,
+      changePct: Number(c.price_change_percentage_24h) || 0,
+      currency: "USD",
+      spark: (c.sparkline_in_7d?.price ?? []).slice(-40),
+      group: "crypto" as const,
+    }));
+  } catch (e) {
+    console.error("[coingecko] threw", e);
+    return [];
+  }
+}
+
+// === Frankfurter (FX, ECB rates) ===
+async function fetchFx(): Promise<Quote[]> {
+  try {
+    // Two-day range to compute change vs previous business day
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const url = `https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(today)}?from=USD&to=INR,EUR,GBP,JPY`;
+    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!r.ok) {
+      console.error(`[frankfurter] HTTP ${r.status}`);
+      return [];
+    }
+    const j: any = await r.json();
+    const rates: Record<string, Record<string, number>> = j.rates ?? {};
+    const dates = Object.keys(rates).sort();
+    if (!dates.length) return [];
+    const last = rates[dates[dates.length - 1]];
+    const prev = rates[dates[dates.length - 2]] ?? last;
+    const ccys = ["INR", "EUR", "GBP", "JPY"] as const;
+    return ccys
+      .map((cc) => {
+        const price = Number(last[cc]);
+        const pr = Number(prev[cc]) || price;
+        if (!price) return null;
+        const change = price - pr;
+        return {
+          symbol: `USD/${cc}`,
+          name: `USD → ${cc}`,
+          price,
+          change,
+          changePct: pr ? (change / pr) * 100 : 0,
+          currency: cc,
+          group: "fx" as const,
+        };
+      })
+      .filter((x): x is Quote => !!x);
+  } catch (e) {
+    console.error("[frankfurter] threw", e);
+    return [];
   }
 }
 
 export const getMarketQuotes = createServerFn({ method: "GET" }).handler(
   async () => {
-    const symbols = Object.keys(INDEX_SYMBOLS);
-    const results = await Promise.all(symbols.map(fetchYahooChart));
-    return results.filter((x): x is Quote => !!x);
+    const [india, crypto, fx] = await Promise.all([
+      fetchNseIndices(),
+      fetchCrypto(),
+      fetchFx(),
+    ]);
+    return [...india, ...crypto, ...fx];
   },
 );
 
-// Lightweight RSS parser (no deps, server-side only)
+// ============ NEWS ============
+
 function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
   const items: NewsItem[] = [];
   const itemRe = /<item[\s\S]*?<\/item>/g;
   const tag = (block: string, t: string) => {
     const m = block.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`, "i"));
     if (!m) return "";
-    return m[1]
-      .replace(/<!\[CDATA\[/g, "")
-      .replace(/\]\]>/g, "")
-      .trim();
+    return m[1].replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "").trim();
   };
   const attr = (block: string, t: string, a: string) => {
     const m = block.match(new RegExp(`<${t}[^>]*${a}="([^"]+)"`, "i"));
@@ -184,7 +258,7 @@ export const getNews = createServerFn({ method: "GET" })
     await Promise.all(
       feeds.map(async (f) => {
         try {
-          const r = await fetch(f.url, { headers: UA });
+          const r = await fetch(f.url, { headers: { "User-Agent": "Mozilla/5.0" } });
           if (!r.ok) return;
           const xml = await r.text();
           all.push(...parseRss(xml, f.source));
@@ -193,7 +267,6 @@ export const getNews = createServerFn({ method: "GET" })
         }
       }),
     );
-    // dedupe by title
     const seen = new Set<string>();
     const out: NewsItem[] = [];
     for (const it of all) {

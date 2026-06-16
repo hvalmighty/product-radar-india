@@ -150,7 +150,16 @@ export const getCorporateActions = createServerFn({ method: "GET" }).handler(asy
   ]);
   const live = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   const usingFallback = live.length === 0;
-  const actions = usingFallback ? fallback() : live;
+  let actions = usingFallback ? fallback() : live;
+
+  // NSE/BSE equity+debt feeds rarely include REIT/InvIT scrips. Supplement
+  // those asset classes from the curated list so the tabs are never empty.
+  const sample = fallback();
+  for (const cls of ["REIT", "InvIT"] as const) {
+    if (!actions.some((a) => a.assetClass === cls)) {
+      actions = actions.concat(sample.filter((a) => a.assetClass === cls));
+    }
+  }
 
   // de-dup by exchange+symbol+exDate+purpose
   const seen = new Set<string>();

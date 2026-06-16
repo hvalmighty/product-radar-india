@@ -86,30 +86,53 @@ async function fetchNseIndices(): Promise<Quote[]> {
   }
 }
 
-// === CoinGecko (crypto) ===
+// === Crypto (Binance public API — no key, edge-friendly) ===
+// CoinGecko's free endpoint returns 403 from Cloudflare Worker IP ranges,
+// so we use Binance 24h ticker which is reliably reachable from workerd.
 async function fetchCrypto(): Promise<Quote[]> {
+  const pairs: { symbol: string; name: string; pair: string }[] = [
+    { symbol: "BTC", name: "Bitcoin", pair: "BTCUSDT" },
+    { symbol: "ETH", name: "Ethereum", pair: "ETHUSDT" },
+    { symbol: "SOL", name: "Solana", pair: "SOLUSDT" },
+    { symbol: "XRP", name: "XRP", pair: "XRPUSDT" },
+    { symbol: "BNB", name: "BNB", pair: "BNBUSDT" },
+  ];
   try {
+    const symbolsParam = encodeURIComponent(
+      JSON.stringify(pairs.map((p) => p.pair)),
+    );
     const r = await fetch(
-      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple,binancecoin&sparkline=true&price_change_percentage=24h",
+      `https://api.binance.com/api/v3/ticker/24hr?symbols=${symbolsParam}`,
       { headers: { Accept: "application/json" } },
     );
     if (!r.ok) {
-      console.error(`[coingecko] HTTP ${r.status}`);
+      console.error(`[binance] HTTP ${r.status}`);
       return [];
     }
     const j: any = await r.json();
-    return (Array.isArray(j) ? j : []).map((c: any) => ({
-      symbol: String(c.symbol ?? "").toUpperCase(),
-      name: c.name,
-      price: Number(c.current_price) || 0,
-      change: Number(c.price_change_24h) || 0,
-      changePct: Number(c.price_change_percentage_24h) || 0,
-      currency: "USD",
-      spark: (c.sparkline_in_7d?.price ?? []).slice(-40),
-      group: "crypto" as const,
-    }));
+    const byPair = new Map<string, any>(
+      (Array.isArray(j) ? j : []).map((t: any) => [t.symbol, t]),
+    );
+    const out: Quote[] = [];
+    for (const p of pairs) {
+      const t = byPair.get(p.pair);
+      if (!t) continue;
+      const price = Number(t.lastPrice) || 0;
+      const change = Number(t.priceChange) || 0;
+      const pct = Number(t.priceChangePercent) || 0;
+      out.push({
+        symbol: p.symbol,
+        name: p.name,
+        price,
+        change,
+        changePct: pct,
+        currency: "USD",
+        group: "crypto",
+      });
+    }
+    return out;
   } catch (e) {
-    console.error("[coingecko] threw", e);
+    console.error("[binance] threw", e);
     return [];
   }
 }

@@ -194,6 +194,18 @@ export const getMarketQuotes = createServerFn({ method: "GET" }).handler(
 
 // ============ NEWS ============
 
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&amp;/g, "&");
+}
+
 function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
   const items: NewsItem[] = [];
   const itemRe = /<item[\s\S]*?<\/item>/g;
@@ -208,29 +220,25 @@ function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
   };
   const matches = xml.match(itemRe) ?? [];
   for (const block of matches) {
-    const title = tag(block, "title");
+    const title = decodeEntities(tag(block, "title"));
     const link = tag(block, "link") || attr(block, "link", "href");
     const pubDate = tag(block, "pubDate") || tag(block, "updated");
-    const source = tag(block, "source") || sourceFallback;
-    const descRaw = tag(block, "description") || tag(block, "summary");
+    const source = decodeEntities(tag(block, "source")) || sourceFallback;
+    // Decode entities FIRST so we can strip the HTML inside (Google News encodes
+    // <a href=...> as &lt;a href=...&gt;), then strip tags, then trim.
+    const descDecoded = decodeEntities(tag(block, "description") || tag(block, "summary"));
     const imgMatch =
-      descRaw.match(/<img[^>]+src="([^"]+)"/i) ||
+      descDecoded.match(/<img[^>]+src="([^"]+)"/i) ||
       block.match(/<media:content[^>]+url="([^"]+)"/i) ||
       block.match(/<enclosure[^>]+url="([^"]+)"/i);
-    const description = descRaw
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+    const description = descDecoded
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
       .trim()
       .slice(0, 240);
     if (title && link) {
       items.push({
-        title: title
-          .replace(/&amp;/g, "&")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'"),
+        title,
         link,
         source,
         pubDate,

@@ -211,68 +211,100 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
 
   const allKnownIsins = knownIsins(fullText);
   const mined: Holding[] = [];
-  let inDematHolding = false;
-  let inMfHolding = false;
+
+  type Mode = "none" | "nsdl_equity" | "cdsl_bal" | "mf_folio" | "cdsl_holding" | "cdsl_mf";
+  let mode: Mode = "none";
+
+  const isEndMarker = (line: string) =>
+    /^(Sub Total|Total\b|Grand Total|Load Structures|Portfolio Value|STATEMENT OF TRANSACTIONS|Transactions for|National Pension System|Nil Holding|Mutual Funds Transaction|ISIN\s+ISIN\s+NAME|Know more about)/i.test(line);
+
+  const collectRow = (startIdx: number, found: { isin: string; index: number; length: number }) => {
+    const afterIsinFirst = lineMap[startIdx].slice(found.index + found.length);
+    const parts: string[] = [afterIsinFirst];
+    const nameParts: string[] = [];
+    const firstNameMatch = afterIsinFirst.match(/^\s*([^0-9]+?)(?=\s+[\d,]+(?:\.\d+)?|$)/);
+    if (firstNameMatch) nameParts.push(firstNameMatch[1].trim());
+    let j = startIdx + 1;
+    for (; j < lineMap.length && j < startIdx + 18; j++) {
+      const nxt = lineMap[j];
+      if (findIsin(nxt, allKnownIsins)) break;
+      if (isEndMarker(nxt)) break;
+      if (/Demat Account|ACCOUNT HOLDER|DP ID:|Mutual Funds \(M\)|Equities \(E\)|Mutual Fund Folios|Equity Shares|^ISIN\s+SECURITY|^ISIN\s+UCC|^ISIN\s+Stock Symbol/i.test(nxt)) break;
+      parts.push(nxt);
+      if (!/^[\d,.\s]+$/.test(nxt) && /[A-Za-z]/.test(nxt) && !/^See Note/i.test(nxt)) {
+        const stripped = nxt.replace(/[\d,]+(?:\.\d+)?/g, "").replace(/\s+/g, " ").trim();
+        if (stripped && stripped.length > 2 && !/^(NSE|BSE|EQUITY SHARES|ISIN SUSPENDED|NOT LISTED|Scheme of Arrangement)/i.test(stripped)) {
+          nameParts.push(stripped);
+        }
+      }
+    }
+    const blob = parts.join(" ");
+    const numbers = extractLooseNumbers(blob).filter(n => Number.isFinite(n));
+    const name = (nameParts.join(" ") || found.isin).replace(/[#*]/g, "").replace(/\s+/g, " ").trim().slice(0, 140);
+    return { numbers, name };
+  };
 
   for (let i = 0; i < lineMap.length; i++) {
     const line = lineMap[i];
 
-    if (/MUTUAL FUND UNITS HELD AS ON/i.test(line)) {
-      inMfHolding = true;
-      inDematHolding = false;
-      continue;
+    if (/Equity Shares|^Equities \(E\)/i.test(line)) mode = "nsdl_equity";
+    else if (/Mutual Fund Folios \(F\)|^ISIN\s+UCC/i.test(line)) mode = "mf_folio";
+    else if (/^ISIN\s+SECURITY/i.test(line)) mode = "cdsl_bal";
+    else if (/MUTUAL FUND UNITS HELD AS ON/i.test(line)) mode = "cdsl_mf";
+    else if (/HOLDING STATEMENT AS ON/i.test(line)) mode = "cdsl_holding";
+    else if (/^(Transactions for|STATEMENT OF TRANSACTIONS|National Pension System|Mutual Funds Transaction|ISIN\s+ISIN\s+NAME|Know more about|Grand Total)/i.test(line)) {
+      mode = "none";
     }
-    if (/HOLDING STATEMENT AS ON/i.test(line)) {
-      inDematHolding = true;
-      inMfHolding = false;
-      continue;
-    }
-    if (/^(Portfolio Value|DP Name|STATEMENT OF TRANSACTIONS|Nil Holding)/i.test(line)) inDematHolding = false;
-    if (/^(Grand Total|Load Structures)/i.test(line)) inMfHolding = false;
 
-    if (inDematHolding) {
-      const found = findIsin(line, allKnownIsins);
-      if (!found) continue;
-      const nums = extractLooseNumbers(line.slice(found.index + found.length)).filter(v => v >= 0);
+    if (mode === "none") continue;
+    const found = findIsin(line, allKnownIsins);
+    if (!found) continue;
+
+    const { numbers, name } = collectRow(i, found);
+    if (numbers.length < 2) continue;
+
+    let quantity = 0, price = 0, value = 0, type: HoldingType = "Equity";
+
+    if (mode === "nsdl_equity") {
+      const tail = numbers.slice(-4);
+      if (tail.length === 4) { quantity = tail[1]; price = tail[2]; value = tail[3]; }
+      else if (tail.length === 3) { quantity = tail[0]; price = 0; value = tail[2]; }
+      else { value = numbers[numbers.length - 1]; quantity = numbers[0]; }
+      type = classify(name, found.isin);
+    } else if (mode === "cdsl_bal") {
+      quantity = numbers[0];
+      price = numbers[numbers.length - 2];
+      value = numbers[numbers.length - 1];
+      type = classify(name, found.isin);
+    } else if (mode === "mf_folio") {
+      quantity = numbers[0];
+      price = numbers[3] ?? numbers[numbers.length - 3];
+      value = numbers[4] ?? numbers[numbers.length - 2];
+      type = "Mutual Fund";
+    } else if (mode === "cdsl_holding") {
+      const nums = numbers.slice(-3);
       if (nums.length < 3) continue;
-      const [quantity, price, value] = nums.slice(-3);
-      if (value <= 0 && quantity <= 0) continue;
-      const name = nameAround(lineMap, i, found, allKnownIsins);
-      mined.push({
-        isin: found.isin,
-        name,
-        type: classify(name, found.isin),
-        quantity,
-        price,
-        value,
-        source: source === "Unknown" ? "CDSL" : source,
-      });
-      continue;
+      [quantity, price, value] = nums;
+      type = classify(name, found.isin);
+    } else if (mode === "cdsl_mf") {
+      quantity = numbers[0];
+      price = numbers[1];
+      value = numbers[3] ?? numbers[numbers.length - 1];
+      type = "Mutual Fund";
     }
 
-    if (inMfHolding) {
-      const currentFound = findIsin(line, allKnownIsins);
-      if (!currentFound) continue;
-      const rowText = normalizeLine([line, lineMap[i + 1] || "", lineMap[i + 2] || ""].join(" "));
-      const found = currentFound;
-      let nums = extractNumberTokens(rowText.slice(found.index + found.length));
-      if (nums.length >= 6 && Number.isInteger(nums[0]) && nums[0] > 100000) nums = nums.slice(1);
-      if (nums.length < 4) continue;
-      const quantity = nums[0];
-      const price = nums[1];
-      const value = nums[3];
-      if (value <= 0 && quantity <= 0) continue;
-      const name = nameAround(lineMap, i, found, allKnownIsins);
-      mined.push({
-        isin: found.isin,
-        name,
-        type: "Mutual Fund",
-        quantity,
-        price,
-        value,
-        source: source === "Unknown" ? "CDSL" : source,
-      });
-    }
+    if (!Number.isFinite(value) || value <= 0) continue;
+    if (!price && quantity > 0) price = value / quantity;
+
+    mined.push({
+      isin: found.isin,
+      name: name || found.isin,
+      type,
+      quantity,
+      price,
+      value,
+      source: source === "Unknown" ? "NSDL" : source,
+    });
   }
 
   const holdings = aggregateHoldings(mined);

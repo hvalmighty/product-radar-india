@@ -41,6 +41,7 @@ function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; 
 
 // Asset class mapping
 function assetClass(h: Holding): string {
+  if (h.productCategory) return h.productCategory;
   if (h.type === "Mutual Fund") {
     const n = h.name.toUpperCase();
     if (/LIQUID|OVERNIGHT|MONEY MARKET|ULTRA SHORT/.test(n)) return "Cash & Equivalents";

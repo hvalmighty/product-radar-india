@@ -107,6 +107,12 @@ const ASSET_BENCHMARKS: Record<string, { name: string; ret: number }> = {
   "Direct Debt": { name: "CRISIL 10Y G-Sec", ret: 7.2 },
   "ETF": { name: "NIFTY 50 TRI", ret: 14.2 },
   "Cash & Equivalents": { name: "CRISIL Liquid", ret: 6.8 },
+  "PMS": { name: "BSE 500 TRI", ret: 16.4 },
+  "AIF": { name: "BSE 500 TRI + 200 bps", ret: 17.8 },
+  "REIT": { name: "Nifty REITs & InvITs", ret: 9.2 },
+  "InvIT": { name: "Nifty REITs & InvITs", ret: 9.2 },
+  "Private Equity": { name: "MSCI India PE Proxy", ret: 18.5 },
+  "Real Estate": { name: "RBI Housing Price Index", ret: 7.5 },
   "Other": { name: "—", ret: 0 },
 };
 

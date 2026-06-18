@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as MarketDataRouteImport } from './routes/market-data'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProposalRoute = ProposalRouteImport.update({
   id: '/proposal',
   path: '/proposal',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
+  '/reports': typeof ReportsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
+  '/reports': typeof ReportsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,27 @@ export interface FileRoutesById {
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
+  '/reports': typeof ReportsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
+  fullPaths:
+    | '/'
+    | '/alerts'
+    | '/market-data'
+    | '/portfolio'
+    | '/proposal'
+    | '/reports'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
-  id: '__root__' | '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal'
+  to: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal' | '/reports'
+  id:
+    | '__root__'
+    | '/'
+    | '/alerts'
+    | '/market-data'
+    | '/portfolio'
+    | '/proposal'
+    | '/reports'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,10 +99,18 @@ export interface RootRouteChildren {
   MarketDataRoute: typeof MarketDataRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
+  ReportsRoute: typeof ReportsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/proposal': {
       id: '/proposal'
       path: '/proposal'
@@ -125,17 +155,8 @@ const rootRouteChildren: RootRouteChildren = {
   MarketDataRoute: MarketDataRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,
+  ReportsRoute: ReportsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

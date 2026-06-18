@@ -578,20 +578,27 @@ function ReportView({ portfolios, title, mode, onBack }: {
             <CFStat label="Unrealized G/L" value={unrealizedGL} tone={unrealizedGL >= 0 ? "pos" : "neg"} />
             <CFStat label="Closing Value" value={totalValue} tone="neutral" highlight />
           </div>
-          <div className="mt-4 h-48">
+          <div className="mt-4 h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
-                { name: "Contribution", v: contribution },
-                { name: "Distribution", v: distribution },
-                { name: "Realized G/L", v: realizedGL },
-                { name: "Unrealized G/L", v: unrealizedGL },
-                { name: "Closing", v: totalValue },
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tickFormatter={(v) => `${(v / 1e7).toFixed(1)}Cr`} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v: number) => fmtINR(v)} />
-                <Bar dataKey="v" fill="#6366f1" />
+                { name: "Contribution", v: contribution, i: 0 },
+                { name: "Distribution", v: distribution, i: 1 },
+                { name: "Realized G/L", v: realizedGL, i: realizedGL >= 0 ? 1 : 3 },
+                { name: "Unrealized G/L", v: unrealizedGL, i: unrealizedGL >= 0 ? 1 : 3 },
+                { name: "Closing", v: totalValue, i: 0 },
+              ]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ChartDefs />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `${(v / 1e7).toFixed(1)}Cr`} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                <Bar dataKey="v" radius={[8, 8, 0, 0]} maxBarSize={64}>
+                  {[0,1,2,3,4].map((idx) => {
+                    const d = [contribution, distribution, realizedGL, unrealizedGL, totalValue][idx];
+                    const pos = d >= 0;
+                    return <Cell key={idx} fill={idx === 4 ? grad(0) : pos ? grad(1) : grad(3)} />;
+                  })}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -609,14 +616,15 @@ function ReportView({ portfolios, title, mode, onBack }: {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={targetVsCurrent} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={120} />
-                  <Tooltip formatter={(v: number) => pct(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="target" name="Target %" fill="#94a3b8" />
-                  <Bar dataKey="current" name="Current %" fill="#6366f1" />
+                <BarChart data={targetVsCurrent} layout="vertical" margin={{ top: 6, right: 12, left: 4, bottom: 0 }} barCategoryGap={10}>
+                  <ChartDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
+                  <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                  <YAxis dataKey="name" type="category" tick={{ ...AXIS_TICK, fontSize: 10 }} width={130} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
+                  <Bar dataKey="target" name="Target" fill={grad(9)} radius={[0, 4, 4, 0]} barSize={10} />
+                  <Bar dataKey="current" name="Current" fill={grad(0)} radius={[0, 4, 4, 0]} barSize={10} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -625,14 +633,15 @@ function ReportView({ portfolios, title, mode, onBack }: {
           <Card title="Asset Class Performance vs Benchmark">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byAssetClass.map(a => ({ name: a.name.replace("Mutual Fund - ", "MF "), portfolio: a.ret, benchmark: a.bench.ret }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={60} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
-                  <Tooltip formatter={(v: number) => pct(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="portfolio" name="Portfolio" fill="#10b981" />
-                  <Bar dataKey="benchmark" name="Benchmark" fill="#94a3b8" />
+                <BarChart data={byAssetClass.map(a => ({ name: a.name.replace("Mutual Fund - ", "MF "), portfolio: a.ret, benchmark: a.bench.ret }))} margin={{ top: 6, right: 8, left: 0, bottom: 8 }} barCategoryGap={14}>
+                  <ChartDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                  <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 9 }} angle={-18} textAnchor="end" height={64} axisLine={false} tickLine={false} interval={0} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${v.toFixed(0)}%`} />
+                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
+                  <Bar dataKey="portfolio" name="Portfolio" fill={grad(1)} radius={[6, 6, 0, 0]} maxBarSize={28} />
+                  <Bar dataKey="benchmark" name="Benchmark" fill={grad(9)} radius={[6, 6, 0, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -689,11 +698,13 @@ function ReportView({ portfolios, title, mode, onBack }: {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={liquidity} dataKey="value" nameKey="name" outerRadius={90} label={(e: any) => `${pct(e.pct)}`}>
-                    {liquidity.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <ChartDefs />
+                  <Pie data={liquidity} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} paddingAngle={2} stroke="hsl(var(--background))" strokeWidth={2}
+                    label={(e: any) => e.pct >= 6 ? `${pct(e.pct, 0)}` : ""} labelLine={false}>
+                    {liquidity.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Tooltip content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Legend wrapperStyle={{ fontSize: 10, paddingTop: 6 }} iconType="circle" />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -713,14 +724,15 @@ function ReportView({ portfolios, title, mode, onBack }: {
           <Card title="Upcoming Cashflows — Next 180 Days">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={upcomingCF}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="coupon" name="Coupon" stackId="a" fill="#10b981" />
-                  <Bar dataKey="maturity" name="Maturity" stackId="a" fill="#f59e0b" />
+                <BarChart data={upcomingCF} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} barCategoryGap={14}>
+                  <ChartDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                  <XAxis dataKey="bucket" tick={{ ...AXIS_TICK, fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
+                  <Bar dataKey="coupon" name="Coupon" stackId="a" fill={grad(1)} maxBarSize={36} />
+                  <Bar dataKey="maturity" name="Maturity" stackId="a" fill={grad(2)} radius={[6, 6, 0, 0]} maxBarSize={36} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -811,12 +823,15 @@ function ReportView({ portfolios, title, mode, onBack }: {
           <Card title="Top 10 Issuers">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byIssuer.slice(0, 10)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={110} />
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
-                  <Bar dataKey="value" fill="#6366f1" />
+                <BarChart data={byIssuer.slice(0, 10)} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
+                  <ChartDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
+                  <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <YAxis dataKey="name" type="category" tick={{ ...AXIS_TICK, fontSize: 10 }} width={120} axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={14}>
+                    {byIssuer.slice(0, 10).map((_, i) => <Cell key={i} fill={grad(i)} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -826,10 +841,12 @@ function ReportView({ portfolios, title, mode, onBack }: {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={bySector} dataKey="value" nameKey="name" outerRadius={90} label={(e: any) => e.pct > 5 ? e.name : ""}>
-                    {bySector.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <ChartDefs />
+                  <Pie data={bySector} dataKey="value" nameKey="name" innerRadius={48} outerRadius={92} paddingAngle={1.5} stroke="hsl(var(--background))" strokeWidth={2}
+                    label={(e: any) => e.pct > 6 ? e.name : ""} labelLine={false}>
+                    {bySector.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Tooltip content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -839,10 +856,13 @@ function ReportView({ portfolios, title, mode, onBack }: {
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={byMarketCap} dataKey="value" nameKey="name" outerRadius={80} label={(e: any) => `${e.name} ${pct(e.pct)}`}>
-                    {byMarketCap.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <ChartDefs />
+                  <Pie data={byMarketCap} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={2} stroke="hsl(var(--background))" strokeWidth={2}
+                    label={(e: any) => `${pct(e.pct, 0)}`} labelLine={false}>
+                    {byMarketCap.map((_, i) => <Cell key={i} fill={rgrad(i + 2)} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Tooltip content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Legend wrapperStyle={{ fontSize: 10, paddingTop: 6 }} iconType="circle" />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -851,12 +871,15 @@ function ReportView({ portfolios, title, mode, onBack }: {
           <Card title="Credit Rating Profile (Debt)">
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byRating}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
-                  <Tooltip formatter={(v: number) => fmtINR(v)} />
-                  <Bar dataKey="value" fill="#10b981" />
+                <BarChart data={byRating} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} barCategoryGap={14}>
+                  <ChartDefs />
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
+                  <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48}>
+                    {byRating.map((_, i) => <Cell key={i} fill={grad(i + 1)} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

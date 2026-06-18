@@ -263,7 +263,7 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
   for (let i = 0; i < lineMap.length; i++) {
     const line = lineMap[i];
 
-    if (/Equity Shares|^Equities \(E\)/i.test(line)) mode = "nsdl_equity";
+    if (/^(?:Equity Shares|Equities \(E\))$/i.test(line)) mode = "nsdl_equity";
     else if (/Mutual Fund Folios \(F\)|^ISIN\s+UCC/i.test(line)) mode = "mf_folio";
     else if (/^ISIN\s+SECURITY/i.test(line)) mode = "cdsl_bal";
     else if (/MUTUAL FUND UNITS HELD AS ON/i.test(line)) mode = "cdsl_mf";

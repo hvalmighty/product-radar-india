@@ -190,16 +190,53 @@ function ReportsPage() {
                 <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Family Name</label>
                 <input value={familyName} onChange={e => setFamilyName(e.target.value)}
                   className="mt-1 block w-full max-w-sm px-3 py-2 text-sm bg-background border border-border rounded-sm focus:outline-none focus:border-foreground/50" />
+
+                {(() => {
+                  const have = new Set(saved.map(s => s.id));
+                  const available = SAMPLE_FAMILIES.filter(f => f.portfolioIds.every(id => have.has(id)));
+                  if (available.length === 0) return null;
+                  return (
+                    <div className="mt-4">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2">Quick-pick sample families</div>
+                      <div className="flex flex-wrap gap-2">
+                        {available.map(f => (
+                          <button key={f.name}
+                            onClick={() => { setFamilyName(f.name); setSelected(new Set(f.portfolioIds)); }}
+                            className="px-3 py-1.5 text-[11px] border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+                            <Users className="w-3 h-3" /> {f.name}
+                            <span className="text-muted-foreground">· {f.portfolioIds.length}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
             <div className="mt-6 border border-border rounded-md bg-surface">
-              <div className="px-4 py-2.5 border-b border-border text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Saved Portfolios ({saved.length})
+              <div className="px-4 py-2.5 border-b border-border flex items-center gap-2">
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Saved Portfolios ({saved.length})
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => setSaved(seedSamplePortfolios())}
+                    className="text-[11px] inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary">
+                    <Sparkles className="w-3 h-3" /> Load sample portfolios
+                  </button>
+                  {saved.some(s => s.isSample) && (
+                    <button
+                      onClick={() => { setSaved(removeSamplePortfolios()); setSelected(new Set()); }}
+                      className="text-[11px] inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary text-muted-foreground">
+                      <Trash className="w-3 h-3" /> Remove samples
+                    </button>
+                  )}
+                </div>
               </div>
               {saved.length === 0 ? (
                 <div className="p-8 text-center text-xs text-muted-foreground">
-                  No saved portfolios yet. Go to <Link to="/portfolio" className="underline">Portfolios</Link>, import an eCAS PDF, and click <strong>Save</strong>.
+                  No saved portfolios yet. <button onClick={() => setSaved(seedSamplePortfolios())} className="underline">Load {SAMPLE_PORTFOLIOS.length} sample portfolios</button> or go to <Link to="/portfolio" className="underline">Portfolios</Link> to import an eCAS PDF.
                 </div>
               ) : (
                 <table className="w-full text-xs">
@@ -213,7 +250,11 @@ function ReportsPage() {
                             <input type={mode === "customer" ? "radio" : "checkbox"} checked={checked} readOnly />
                           </td>
                           <td className="px-2 py-3">
-                            <div className="font-medium">{s.name}</div>
+                            <div className="font-medium flex items-center gap-2">
+                              {s.name}
+                              {s.isSample && <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground">Sample</span>}
+                              {s.family && <span className="text-[10px] text-muted-foreground">· {s.family}</span>}
+                            </div>
                             <div className="text-[10px] text-muted-foreground mono-num">{s.data.holdings.length} holdings · {fmtINR(s.data.totalValue)}</div>
                           </td>
                           <td className="px-4 py-3 text-right text-[10px] text-muted-foreground">

@@ -23,6 +23,8 @@ export interface Holding {
   price: number;
   value: number;
   source: "NSDL" | "CDSL";
+  /** Optional fine-grained product category (PMS / AIF / REIT / InvIT / Private Equity / Real Estate / Mutual Fund - Equity etc.). When present, reports use this for asset-class bucketing instead of `type`. */
+  productCategory?: string;
 }
 
 export interface PortfolioParseResult {

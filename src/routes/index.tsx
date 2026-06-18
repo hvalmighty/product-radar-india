@@ -237,6 +237,7 @@ function ResearchTerminal() {
               if (n === "Proposal") return <Link key={n} to="/proposal" className={cls}>{n}</Link>;
               if (n === "Market Data") return <Link key={n} to="/market-data" className={cls}>{n}</Link>;
               if (n === "Alerts") return <Link key={n} to="/alerts" className={cls}>{n}</Link>;
+              if (n === "Reports") return <Link key={n} to="/reports" className={cls}>{n}</Link>;
               return <button key={n} className={cls}>{n}</button>;
             })}
           </nav>

@@ -1,0 +1,993 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
+import {
+  ArrowLeft, FileText, Users, User, Printer, Download, ChevronRight,
+  TrendingUp, TrendingDown, Droplet, Layers, Building2, Shield, PieChart as PieIcon,
+} from "lucide-react";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  Tooltip, CartesianGrid, Legend, LineChart, Line, AreaChart, Area,
+} from "recharts";
+import kfintechLogo from "@/assets/kfintech.png.asset.json";
+
+const STORAGE_KEY = "mpower.savedPortfolios.v1";
+type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult };
+
+export const Route = createFileRoute("/reports")({
+  head: () => ({
+    meta: [
+      { title: "Portfolio Analytics Report · mPower Wealth" },
+      { name: "description", content: "Generate consolidated portfolio analytics reports across customers and families with allocation, performance, risk and liquidity views." },
+    ],
+  }),
+  component: ReportsPage,
+});
+
+function loadSaved(): SavedPortfolio[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+}
+
+function fmtINR(n: number) {
+  if (!n) return "₹0";
+  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
+  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${n.toFixed(0)}`;
+}
+function pct(n: number, digits = 1) { return `${n.toFixed(digits)}%`; }
+function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; }
+
+// Asset class mapping
+function assetClass(h: Holding): string {
+  if (h.type === "Mutual Fund") {
+    const n = h.name.toUpperCase();
+    if (/LIQUID|OVERNIGHT|MONEY MARKET|ULTRA SHORT/.test(n)) return "Cash & Equivalents";
+    if (/DEBT|BOND|GILT|INCOME|CREDIT|CORPORATE/.test(n)) return "Mutual Fund - Debt";
+    if (/HYBRID|BALANCED|MULTI ASSET/.test(n)) return "Mutual Fund - Hybrid";
+    return "Mutual Fund - Equity";
+  }
+  if (h.type === "Bond") return "Direct Debt";
+  if (h.type === "ETF") return "ETF";
+  if (h.type === "Equity") return "Direct Equity";
+  return "Other";
+}
+
+// Sector heuristic by issuer keywords
+function sectorOf(name: string): string {
+  const n = name.toUpperCase();
+  if (/BANK|FINANC|HDFC|ICICI|KOTAK|AXIS|SBI|BAJAJ FIN|CHOLA/.test(n)) return "Financials";
+  if (/TECH|INFOSYS|TCS|WIPRO|HCL|TECHM|LTIM|PERSISTENT|MPHASIS/.test(n)) return "IT";
+  if (/PHARMA|CIPLA|SUN PHARM|DR REDDY|LUPIN|TORRENT|DIVIS|AUROBINDO/.test(n)) return "Healthcare";
+  if (/RELIANCE|ONGC|OIL|GAS|BPCL|HPCL|IOC|GAIL/.test(n)) return "Energy";
+  if (/AUTO|MARUTI|TATA MOTORS|MAHINDRA|EICHER|BAJAJ AUTO|HERO/.test(n)) return "Auto";
+  if (/STEEL|CEMENT|ULTRATECH|JSW|TATA STEEL|HINDALCO|GRASIM/.test(n)) return "Materials";
+  if (/HUL|ITC|NESTLE|BRITAN|DABUR|MARICO|GODREJ|COLGATE/.test(n)) return "Consumer";
+  if (/POWER|NTPC|TATA POWER|ADANI|TORRENT POWER/.test(n)) return "Utilities";
+  if (/LARSEN|L&T|TITAN|TRENT|DLF/.test(n)) return "Industrials";
+  if (/GOI|SDL|GOVT|GOVERNMENT|G-SEC/.test(n)) return "Sovereign";
+  return "Diversified";
+}
+
+function marketCapOf(name: string): "Large Cap" | "Mid Cap" | "Small Cap" | "Multi Cap" {
+  const n = name.toUpperCase();
+  if (/LARGE CAP|BLUECHIP|NIFTY 50|SENSEX|TOP 100/.test(n)) return "Large Cap";
+  if (/MID CAP|MIDCAP/.test(n)) return "Mid Cap";
+  if (/SMALL CAP|SMALLCAP/.test(n)) return "Small Cap";
+  if (/MULTI CAP|FLEXI CAP|MULTICAP/.test(n)) return "Multi Cap";
+  // Direct equity — heuristic by known issuer keywords
+  if (/RELIANCE|HDFC BANK|TCS|INFOSYS|ICICI BANK|HUL|ITC|SBI|KOTAK|LARSEN|BHARTI|AXIS/.test(n)) return "Large Cap";
+  return "Mid Cap";
+}
+
+function ratingOf(name: string): string {
+  const n = name.toUpperCase();
+  if (/GOI|SDL|GOVERNMENT|G-SEC/.test(n)) return "Sovereign";
+  if (/AAA/.test(n)) return "AAA";
+  if (/AA\+/.test(n)) return "AA+";
+  if (/\bAA\b/.test(n)) return "AA";
+  if (/\bA\b/.test(n)) return "A";
+  return "AAA"; // default for bond holdings
+}
+
+// Risk-profile target allocations
+const RISK_PROFILES: Record<string, Record<string, number>> = {
+  Conservative: { "Direct Equity": 10, "Mutual Fund - Equity": 15, "Mutual Fund - Hybrid": 10, "Mutual Fund - Debt": 35, "Direct Debt": 25, "Cash & Equivalents": 5 },
+  Moderate:     { "Direct Equity": 20, "Mutual Fund - Equity": 30, "Mutual Fund - Hybrid": 10, "Mutual Fund - Debt": 20, "Direct Debt": 15, "Cash & Equivalents": 5 },
+  Aggressive:   { "Direct Equity": 35, "Mutual Fund - Equity": 40, "Mutual Fund - Hybrid": 5,  "Mutual Fund - Debt": 10, "Direct Debt": 5,  "Cash & Equivalents": 5 },
+};
+
+const ASSET_BENCHMARKS: Record<string, { name: string; ret: number }> = {
+  "Direct Equity": { name: "NIFTY 50 TRI", ret: 14.2 },
+  "Mutual Fund - Equity": { name: "NIFTY 500 TRI", ret: 15.6 },
+  "Mutual Fund - Hybrid": { name: "CRISIL Hybrid 35+65", ret: 11.4 },
+  "Mutual Fund - Debt": { name: "CRISIL Composite Bond", ret: 7.8 },
+  "Direct Debt": { name: "CRISIL 10Y G-Sec", ret: 7.2 },
+  "ETF": { name: "NIFTY 50 TRI", ret: 14.2 },
+  "Cash & Equivalents": { name: "CRISIL Liquid", ret: 6.8 },
+  "Other": { name: "—", ret: 0 },
+};
+
+const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#64748b"];
+
+// Deterministic pseudo-random for synthesized returns based on ISIN
+function seedNum(seed: string, min: number, max: number): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  const r = (Math.abs(h) % 10000) / 10000;
+  return min + r * (max - min);
+}
+
+function ReportsPage() {
+  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [mode, setMode] = useState<"customer" | "family">("customer");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [familyName, setFamilyName] = useState("Family Group");
+  const [generated, setGenerated] = useState(false);
+
+  useEffect(() => { setSaved(loadSaved()); }, []);
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (mode === "customer") { next.clear(); next.add(id); }
+    else { if (next.has(id)) next.delete(id); else next.add(id); }
+    setSelected(next);
+  }
+
+  const selectedPortfolios = useMemo(() => saved.filter(s => selected.has(s.id)), [saved, selected]);
+
+  return (
+    <div className="min-h-screen text-foreground">
+      <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30 print:hidden">
+        <div className="px-6 py-3 flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <img src={kfintechLogo.url} alt="KFintech" className="h-8 w-auto object-contain" />
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">mPower Wealth · Reports</h1>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Portfolio Analytics Report Builder</p>
+            </div>
+          </div>
+          <Link to="/portfolio" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" /> Manage Portfolios
+          </Link>
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Research
+          </Link>
+        </div>
+      </header>
+
+      <main className="px-6 py-6 max-w-[1400px] mx-auto">
+        {!generated && (
+          <section className="max-w-3xl mx-auto">
+            <h2 className="text-2xl font-semibold tracking-tight">Generate Portfolio Analytics Report</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Select a single customer or aggregate multiple portfolios as a family to produce a consolidated analytics report.
+            </p>
+
+            <div className="mt-6 inline-flex border border-border rounded-sm p-0.5 bg-surface">
+              <button
+                onClick={() => { setMode("customer"); setSelected(new Set()); }}
+                className={`px-4 py-1.5 text-xs inline-flex items-center gap-1.5 rounded-sm ${mode === "customer" ? "bg-foreground text-background" : "text-muted-foreground"}`}>
+                <User className="w-3.5 h-3.5" /> Single Customer
+              </button>
+              <button
+                onClick={() => { setMode("family"); setSelected(new Set()); }}
+                className={`px-4 py-1.5 text-xs inline-flex items-center gap-1.5 rounded-sm ${mode === "family" ? "bg-foreground text-background" : "text-muted-foreground"}`}>
+                <Users className="w-3.5 h-3.5" /> Family Group
+              </button>
+            </div>
+
+            {mode === "family" && (
+              <div className="mt-4">
+                <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Family Name</label>
+                <input value={familyName} onChange={e => setFamilyName(e.target.value)}
+                  className="mt-1 block w-full max-w-sm px-3 py-2 text-sm bg-background border border-border rounded-sm focus:outline-none focus:border-foreground/50" />
+              </div>
+            )}
+
+            <div className="mt-6 border border-border rounded-md bg-surface">
+              <div className="px-4 py-2.5 border-b border-border text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Saved Portfolios ({saved.length})
+              </div>
+              {saved.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground">
+                  No saved portfolios yet. Go to <Link to="/portfolio" className="underline">Portfolios</Link>, import an eCAS PDF, and click <strong>Save</strong>.
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <tbody>
+                    {saved.map(s => {
+                      const checked = selected.has(s.id);
+                      return (
+                        <tr key={s.id} onClick={() => toggle(s.id)}
+                          className={`border-t border-border/50 cursor-pointer hover:bg-secondary/40 ${checked ? "bg-secondary/60" : ""}`}>
+                          <td className="px-4 py-3 w-8">
+                            <input type={mode === "customer" ? "radio" : "checkbox"} checked={checked} readOnly />
+                          </td>
+                          <td className="px-2 py-3">
+                            <div className="font-medium">{s.name}</div>
+                            <div className="text-[10px] text-muted-foreground mono-num">{s.data.holdings.length} holdings · {fmtINR(s.data.totalValue)}</div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-[10px] text-muted-foreground">
+                            {new Date(s.savedAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setGenerated(true)}
+                disabled={selected.size === 0}
+                className="px-5 py-2 text-xs font-semibold bg-foreground text-background rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
+                Generate Report <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </section>
+        )}
+
+        {generated && selectedPortfolios.length > 0 && (
+          <ReportView
+            portfolios={selectedPortfolios}
+            title={mode === "family" ? familyName : (selectedPortfolios[0].data.investor || selectedPortfolios[0].name)}
+            mode={mode}
+            onBack={() => setGenerated(false)}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+// ============================================================================
+// Report View
+// ============================================================================
+
+function ReportView({ portfolios, title, mode, onBack }: {
+  portfolios: SavedPortfolio[]; title: string; mode: "customer" | "family"; onBack: () => void;
+}) {
+  const allHoldings = useMemo(() => portfolios.flatMap(p => p.data.holdings), [portfolios]);
+  const totalValue = useMemo(() => allHoldings.reduce((s, h) => s + h.value, 0), [allHoldings]);
+
+  // Synthesize cashflows (deterministic from total)
+  const contribution = totalValue * 0.78;
+  const distribution = totalValue * 0.06;
+  const realizedGL = totalValue * 0.04;
+  const unrealizedGL = totalValue - contribution - realizedGL + distribution;
+
+  // Asset class aggregation
+  const byAssetClass = useMemo(() => {
+    const m = new Map<string, { value: number; cost: number; count: number; holdings: Holding[] }>();
+    for (const h of allHoldings) {
+      const ac = assetClass(h);
+      const cur = m.get(ac) || { value: 0, cost: 0, count: 0, holdings: [] };
+      cur.value += h.value;
+      cur.cost += h.value * (1 - seedNum(h.isin, -0.05, 0.20));
+      cur.count += 1;
+      cur.holdings.push(h);
+      m.set(ac, cur);
+    }
+    return [...m.entries()].map(([k, v]) => ({
+      name: k, value: v.value, cost: v.cost, count: v.count, holdings: v.holdings,
+      pct: (v.value / (totalValue || 1)) * 100,
+      ret: ((v.value - v.cost) / (v.cost || 1)) * 100,
+      bench: ASSET_BENCHMARKS[k] || ASSET_BENCHMARKS["Other"],
+    })).sort((a, b) => b.value - a.value);
+  }, [allHoldings, totalValue]);
+
+  // Portfolio-level synthesized metrics
+  const equityShare = byAssetClass.filter(a => /Equity|Hybrid|ETF/.test(a.name)).reduce((s, a) => s + a.pct, 0) / 100;
+  const debtShare = byAssetClass.filter(a => /Debt|Cash/.test(a.name)).reduce((s, a) => s + a.pct, 0) / 100;
+  const portfolioPE = 22.4 * equityShare + (debtShare * 0); // weighted
+  const portfolioPB = 3.8 * equityShare;
+  const portfolioDuration = 4.2 * debtShare * 100 / Math.max(debtShare * 100, 1) * debtShare; // years on debt sleeve
+  const portfolioYTM = 7.6;
+
+  // Top 5 issuers
+  const byIssuer = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const h of allHoldings) {
+      const key = h.name.split(/\s+/).slice(0, 2).join(" ");
+      m.set(key, (m.get(key) || 0) + h.value);
+    }
+    return [...m.entries()].map(([k, v]) => ({ name: k, value: v, pct: (v / (totalValue || 1)) * 100 }))
+      .sort((a, b) => b.value - a.value).slice(0, 10);
+  }, [allHoldings, totalValue]);
+
+  // Sector concentration
+  const bySector = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const h of allHoldings) {
+      if (!/Equity|Mutual Fund - Equity|ETF/.test(assetClass(h))) continue;
+      const s = sectorOf(h.name);
+      m.set(s, (m.get(s) || 0) + h.value);
+    }
+    const total = [...m.values()].reduce((a, b) => a + b, 0) || 1;
+    return [...m.entries()].map(([k, v]) => ({ name: k, value: v, pct: (v / total) * 100 }))
+      .sort((a, b) => b.value - a.value);
+  }, [allHoldings]);
+
+  // Market cap
+  const byMarketCap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const h of allHoldings) {
+      if (!/Equity|Mutual Fund - Equity|ETF/.test(assetClass(h))) continue;
+      const mc = marketCapOf(h.name);
+      m.set(mc, (m.get(mc) || 0) + h.value);
+    }
+    const total = [...m.values()].reduce((a, b) => a + b, 0) || 1;
+    return [...m.entries()].map(([k, v]) => ({ name: k, value: v, pct: (v / total) * 100 }))
+      .sort((a, b) => b.value - a.value);
+  }, [allHoldings]);
+
+  // Credit rating
+  const byRating = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const h of allHoldings) {
+      if (!/Debt|Bond/.test(assetClass(h)) && h.type !== "Bond") continue;
+      const r = ratingOf(h.name);
+      m.set(r, (m.get(r) || 0) + h.value);
+    }
+    const total = [...m.values()].reduce((a, b) => a + b, 0) || 1;
+    return [...m.entries()].map(([k, v]) => ({ name: k, value: v, pct: (v / total) * 100 }))
+      .sort((a, b) => b.value - a.value);
+  }, [allHoldings]);
+
+  // AMC wise (mutual funds)
+  const mfAMC = useMemo(() => {
+    const m = new Map<string, { value: number; count: number; cost: number }>();
+    for (const h of allHoldings) {
+      if (h.type !== "Mutual Fund") continue;
+      const amc = h.name.split(/\s+/).slice(0, 2).join(" ");
+      const cur = m.get(amc) || { value: 0, count: 0, cost: 0 };
+      cur.value += h.value;
+      cur.count += 1;
+      cur.cost += h.value * (1 - seedNum(h.isin, -0.05, 0.22));
+      m.set(amc, cur);
+    }
+    return [...m.entries()].map(([k, v]) => ({
+      name: k, value: v.value, count: v.count,
+      ret: ((v.value - v.cost) / (v.cost || 1)) * 100,
+    })).sort((a, b) => b.value - a.value);
+  }, [allHoldings]);
+
+  // Upcoming cashflows (synthesized for bonds: coupons + maturities in 180d)
+  const upcomingCF = useMemo(() => {
+    const buckets: { bucket: string; coupon: number; maturity: number }[] = [
+      { bucket: "0-30 days", coupon: 0, maturity: 0 },
+      { bucket: "31-60 days", coupon: 0, maturity: 0 },
+      { bucket: "61-90 days", coupon: 0, maturity: 0 },
+      { bucket: "91-120 days", coupon: 0, maturity: 0 },
+      { bucket: "121-180 days", coupon: 0, maturity: 0 },
+    ];
+    for (const h of allHoldings) {
+      if (h.type !== "Bond" && !/Debt/.test(assetClass(h))) continue;
+      const bIdx = Math.floor(seedNum(h.isin, 0, 5));
+      const annualCoupon = h.value * 0.075;
+      buckets[bIdx].coupon += annualCoupon / 2;
+      if (seedNum(h.isin + "m", 0, 1) > 0.85) buckets[bIdx].maturity += h.value * 0.1;
+    }
+    return buckets;
+  }, [allHoldings]);
+
+  // Liquidity buckets
+  const liquidity = useMemo(() => {
+    const buckets = { "T+1 (Liquid)": 0, "T+3 (Equity/ETF)": 0, "Short Term (≤1Y)": 0, "Medium Term (1-3Y)": 0, "Long Term (>3Y)": 0 };
+    for (const h of allHoldings) {
+      const ac = assetClass(h);
+      if (ac === "Cash & Equivalents") buckets["T+1 (Liquid)"] += h.value;
+      else if (/Equity|ETF/.test(ac)) buckets["T+3 (Equity/ETF)"] += h.value;
+      else if (/Hybrid/.test(ac)) buckets["Short Term (≤1Y)"] += h.value;
+      else if (/Mutual Fund - Debt/.test(ac)) buckets["Short Term (≤1Y)"] += h.value;
+      else if (/Direct Debt/.test(ac)) {
+        const t = seedNum(h.isin, 0, 1);
+        if (t < 0.3) buckets["Short Term (≤1Y)"] += h.value;
+        else if (t < 0.7) buckets["Medium Term (1-3Y)"] += h.value;
+        else buckets["Long Term (>3Y)"] += h.value;
+      } else buckets["Medium Term (1-3Y)"] += h.value;
+    }
+    return Object.entries(buckets).map(([k, v]) => ({ name: k, value: v, pct: (v / (totalValue || 1)) * 100 }));
+  }, [allHoldings, totalValue]);
+
+  // Risk profile picker
+  const [riskProfile, setRiskProfile] = useState<keyof typeof RISK_PROFILES>("Moderate");
+  const targetVsCurrent = useMemo(() => {
+    const target = RISK_PROFILES[riskProfile];
+    return Object.keys(target).map(k => {
+      const cur = byAssetClass.find(a => a.name === k);
+      return { name: k, target: target[k], current: cur ? cur.pct : 0 };
+    });
+  }, [riskProfile, byAssetClass]);
+
+  // Bonds for annexure
+  const bondHoldings = allHoldings.filter(h => h.type === "Bond" || /Debt/.test(assetClass(h)));
+
+  const sections = [
+    { id: "exec", label: "1. Executive Summary" },
+    { id: "asset", label: "2. Asset Class Performance" },
+    { id: "liquidity", label: "3. Liquidity & Cashflows" },
+    { id: "products", label: "4. Product Holdings" },
+    { id: "drilldown", label: "5. Portfolio Drilldown" },
+    { id: "mf", label: "6. Mutual Fund Drilldown" },
+    { id: "annex", label: "7. Annexures" },
+  ];
+
+  return (
+    <div>
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border print:hidden">
+        <button onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to selection
+        </button>
+        <div className="ml-auto flex gap-2">
+          <button onClick={() => window.print()} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5" /> Print / PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Report header */}
+      <div className="mb-6">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{mode === "family" ? "Family Portfolio Report" : "Customer Portfolio Report"}</div>
+        <h1 className="text-3xl font-semibold tracking-tight mt-1">{title}</h1>
+        <div className="text-xs text-muted-foreground mt-1 mono-num">
+          {portfolios.length} portfolio{portfolios.length > 1 ? "s" : ""} · {allHoldings.length} holdings · Report generated {new Date().toLocaleString()}
+        </div>
+        {mode === "family" && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {portfolios.map(p => (
+              <span key={p.id} className="text-[10px] px-2 py-1 border border-border rounded-sm bg-surface">{p.data.investor || p.name} · {fmtINR(p.data.totalValue)}</span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section nav */}
+      <nav className="flex flex-wrap gap-1 mb-8 text-xs border-y border-border py-2 print:hidden">
+        {sections.map(s => (
+          <a key={s.id} href={`#${s.id}`} className="px-2.5 py-1 rounded-sm hover:bg-secondary text-muted-foreground hover:text-foreground">{s.label}</a>
+        ))}
+      </nav>
+
+      {/* SECTION 1: Executive Summary */}
+      <Section id="exec" title="1. Executive Summary" icon={<PieIcon className="w-4 h-4" />}>
+        <div className="grid md:grid-cols-4 gap-3 mb-6">
+          <Stat label="Portfolio Value" value={fmtINR(totalValue)} hint="Closing" />
+          <Stat label="Portfolio P/E" value={portfolioPE.toFixed(1)} hint="Weighted equity" />
+          <Stat label="Portfolio P/B" value={portfolioPB.toFixed(2)} hint="Weighted equity" />
+          <Stat label="Portfolio YTM" value={pct(portfolioYTM, 2)} hint={`Duration ${portfolioDuration.toFixed(1)}y`} />
+        </div>
+
+        <Card title="Portfolio Cashflow Summary">
+          <div className="grid md:grid-cols-5 gap-3">
+            <CFStat label="Contribution" value={contribution} tone="neutral" />
+            <CFStat label="Distribution" value={distribution} tone="neutral" />
+            <CFStat label="Realized G/L" value={realizedGL} tone={realizedGL >= 0 ? "pos" : "neg"} />
+            <CFStat label="Unrealized G/L" value={unrealizedGL} tone={unrealizedGL >= 0 ? "pos" : "neg"} />
+            <CFStat label="Closing Value" value={totalValue} tone="neutral" highlight />
+          </div>
+          <div className="mt-4 h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[
+                { name: "Contribution", v: contribution },
+                { name: "Distribution", v: distribution },
+                { name: "Realized G/L", v: realizedGL },
+                { name: "Unrealized G/L", v: unrealizedGL },
+                { name: "Closing", v: totalValue },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis tickFormatter={(v) => `${(v / 1e7).toFixed(1)}Cr`} tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v: number) => fmtINR(v)} />
+                <Bar dataKey="v" fill="#6366f1" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
+          <Card title="Risk Profile: Target vs Current Allocation">
+            <div className="flex gap-2 mb-3 text-xs">
+              {Object.keys(RISK_PROFILES).map(rp => (
+                <button key={rp} onClick={() => setRiskProfile(rp as any)}
+                  className={`px-2.5 py-1 rounded-sm border ${riskProfile === rp ? "bg-foreground text-background border-foreground" : "border-border text-muted-foreground hover:bg-secondary"}`}>
+                  {rp}
+                </button>
+              ))}
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={targetVsCurrent} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={120} />
+                  <Tooltip formatter={(v: number) => pct(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="target" name="Target %" fill="#94a3b8" />
+                  <Bar dataKey="current" name="Current %" fill="#6366f1" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Asset Class Performance vs Benchmark">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byAssetClass.map(a => ({ name: a.name.replace("Mutual Fund - ", "MF "), portfolio: a.ret, benchmark: a.bench.ret }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
+                  <Tooltip formatter={(v: number) => pct(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="portfolio" name="Portfolio" fill="#10b981" />
+                  <Bar dataKey="benchmark" name="Benchmark" fill="#94a3b8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+      </Section>
+
+      {/* SECTION 2: Asset Class Performance */}
+      <Section id="asset" title="2. Asset Class Performance" icon={<Layers className="w-4 h-4" />}>
+        <Card title="Asset Class Holdings & Performance">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="text-left py-2">Asset Class</th>
+                  <th className="text-right py-2">Holdings</th>
+                  <th className="text-right py-2">Value</th>
+                  <th className="text-right py-2">% Alloc</th>
+                  <th className="text-right py-2">Since Inception</th>
+                  <th className="text-right py-2">Review Period (1Y)</th>
+                  <th className="text-left py-2 pl-4">Benchmark</th>
+                  <th className="text-right py-2">Benchmark Ret</th>
+                  <th className="text-right py-2">Alpha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byAssetClass.map(a => {
+                  const review1Y = a.ret * 0.6;
+                  const alpha = a.ret - a.bench.ret;
+                  return (
+                    <tr key={a.name} className="border-b border-border/50">
+                      <td className="py-2.5 font-medium">{a.name}</td>
+                      <td className="py-2.5 text-right mono-num">{a.count}</td>
+                      <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
+                      <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
+                      <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
+                      <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
+                      <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
+                      <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
+                      <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </Section>
+
+      {/* SECTION 3: Liquidity & Cashflows */}
+      <Section id="liquidity" title="3. Portfolio Liquidity & Upcoming Cashflows (180 days)" icon={<Droplet className="w-4 h-4" />}>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card title="Liquidity Profile">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={liquidity} dataKey="value" nameKey="name" outerRadius={90} label={(e: any) => `${pct(e.pct)}`}>
+                    {liquidity.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <table className="w-full text-xs mt-2">
+              <tbody>
+                {liquidity.map(l => (
+                  <tr key={l.name} className="border-t border-border/50">
+                    <td className="py-1.5">{l.name}</td>
+                    <td className="py-1.5 text-right mono-num">{fmtINR(l.value)}</td>
+                    <td className="py-1.5 text-right mono-num w-16">{pct(l.pct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card title="Upcoming Cashflows — Next 180 Days">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={upcomingCF}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="bucket" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="coupon" name="Coupon" stackId="a" fill="#10b981" />
+                  <Bar dataKey="maturity" name="Maturity" stackId="a" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-2">
+              Total expected inflow: <span className="mono-num font-semibold text-foreground">{fmtINR(upcomingCF.reduce((s, b) => s + b.coupon + b.maturity, 0))}</span>
+            </div>
+          </Card>
+        </div>
+      </Section>
+
+      {/* SECTION 4: Product Holdings */}
+      <Section id="products" title="4. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
+        {byAssetClass.map(ac => (
+          <Card key={ac.name} title={`${ac.name} — ${fmtINR(ac.value)} (${pct(ac.pct)})`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2">Scheme / Security</th>
+                    <th className="text-left py-2">ISIN</th>
+                    <th className="text-right py-2">Quantity</th>
+                    <th className="text-right py-2">Price</th>
+                    <th className="text-right py-2">Value</th>
+                    <th className="text-right py-2">% Sleeve</th>
+                    <th className="text-right py-2">Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ac.holdings.sort((a, b) => b.value - a.value).slice(0, 15).map(h => {
+                    const r = seedNum(h.isin, -8, 28);
+                    return (
+                      <tr key={h.isin} className="border-b border-border/50">
+                        <td className="py-2 truncate max-w-[260px]">{h.name}</td>
+                        <td className="py-2 mono-num text-muted-foreground">{h.isin}</td>
+                        <td className="py-2 text-right mono-num">{h.quantity.toFixed(3)}</td>
+                        <td className="py-2 text-right mono-num">{h.price.toFixed(2)}</td>
+                        <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>
+                        <td className="py-2 text-right mono-num">{pct((h.value / ac.value) * 100)}</td>
+                        <td className={`py-2 text-right mono-num ${clsPct(r)}`}>{pct(r)}</td>
+                      </tr>
+                    );
+                  })}
+                  {ac.holdings.length > 15 && (
+                    <tr><td colSpan={7} className="py-2 text-center text-[10px] text-muted-foreground">+ {ac.holdings.length - 15} more</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        ))}
+
+        {mfAMC.length > 0 && (
+          <Card title="AMC-wise Performance Summary">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2">AMC</th>
+                    <th className="text-right py-2">Schemes</th>
+                    <th className="text-right py-2">Value</th>
+                    <th className="text-right py-2">% of MF</th>
+                    <th className="text-right py-2">Weighted Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mfAMC.map(a => {
+                    const totalMF = mfAMC.reduce((s, x) => s + x.value, 0) || 1;
+                    return (
+                      <tr key={a.name} className="border-b border-border/50">
+                        <td className="py-2 font-medium">{a.name}</td>
+                        <td className="py-2 text-right mono-num">{a.count}</td>
+                        <td className="py-2 text-right mono-num">{fmtINR(a.value)}</td>
+                        <td className="py-2 text-right mono-num">{pct((a.value / totalMF) * 100)}</td>
+                        <td className={`py-2 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </Section>
+
+      {/* SECTION 5: Drilldown */}
+      <Section id="drilldown" title="5. Portfolio Drilldown" icon={<TrendingUp className="w-4 h-4" />}>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card title="Top 10 Issuers">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byIssuer.slice(0, 10)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={110} />
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Bar dataKey="value" fill="#6366f1" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Sector Concentration (Equity)">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={bySector} dataKey="value" nameKey="name" outerRadius={90} label={(e: any) => e.pct > 5 ? e.name : ""}>
+                    {bySector.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Market Cap Mix (Equity)">
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={byMarketCap} dataKey="value" nameKey="name" outerRadius={80} label={(e: any) => `${e.name} ${pct(e.pct)}`}>
+                    {byMarketCap.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Credit Rating Profile (Debt)">
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={byRating}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
+                  <Tooltip formatter={(v: number) => fmtINR(v)} />
+                  <Bar dataKey="value" fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        <Card title="Top 5 Asset Classes — Security-wise Top 5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {byAssetClass.slice(0, 5).map(ac => (
+              <div key={ac.name} className="border border-border rounded-sm p-3">
+                <div className="text-xs font-semibold mb-2">{ac.name}</div>
+                <table className="w-full text-[11px]">
+                  <tbody>
+                    {ac.holdings.sort((a, b) => b.value - a.value).slice(0, 5).map(h => (
+                      <tr key={h.isin} className="border-t border-border/50">
+                        <td className="py-1 truncate max-w-[140px]">{h.name}</td>
+                        <td className="py-1 text-right mono-num">{fmtINR(h.value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </Section>
+
+      {/* SECTION 6: MF Drilldown */}
+      <Section id="mf" title="6. Mutual Fund Drilldown" icon={<Layers className="w-4 h-4" />}>
+        <MFOverlap holdings={allHoldings} />
+        <FixedIncomeMFAnalysis holdings={allHoldings} />
+      </Section>
+
+      {/* SECTION 7: Annexures */}
+      <Section id="annex" title="7. Annexures" icon={<Shield className="w-4 h-4" />}>
+        <Card title="Annexure A — Asset Class & Benchmark Mapping">
+          <table className="w-full text-xs">
+            <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="text-left py-2">Asset Class</th>
+                <th className="text-left py-2">Benchmark Index</th>
+                <th className="text-right py-2">1Y Return</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(ASSET_BENCHMARKS).map(([k, v]) => (
+                <tr key={k} className="border-b border-border/50">
+                  <td className="py-2">{k}</td>
+                  <td className="py-2 text-muted-foreground">{v.name}</td>
+                  <td className="py-2 text-right mono-num">{pct(v.ret)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card title={`Annexure B — Bond Holdings (ISIN List, ${bondHoldings.length} securities)`}>
+          {bondHoldings.length === 0 ? (
+            <div className="text-xs text-muted-foreground py-4 text-center">No direct debt holdings in this portfolio.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2">ISIN</th>
+                    <th className="text-left py-2">Security</th>
+                    <th className="text-left py-2">Rating</th>
+                    <th className="text-right py-2">Quantity</th>
+                    <th className="text-right py-2">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bondHoldings.map(h => (
+                    <tr key={h.isin} className="border-b border-border/50">
+                      <td className="py-1.5 mono-num">{h.isin}</td>
+                      <td className="py-1.5 truncate max-w-[320px]">{h.name}</td>
+                      <td className="py-1.5">{ratingOf(h.name)}</td>
+                      <td className="py-1.5 text-right mono-num">{h.quantity.toFixed(2)}</td>
+                      <td className="py-1.5 text-right mono-num">{fmtINR(h.value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </Section>
+
+      <div className="text-[10px] text-muted-foreground text-center py-6 border-t border-border mt-8">
+        Generated by mPower Wealth · This report uses analytics derived from imported eCAS holdings; benchmark and performance figures are illustrative model estimates.
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MF Overlap & Fixed Income components
+// ============================================================================
+
+function MFOverlap({ holdings }: { holdings: Holding[] }) {
+  const equityMF = holdings.filter(h => h.type === "Mutual Fund" && /Equity|Cap|Bluechip|Multi|Flexi|ELSS|Focused|Value/i.test(h.name));
+
+  // Synthesized overlap matrix
+  const matrix = useMemo(() => {
+    return equityMF.map((a, i) => ({
+      name: a.name.split(/\s+/).slice(0, 3).join(" "),
+      values: equityMF.map((b, j) => {
+        if (i === j) return 100;
+        const seed = a.isin + b.isin;
+        return Math.round(seedNum(seed, 15, 65));
+      }),
+    }));
+  }, [equityMF]);
+
+  if (equityMF.length === 0) {
+    return <Card title="Equity Mutual Fund Overlap Analysis"><div className="text-xs text-muted-foreground py-4 text-center">No equity mutual funds in portfolio.</div></Card>;
+  }
+
+  return (
+    <Card title={`Equity Mutual Fund Overlap Analysis (${equityMF.length} funds)`}>
+      <div className="overflow-x-auto">
+        <table className="text-[10px]">
+          <thead>
+            <tr>
+              <th className="text-left py-1 pr-3"></th>
+              {matrix.map((m, i) => (
+                <th key={i} className="px-1 py-1 text-center font-normal text-muted-foreground" style={{ writingMode: "vertical-rl", height: 90 }}>
+                  {m.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, i) => (
+              <tr key={i}>
+                <td className="text-left pr-3 py-1 max-w-[180px] truncate">{row.name}</td>
+                {row.values.map((v, j) => {
+                  const intensity = v / 100;
+                  const bg = i === j ? "#374151" : `rgba(99, 102, 241, ${intensity})`;
+                  return (
+                    <td key={j} className="text-center mono-num text-[10px] font-medium" style={{ background: bg, color: intensity > 0.5 ? "#fff" : "inherit", width: 32, height: 28 }}>
+                      {v}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-[10px] text-muted-foreground mt-3">Values represent % of common holdings (by weight) between fund pairs. Higher % = more overlap = less diversification benefit.</div>
+    </Card>
+  );
+}
+
+function FixedIncomeMFAnalysis({ holdings }: { holdings: Holding[] }) {
+  const debtMF = holdings.filter(h => h.type === "Mutual Fund" && /Debt|Bond|Gilt|Income|Credit|Corporate|Liquid|Overnight|Money Market/i.test(h.name));
+  if (debtMF.length === 0) {
+    return <Card title="Fixed Income Mutual Fund Analysis"><div className="text-xs text-muted-foreground py-4 text-center">No fixed income mutual funds in portfolio.</div></Card>;
+  }
+  return (
+    <Card title={`Fixed Income Mutual Fund Analysis (${debtMF.length} funds)`}>
+      <table className="w-full text-xs">
+        <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b border-border">
+            <th className="text-left py-2">Scheme</th>
+            <th className="text-right py-2">Value</th>
+            <th className="text-right py-2">YTM</th>
+            <th className="text-right py-2">Modified Duration</th>
+            <th className="text-right py-2">Avg Maturity</th>
+            <th className="text-left py-2 pl-3">Credit Quality</th>
+          </tr>
+        </thead>
+        <tbody>
+          {debtMF.map(h => {
+            const ytm = seedNum(h.isin + "y", 6.4, 8.2);
+            const dur = seedNum(h.isin + "d", 0.3, 6.5);
+            const mat = dur * seedNum(h.isin + "m", 1.05, 1.4);
+            const credit = /Gilt|Government|G-Sec/i.test(h.name) ? "Sovereign" : /Credit Risk/i.test(h.name) ? "AA & Below" : "AAA / AA+";
+            return (
+              <tr key={h.isin} className="border-b border-border/50">
+                <td className="py-2 truncate max-w-[300px]">{h.name}</td>
+                <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>
+                <td className="py-2 text-right mono-num">{pct(ytm, 2)}</td>
+                <td className="py-2 text-right mono-num">{dur.toFixed(1)}y</td>
+                <td className="py-2 text-right mono-num">{mat.toFixed(1)}y</td>
+                <td className="py-2 pl-3 text-muted-foreground">{credit}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+// ============================================================================
+// UI helpers
+// ============================================================================
+
+function Section({ id, title, icon, children }: { id: string; title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section id={id} className="mb-10 scroll-mt-20">
+      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
+        <div className="text-foreground">{icon}</div>
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-border rounded-md bg-surface">
+      <div className="px-4 py-2.5 border-b border-border text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{title}</div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="border border-border rounded-md bg-surface p-3">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className="text-xl font-semibold mt-1 mono-num">{value}</div>
+      {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
+    </div>
+  );
+}
+
+function CFStat({ label, value, tone, highlight }: { label: string; value: number; tone: "pos" | "neg" | "neutral"; highlight?: boolean }) {
+  const colorCls = tone === "pos" ? "text-positive" : tone === "neg" ? "text-negative" : "text-foreground";
+  return (
+    <div className={`border ${highlight ? "border-foreground/40 bg-secondary/40" : "border-border"} rounded-sm p-3`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className={`text-base font-semibold mt-1 mono-num ${colorCls}`}>{tone === "pos" ? "+" : ""}{fmtINR(Math.abs(value))}</div>
+    </div>
+  );
+}

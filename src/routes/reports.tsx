@@ -117,6 +117,65 @@ const ASSET_BENCHMARKS: Record<string, { name: string; ret: number }> = {
 
 const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#64748b"];
 
+// Gradient palette tuned for charts (top → bottom for bars, center → edge for pies)
+const GRAD_PAIRS: Array<[string, string]> = [
+  ["#818cf8", "#4f46e5"], // indigo
+  ["#34d399", "#059669"], // emerald
+  ["#fbbf24", "#d97706"], // amber
+  ["#fb7185", "#e11d48"], // rose
+  ["#a78bfa", "#7c3aed"], // violet
+  ["#22d3ee", "#0891b2"], // cyan
+  ["#f472b6", "#db2777"], // pink
+  ["#a3e635", "#65a30d"], // lime
+  ["#fb923c", "#ea580c"], // orange
+  ["#94a3b8", "#475569"], // slate
+];
+
+/** Reusable SVG gradient defs — render once inside each chart */
+function ChartDefs() {
+  return (
+    <defs>
+      {GRAD_PAIRS.map(([from, to], i) => (
+        <linearGradient key={i} id={`g${i}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={from} stopOpacity={0.95} />
+          <stop offset="100%" stopColor={to} stopOpacity={0.85} />
+        </linearGradient>
+      ))}
+      {GRAD_PAIRS.map(([from, to], i) => (
+        <radialGradient key={`r${i}`} id={`rg${i}`} cx="50%" cy="50%" r="65%">
+          <stop offset="0%" stopColor={from} stopOpacity={1} />
+          <stop offset="100%" stopColor={to} stopOpacity={0.9} />
+        </radialGradient>
+      ))}
+      <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.18" />
+      </filter>
+    </defs>
+  );
+}
+const grad = (i: number) => `url(#g${i % GRAD_PAIRS.length})`;
+const rgrad = (i: number) => `url(#rg${i % GRAD_PAIRS.length})`;
+
+/** Polished tooltip with currency / percent formatting */
+function NiceTooltip({ active, payload, label, formatter }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-md border border-border bg-background/95 backdrop-blur px-3 py-2 shadow-lg text-[11px]">
+      {label !== undefined && <div className="font-semibold text-foreground mb-1">{label}</div>}
+      {payload.map((p: any, i: number) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color || p.payload?.fill || "#6366f1" }} />
+          <span className="text-muted-foreground">{p.name}:</span>
+          <span className="mono-num font-semibold text-foreground">{formatter ? formatter(p.value) : p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const AXIS_TICK = { fontSize: 10, fill: "hsl(var(--muted-foreground))" } as const;
+const GRID_STROKE = "hsl(var(--border))";
+
 // Deterministic pseudo-random for synthesized returns based on ISIN
 function seedNum(seed: string, min: number, max: number): number {
   let h = 0;

@@ -74,6 +74,18 @@ function knownIsins(fullText: string): string[] {
   return [...new Set([...fullText.matchAll(ISIN_RE)].map(m => m[1]))];
 }
 
+function investorFromNsdlLines(lines: string[]): string | undefined {
+  const start = lines.findIndex(line => /^NSDL ID:/i.test(line));
+  if (start < 0) return undefined;
+  for (let i = start + 1; i < Math.min(lines.length, start + 8); i++) {
+    const candidate = normalizeLine(lines[i]);
+    if (/^[A-Z][A-Z .]{4,80}$/.test(candidate) && !/^(PINCODE|SUMMARY|HOLDINGS|TRANSACTIONS)$/i.test(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 function findIsin(line: string, known: string[]): { isin: string; index: number; length: number } | null {
   ISIN_RE.lastIndex = 0;
   const full = ISIN_RE.exec(line);
@@ -202,14 +214,16 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
   }
 
   const source: "NSDL" | "CDSL" | "Unknown" =
+    /NSDL ID:|National Securities Depository|\bNSDL\b/i.test(fullText) ? "NSDL" :
     /CDSL|Central Depository Services/i.test(fullText) ? "CDSL" :
-    /NSDL|National Securities Depository/i.test(fullText) ? "NSDL" :
     /Consolidated Account Statement|CAS/i.test(fullText) ? "NSDL" : "Unknown";
 
   const panMatch = fullText.match(/\b([A-Z]{5}[0-9]{4}[A-Z])\b/);
+  const passwordPanMatch = password?.toUpperCase().match(/^([A-Z]{5}[0-9]{4}[A-Z])/);
   const asOfMatch = fullText.match(/as on ([0-9]{1,2}[- /][A-Za-z0-9]{3,9}[- /][0-9]{2,4})/i) ||
                     fullText.match(/Statement.*?([0-9]{1,2}[- /][A-Za-z]{3,9}[- /][0-9]{2,4})/i);
   const investorMatch = fullText.match(/(?:Name of (?:the )?(?:Investor|Holder|First Holder)|Investor Name)[:\s]+([A-Z][A-Z .]+?)(?:\s{2,}|\n|PAN)/i);
+  const nsdlInvestor = investorFromNsdlLines(lineMap);
 
   const allKnownIsins = knownIsins(fullText);
   const mined: Holding[] = [];
@@ -231,7 +245,7 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
       const nxt = lineMap[j];
       if (findIsin(nxt, allKnownIsins)) break;
       if (isEndMarker(nxt)) break;
-      if (/Demat Account|ACCOUNT HOLDER|DP ID:|Mutual Funds \(M\)|Equities \(E\)|Mutual Fund Folios|Equity Shares|^ISIN\s+SECURITY|^ISIN\s+UCC|^ISIN\s+Stock Symbol/i.test(nxt)) break;
+      if (/Demat Account|ACCOUNT HOLDER|DP ID:|Mutual Funds \(M\)|Equities \(E\)|Mutual Fund Folios|Equity Shares|^ISIN\s+(?:SECURITY|Company Name|UCC|Stock Symbol)|National Securities Depository|Consolidated Account Statement|^Summary\s+Holdings/i.test(nxt)) break;
       parts.push(nxt);
       if (!/^[\d,.\s]+$/.test(nxt) && /[A-Za-z]/.test(nxt) && !/^See Note/i.test(nxt)) {
         const stripped = nxt.replace(/[\d,]+(?:\.\d+)?/g, "").replace(/\s+/g, " ").trim();
@@ -270,18 +284,24 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
     if (mode === "nsdl_equity") {
       const tail = numbers.slice(-4);
       if (tail.length === 4) { quantity = tail[1]; price = tail[2]; value = tail[3]; }
-      else if (tail.length === 3) { quantity = tail[0]; price = 0; value = tail[2]; }
+      else if (tail.length === 3) { quantity = tail[1]; price = 0; value = tail[2]; }
       else { value = numbers[numbers.length - 1]; quantity = numbers[0]; }
       type = classify(name, found.isin);
     } else if (mode === "cdsl_bal") {
       quantity = numbers[0];
-      price = numbers[numbers.length - 2];
-      value = numbers[numbers.length - 1];
+      if (numbers.length >= 5 && numbers[4] > 0) {
+        price = numbers[3];
+        value = numbers[4];
+      } else {
+        price = numbers[numbers.length - 2];
+        value = numbers[numbers.length - 1];
+      }
       type = classify(name, found.isin);
     } else if (mode === "mf_folio") {
-      quantity = numbers[0];
-      price = numbers[3] ?? numbers[numbers.length - 3];
-      value = numbers[4] ?? numbers[numbers.length - 2];
+      const offset = numbers[0] > 1000000 ? 1 : 0;
+      quantity = numbers[offset];
+      price = numbers[offset + 3] ?? numbers[numbers.length - 3];
+      value = numbers[offset + 4] ?? numbers[numbers.length - 2];
       type = "Mutual Fund";
     } else if (mode === "cdsl_holding") {
       const nums = numbers.slice(-3);
@@ -316,8 +336,8 @@ export async function parseECasPdf(file: File, password?: string): Promise<Portf
   return {
     source,
     asOf: asOfMatch?.[1],
-    investor: investorMatch?.[1]?.trim(),
-    pan: panMatch?.[1],
+    investor: (nsdlInvestor || investorMatch?.[1])?.trim(),
+    pan: panMatch?.[1] || passwordPanMatch?.[1],
     holdings,
     totalValue,
     rawTextLength: fullText.length,

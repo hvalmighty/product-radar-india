@@ -10,9 +10,8 @@ import {
   Tooltip, CartesianGrid, Legend, LineChart, Line, AreaChart, Area,
 } from "recharts";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
-
-const STORAGE_KEY = "mpower.savedPortfolios.v1";
-type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult };
+import { SAMPLE_FAMILIES, SAMPLE_PORTFOLIOS, seedSamplePortfolios, removeSamplePortfolios, STORAGE_KEY, type SavedPortfolio } from "@/lib/sample-portfolios";
+import { Sparkles, Trash } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({

@@ -7,7 +7,7 @@ import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { seedSamplePortfolios, removeSamplePortfolios, SAMPLE_PORTFOLIOS } from "@/lib/sample-portfolios";
 
 const STORAGE_KEY = "mpower.savedPortfolios.v1";
-type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult };
+type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult; family?: string; isSample?: boolean };
 
 function loadSaved(): SavedPortfolio[] {
   if (typeof window === "undefined") return [];

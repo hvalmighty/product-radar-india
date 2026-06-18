@@ -188,17 +188,35 @@ function PortfolioImporter() {
           <div className="mb-6 border border-border rounded-md bg-surface">
             <div className="px-4 py-2.5 border-b border-border flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               <FolderOpen className="w-3.5 h-3.5" /> Saved Portfolios
-              <button onClick={() => setShowSaved(false)} className="ml-auto text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+              <div className="ml-auto flex items-center gap-2 normal-case tracking-normal">
+                <button onClick={() => setSaved(seedSamplePortfolios())}
+                  className="text-[11px] inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary">
+                  <Sparkles className="w-3 h-3" /> Load {SAMPLE_PORTFOLIOS.length} samples
+                </button>
+                {saved.some(s => s.isSample) && (
+                  <button onClick={() => setSaved(removeSamplePortfolios())}
+                    className="text-[11px] inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary text-muted-foreground">
+                    Remove samples
+                  </button>
+                )}
+                <button onClick={() => setShowSaved(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+              </div>
             </div>
             {saved.length === 0 ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">No saved portfolios yet. Import a statement and click <strong>Save</strong> to keep it in this browser.</div>
+              <div className="p-6 text-center text-xs text-muted-foreground">
+                No saved portfolios yet. Import a statement and click <strong>Save</strong>, or <button onClick={() => setSaved(seedSamplePortfolios())} className="underline">load {SAMPLE_PORTFOLIOS.length} sample portfolios</button> to explore the analytics.
+              </div>
             ) : (
               <table className="w-full text-xs">
                 <tbody>
                   {saved.map(s => (
                     <tr key={s.id} className="border-t border-border/50 hover:bg-secondary/30">
                       <td className="px-4 py-2">
-                        <div className="font-medium">{s.name}</div>
+                        <div className="font-medium flex items-center gap-2">
+                          {s.name}
+                          {s.isSample && <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground">Sample</span>}
+                          {s.family && <span className="text-[10px] text-muted-foreground">· {s.family}</span>}
+                        </div>
                         <div className="text-[10px] text-muted-foreground mono-num">{s.data.holdings.length} holdings · {fmtINR(s.data.totalValue)} · saved {new Date(s.savedAt).toLocaleString()}</div>
                       </td>
                       <td className="px-4 py-2 text-right">

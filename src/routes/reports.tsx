@@ -537,6 +537,11 @@ function ReportView({ portfolios, title, mode, onBack }: {
 
   return (
     <div>
+      {/* Page-level SVG gradient defs — must live OUTSIDE Recharts (Recharts
+          filters out unknown children of BarChart/PieChart, so an inline
+          <ChartDefs /> inside a chart never reaches the DOM and url(#gN)
+          references resolve to nothing → invisible bars/slices). */}
+      <ChartDefs />
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border print:hidden">
         <button onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">

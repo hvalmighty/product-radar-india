@@ -781,8 +781,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
                     const r = seedNum(h.isin, -8, 28);
                     return (
                       <tr key={h.isin} className="border-b border-border/50">
-                        <td className="py-2 truncate max-w-[260px]">{h.name}</td>
-                        <td className="py-2 mono-num text-muted-foreground">{h.isin}</td>
+                        <td className="py-2 max-w-[280px] whitespace-normal break-words leading-snug">{h.name}</td>
+                        <td className="py-2 mono-num text-muted-foreground whitespace-nowrap">{h.isin}</td>
                         <td className="py-2 text-right mono-num">{h.quantity.toFixed(3)}</td>
                         <td className="py-2 text-right mono-num">{h.price.toFixed(2)}</td>
                         <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>

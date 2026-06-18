@@ -131,26 +131,37 @@ const GRAD_PAIRS: Array<[string, string]> = [
   ["#94a3b8", "#475569"], // slate
 ];
 
-/** Reusable SVG gradient defs — render once inside each chart */
+/** Reusable SVG gradient defs — rendered as a hidden, document-level <svg>
+ *  so url(#id) references resolve from any Recharts chart on the page.
+ *  (Custom children inside Recharts BarChart/PieChart are filtered out, so
+ *  inline <defs> inside the chart would not render. A page-level hidden svg
+ *  works because SVG url() refs are document-scoped.) */
 function ChartDefs() {
   return (
-    <defs>
-      {GRAD_PAIRS.map(([from, to], i) => (
-        <linearGradient key={i} id={`g${i}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={from} stopOpacity={0.95} />
-          <stop offset="100%" stopColor={to} stopOpacity={0.85} />
-        </linearGradient>
-      ))}
-      {GRAD_PAIRS.map(([from, to], i) => (
-        <radialGradient key={`r${i}`} id={`rg${i}`} cx="50%" cy="50%" r="65%">
-          <stop offset="0%" stopColor={from} stopOpacity={1} />
-          <stop offset="100%" stopColor={to} stopOpacity={0.9} />
-        </radialGradient>
-      ))}
-      <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.18" />
-      </filter>
-    </defs>
+    <svg
+      width="0"
+      height="0"
+      aria-hidden="true"
+      style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+    >
+      <defs>
+        {GRAD_PAIRS.map(([from, to], i) => (
+          <linearGradient key={i} id={`g${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={from} stopOpacity={0.95} />
+            <stop offset="100%" stopColor={to} stopOpacity={0.85} />
+          </linearGradient>
+        ))}
+        {GRAD_PAIRS.map(([from, to], i) => (
+          <radialGradient key={`r${i}`} id={`rg${i}`} cx="50%" cy="50%" r="65%">
+            <stop offset="0%" stopColor={from} stopOpacity={1} />
+            <stop offset="100%" stopColor={to} stopOpacity={0.9} />
+          </radialGradient>
+        ))}
+        <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.18" />
+        </filter>
+      </defs>
+    </svg>
   );
 }
 const grad = (i: number) => `url(#g${i % GRAD_PAIRS.length})`;

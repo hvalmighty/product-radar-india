@@ -114,10 +114,57 @@ function ProposalPage() {
   function removeHolding(uid: string) {
     setHoldings(prev => prev.filter(h => h.uid !== uid));
   }
-  function autoAllocateEqual() {
+  type AllocStrategy = "equal" | "sharpe" | "maxret" | "maxrisk" | "minrisk";
+  const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
+  const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)
+
+  function allocByWeights(weights: number[]) {
+    const sum = weights.reduce((s, w) => s + w, 0);
+    if (sum <= 0) return;
+    setHoldings(prev => prev.map((h, i) => ({
+      ...h,
+      amount: Math.floor((weights[i] / sum) * totalCorpus),
+    })));
+  }
+
+  function autoAllocate(strategy: AllocStrategy = allocStrategy) {
     if (holdings.length === 0) return;
-    const each = Math.floor(totalCorpus / holdings.length);
-    setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+    const live = holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h);
+    switch (strategy) {
+      case "equal": {
+        const each = Math.floor(totalCorpus / holdings.length);
+        setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+        return;
+      }
+      case "maxret": {
+        // Tilt heavily to higher expected returns (cubic emphasis)
+        const w = live.map(h => Math.pow(Math.max(0.01, h.expectedReturn), 3));
+        allocByWeights(w);
+        return;
+      }
+      case "minrisk": {
+        // Inverse risk weighting (low-vol tilt)
+        const w = live.map(h => 1 / Math.pow(RISK_SCORE[h.risk] || 3, 2));
+        allocByWeights(w);
+        return;
+      }
+      case "maxrisk": {
+        // Concentrate in highest-risk assets (aggressive growth tilt)
+        const w = live.map(h => Math.pow(RISK_SCORE[h.risk] || 3, 3));
+        allocByWeights(w);
+        return;
+      }
+      case "sharpe": {
+        // Risk-adjusted: (return - rf) / risk score; clip negatives to a tiny positive
+        const w = live.map(h => {
+          const excess = h.expectedReturn - RF;
+          const sigma = RISK_SCORE[h.risk] || 3;
+          return Math.max(0.001, excess / sigma);
+        });
+        allocByWeights(w);
+        return;
+      }
+    }
   }
   // Keep cash holdings synced to cashRate input
   const holdingsLive = useMemo(() => holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h), [holdings, cashRate]);
@@ -256,9 +303,33 @@ function ProposalPage() {
                   <input type="number" step="0.1" value={cashRate} onChange={e => setCashRate(+e.target.value || 0)}
                     className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs mono-num" />
                 </Field>
-                <button onClick={autoAllocateEqual} disabled={holdings.length === 0}
-                  className="w-full text-xs px-2 py-1.5 border border-border rounded-sm hover:bg-secondary disabled:opacity-40">
-                  Equal-weight allocate
+                <Field label={
+                  <span className="inline-flex items-center gap-1">
+                    Optimisation Strategy
+                    <Tooltip>
+                      <TooltipTrigger asChild><Info className="w-3 h-3 text-muted-foreground cursor-help" /></TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-[11px] space-y-1">
+                        <div><b>Equal Weight</b> — same ₹ amount in every holding. Naive 1/N benchmark.</div>
+                        <div><b>Max Sharpe</b> — tilts to best risk-adjusted return: (Exp.Return − 6.5% Rf) / Risk-score.</div>
+                        <div><b>Max Return</b> — concentrates in highest expected-return holdings (return³ weighting).</div>
+                        <div><b>Min Risk</b> — inverse-risk weighting; favours low-vol holdings (defensive tilt).</div>
+                        <div><b>Max Risk</b> — concentrates in highest-risk holdings (aggressive growth tilt).</div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                }>
+                  <select value={allocStrategy} onChange={e => setAllocStrategy(e.target.value as AllocStrategy)}
+                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs">
+                    <option value="equal">Equal Weight (1/N)</option>
+                    <option value="sharpe">Max Sharpe Ratio</option>
+                    <option value="maxret">Max Return</option>
+                    <option value="minrisk">Min Risk (Defensive)</option>
+                    <option value="maxrisk">Max Risk (Aggressive)</option>
+                  </select>
+                </Field>
+                <button onClick={() => autoAllocate()} disabled={holdings.length === 0}
+                  className="w-full text-xs px-2 py-1.5 border border-border rounded-sm hover:bg-secondary disabled:opacity-40 font-medium">
+                  Apply Allocation
                 </button>
               </div>
             </section>

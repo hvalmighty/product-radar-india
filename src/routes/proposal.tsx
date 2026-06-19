@@ -114,10 +114,57 @@ function ProposalPage() {
   function removeHolding(uid: string) {
     setHoldings(prev => prev.filter(h => h.uid !== uid));
   }
-  function autoAllocateEqual() {
+  type AllocStrategy = "equal" | "sharpe" | "maxret" | "maxrisk" | "minrisk";
+  const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
+  const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)
+
+  function allocByWeights(weights: number[]) {
+    const sum = weights.reduce((s, w) => s + w, 0);
+    if (sum <= 0) return;
+    setHoldings(prev => prev.map((h, i) => ({
+      ...h,
+      amount: Math.floor((weights[i] / sum) * totalCorpus),
+    })));
+  }
+
+  function autoAllocate(strategy: AllocStrategy = allocStrategy) {
     if (holdings.length === 0) return;
-    const each = Math.floor(totalCorpus / holdings.length);
-    setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+    const live = holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h);
+    switch (strategy) {
+      case "equal": {
+        const each = Math.floor(totalCorpus / holdings.length);
+        setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+        return;
+      }
+      case "maxret": {
+        // Tilt heavily to higher expected returns (cubic emphasis)
+        const w = live.map(h => Math.pow(Math.max(0.01, h.expectedReturn), 3));
+        allocByWeights(w);
+        return;
+      }
+      case "minrisk": {
+        // Inverse risk weighting (low-vol tilt)
+        const w = live.map(h => 1 / Math.pow(RISK_SCORE[h.risk] || 3, 2));
+        allocByWeights(w);
+        return;
+      }
+      case "maxrisk": {
+        // Concentrate in highest-risk assets (aggressive growth tilt)
+        const w = live.map(h => Math.pow(RISK_SCORE[h.risk] || 3, 3));
+        allocByWeights(w);
+        return;
+      }
+      case "sharpe": {
+        // Risk-adjusted: (return - rf) / risk score; clip negatives to a tiny positive
+        const w = live.map(h => {
+          const excess = h.expectedReturn - RF;
+          const sigma = RISK_SCORE[h.risk] || 3;
+          return Math.max(0.001, excess / sigma);
+        });
+        allocByWeights(w);
+        return;
+      }
+    }
   }
   // Keep cash holdings synced to cashRate input
   const holdingsLive = useMemo(() => holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h), [holdings, cashRate]);

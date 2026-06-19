@@ -308,12 +308,51 @@ function ProposalPage() {
                     Optimisation Strategy
                     <Tooltip>
                       <TooltipTrigger asChild><Info className="w-3 h-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-[11px] space-y-1">
-                        <div><b>Equal Weight</b> — same ₹ amount in every holding. Naive 1/N benchmark.</div>
-                        <div><b>Max Sharpe</b> — tilts to best risk-adjusted return: (Exp.Return − 6.5% Rf) / Risk-score.</div>
-                        <div><b>Max Return</b> — concentrates in highest expected-return holdings (return³ weighting).</div>
-                        <div><b>Min Risk</b> — inverse-risk weighting; favours low-vol holdings (defensive tilt).</div>
-                        <div><b>Max Risk</b> — concentrates in highest-risk holdings (aggressive growth tilt).</div>
+                      <TooltipContent side="right" className="max-w-sm text-[11px] leading-relaxed space-y-2.5 p-3">
+                        <div className="font-semibold text-foreground">How allocation strategies work</div>
+                        <div className="text-muted-foreground">
+                          Each strategy uses the <b>Expected Return</b> and <b>Risk Score</b> of every holding you have selected. These are the same numbers shown in the Proposed Holdings table. The system converts them into weights and then scales each weight to the Total Corpus.
+                        </div>
+                        <div className="space-y-1.5">
+                          <div><b className="text-foreground">1. Equal Weight (1/N)</b></div>
+                          <div className="text-muted-foreground pl-3 border-l border-border">
+                            <b>Method:</b> Divide the Total Corpus equally across every holding.<br />
+                            <b>Formula:</b> amountᵢ = Corpus / N<br />
+                            <b>Data used:</b> None — this is a naive benchmark independent of return or risk.<br />
+                            <b>Best for:</b> Quick baseline or when you have no strong view on relative attractiveness.
+                          </div>
+                          <div><b className="text-foreground">2. Max Sharpe Ratio</b></div>
+                          <div className="text-muted-foreground pl-3 border-l border-border">
+                            <b>Method:</b> Reward per unit of risk. Higher weight to holdings that give the most return for the risk they take.<br />
+                            <b>Formula:</b> weightᵢ = max(0.001, (Returnᵢ − 6.5%) / RiskScoreᵢ)<br />
+                            <b>Data used:</b> Expected Return of each holding, mapped Risk Score (Low=1 … Very High=6), and a fixed 6.5% risk-free rate (10Y G-Sec proxy).<br />
+                            <b>Best for:</b> Clients who want the most efficient risk-adjusted portfolio.
+                          </div>
+                          <div><b className="text-foreground">3. Max Return</b></div>
+                          <div className="text-muted-foreground pl-3 border-l border-border">
+                            <b>Method:</b> Aggressively tilt toward the highest expected-return holdings using cubic emphasis so leaders dominate.<br />
+                            <b>Formula:</b> weightᵢ = (Returnᵢ)³<br />
+                            <b>Data used:</b> Expected Return only.<br />
+                            <b>Best for:</b> Growth-oriented clients with high risk tolerance and long horizons.
+                          </div>
+                          <div><b className="text-foreground">4. Min Risk (Defensive)</b></div>
+                          <div className="text-muted-foreground pl-3 border-l border-border">
+                            <b>Method:</b> Inverse-risk weighting — the safer the holding, the larger its share.<br />
+                            <b>Formula:</b> weightᵢ = 1 / (RiskScoreᵢ)²<br />
+                            <b>Data used:</b> Risk Score only.<br />
+                            <b>Best for:</b> Conservative clients, retirees, or portfolios where capital preservation matters more than upside.
+                          </div>
+                          <div><b className="text-foreground">5. Max Risk (Aggressive)</b></div>
+                          <div className="text-muted-foreground pl-3 border-l border-border">
+                            <b>Method:</b> Concentrate capital in the highest-risk holdings (risk³ weighting) to maximise growth potential.<br />
+                            <b>Formula:</b> weightᵢ = (RiskScoreᵢ)³<br />
+                            <b>Data used:</b> Risk Score only.<br />
+                            <b>Best for:</b> Very aggressive clients seeking maximum capital appreciation and willing to accept higher volatility.
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground border-t border-border pt-1.5">
+                          After weights are computed they are normalised so the sum equals 100%, then multiplied by the Total Corpus to get each holding’s ₹ allocation.
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                   </span>

@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type Category } from "@/lib/research-data";
+import { getTopBarIndices } from "@/lib/market-data.functions";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
@@ -33,6 +35,37 @@ function fmtINR(n: number) {
 
 function pctClass(v: number) {
   return v >= 0 ? "text-positive" : "text-negative";
+}
+
+function TopBarTicker() {
+  const q = useQuery({
+    queryKey: ["topbar-indices"],
+    queryFn: () => getTopBarIndices(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const data = q.data ?? [];
+  const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
+      {q.isLoading && !data.length ? (
+        <span className="opacity-60">Loading indices…</span>
+      ) : data.length === 0 ? (
+        <span className="opacity-60">Indices unavailable</span>
+      ) : (
+        data.map((d, i) => (
+          <span key={d.symbol} className="flex items-center gap-1">
+            {i === 0 && <Activity className={`w-3 h-3 ${d.changePct >= 0 ? "text-positive" : "text-negative"}`} />}
+            {i > 0 && <span className="opacity-40 mr-1">|</span>}
+            {d.label} {fmt(d.price)}{" "}
+            <span className={d.changePct >= 0 ? "text-positive" : "text-negative"}>
+              {d.changePct >= 0 ? "+" : ""}{d.changePct.toFixed(2)}%
+            </span>
+          </span>
+        ))
+      )}
+    </div>
+  );
 }
 
 function ResearchTerminal() {
@@ -242,13 +275,7 @@ function ResearchTerminal() {
             })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
-              <span className="flex items-center gap-1"><Activity className="w-3 h-3 text-positive" /> NIFTY 24,856.20 <span className="text-positive">+0.42%</span></span>
-              <span className="opacity-40">|</span>
-              <span>SENSEX 81,432.10 <span className="text-positive">+0.38%</span></span>
-              <span className="opacity-40">|</span>
-              <span>10Y G-Sec 6.92%</span>
-            </div>
+            <TopBarTicker />
             <div className="text-[11px] text-muted-foreground border-l border-border pl-3">RM · A. Mehta</div>
           </div>
         </div>

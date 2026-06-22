@@ -192,6 +192,60 @@ export const getMarketQuotes = createServerFn({ method: "GET" }).handler(
   },
 );
 
+// === Yahoo Finance — top-bar benchmark indices (NIFTY 50 + SENSEX) ===
+// NSE's allIndices doesn't include BSE Sensex and is often blocked from edge IPs.
+// Yahoo is reliable from workerd and returns both.
+async function fetchYahooQuote(symbol: string): Promise<{ price: number; prev: number } | null> {
+  try {
+    const r = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
+      { headers: { "User-Agent": BROWSER_HEADERS["User-Agent"], Accept: "application/json" } },
+    );
+    if (!r.ok) {
+      console.error(`[yahoo ${symbol}] HTTP ${r.status}`);
+      return null;
+    }
+    const j: any = await r.json();
+    const result = j?.chart?.result?.[0];
+    if (!result) return null;
+    const price = Number(result.meta?.regularMarketPrice);
+    const prev = Number(result.meta?.chartPreviousClose ?? result.meta?.previousClose);
+    if (!Number.isFinite(price) || !Number.isFinite(prev)) return null;
+    return { price, prev };
+  } catch (e) {
+    console.error(`[yahoo ${symbol}] threw`, e);
+    return null;
+  }
+}
+
+export type TopBarIndex = {
+  symbol: string;
+  label: string;
+  price: number;
+  changePct: number;
+};
+
+export const getTopBarIndices = createServerFn({ method: "GET" }).handler(
+  async (): Promise<TopBarIndex[]> => {
+    const [nifty, sensex] = await Promise.all([
+      fetchYahooQuote("^NSEI"),
+      fetchYahooQuote("^BSESN"),
+    ]);
+    const out: TopBarIndex[] = [];
+    if (nifty) out.push({
+      symbol: "^NSEI", label: "NIFTY",
+      price: nifty.price,
+      changePct: nifty.prev ? ((nifty.price - nifty.prev) / nifty.prev) * 100 : 0,
+    });
+    if (sensex) out.push({
+      symbol: "^BSESN", label: "SENSEX",
+      price: sensex.price,
+      changePct: sensex.prev ? ((sensex.price - sensex.prev) / sensex.prev) * 100 : 0,
+    });
+    return out;
+  },
+);
+
 // ============ NEWS ============
 
 function decodeEntities(s: string): string {

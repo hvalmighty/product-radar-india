@@ -166,6 +166,114 @@ function ProposalPage() {
       }
     }
   }
+
+  // Auto Portfolio Creator — picks a curated set of holdings across asset classes
+  // tuned to the selected optimisation strategy, then sizes them via the same strategy weights.
+  function autoCreatePortfolio() {
+    type Cand = { klass: AssetClassKey; id: string; name: string; sub: string; ret: number; risk: string };
+    const mf: Cand[]  = mutualFunds.map(m => ({ klass: "MF", id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk }));
+    const eq: Cand[]  = equityStocks.map(s => ({ klass: "EQ", id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk }));
+    const pms: Cand[] = pmsSchemes.map(p => ({ klass: "PMS", id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk }));
+    const aif: Cand[] = aifSchemes.map(a => ({ klass: "AIF", id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk }));
+    const dbt: Cand[] = bonds.map(b => ({ klass: "DEBT", id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk }));
+    const fd: Cand[]  = fixedDeposits.map(f => ({ klass: "FD", id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod" }));
+    const cash: Cand  = { klass: "CASH", id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low" };
+
+    const topBy = <T,>(arr: T[], n: number, score: (x: T) => number) =>
+      [...arr].sort((a, b) => score(b) - score(a)).slice(0, n);
+    const rs = (r: string) => RISK_SCORE[r] || 3;
+
+    let picks: Cand[] = [];
+    switch (allocStrategy) {
+      case "equal":
+        // Balanced sampler across every class
+        picks = [
+          ...topBy(mf, 3, x => x.ret),
+          ...topBy(eq, 2, x => x.ret),
+          ...topBy(pms, 1, x => x.ret),
+          ...topBy(aif, 1, x => x.ret),
+          ...topBy(dbt, 1, x => x.ret),
+          ...topBy(fd, 1, x => x.ret),
+          cash,
+        ];
+        break;
+      case "sharpe": {
+        // Best risk-adjusted reward in each class
+        const sh = (x: Cand) => (x.ret - RF) / rs(x.risk);
+        picks = [
+          ...topBy(mf, 3, sh),
+          ...topBy(eq, 2, sh),
+          ...topBy(pms, 1, sh),
+          ...topBy(aif, 1, sh),
+          ...topBy(dbt, 1, sh),
+          ...topBy(fd, 1, sh),
+        ];
+        break;
+      }
+      case "maxret":
+        // Growth-tilted: heavy equity/PMS/AIF, top returns
+        picks = [
+          ...topBy(eq, 4, x => x.ret),
+          ...topBy(mf.filter(m => /Small|Mid|Flexi|Thematic|Sector/i.test(m.sub)), 3, x => x.ret),
+          ...topBy(pms, 2, x => x.ret),
+          ...topBy(aif, 1, x => x.ret),
+        ];
+        break;
+      case "minrisk":
+        // Capital preservation: FD heavy, top-rated bonds, low-vol MFs
+        picks = [
+          ...topBy(fd, 4, x => x.ret),
+          ...topBy(dbt.filter(b => /AAA|G-Sec|SDL/i.test(b.sub)), 3, x => x.ret),
+          ...topBy(mf.filter(m => /Debt|Liquid|Hybrid|Conservative|Arbitrage/i.test(m.sub)), 2, x => x.ret),
+          cash,
+        ];
+        break;
+      case "maxrisk":
+        // Aggressive: highest-risk equities, thematic MFs, AIF Cat-III, growth PMS
+        picks = [
+          ...topBy(eq, 3, x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(aif, 2, x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(pms, 2, x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(mf.filter(m => /Small|Mid|Thematic|Sector/i.test(m.sub)), 3, x => x.ret),
+        ];
+        break;
+    }
+
+    // Dedupe (in case overlap) and convert to Holdings with strategy-based weights
+    const seen = new Set<string>();
+    picks = picks.filter(p => {
+      const k = `${p.klass}-${p.id}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    if (picks.length === 0) return;
+
+    // Compute weights for this strategy
+    let weights: number[];
+    switch (allocStrategy) {
+      case "equal":   weights = picks.map(() => 1); break;
+      case "maxret":  weights = picks.map(p => Math.pow(Math.max(0.01, p.ret), 3)); break;
+      case "minrisk": weights = picks.map(p => 1 / Math.pow(rs(p.risk), 2)); break;
+      case "maxrisk": weights = picks.map(p => Math.pow(rs(p.risk), 3)); break;
+      case "sharpe":  weights = picks.map(p => Math.max(0.001, (p.ret - RF) / rs(p.risk))); break;
+    }
+    const wSum = weights!.reduce((s, w) => s + w, 0) || 1;
+
+    const stamp = Date.now();
+    const newHoldings: Holding[] = picks.map((p, i) => ({
+      uid: `${p.klass}-${p.id}-${stamp}-${i}`,
+      klass: p.klass,
+      id: p.id,
+      name: p.name,
+      sub: p.sub,
+      amount: Math.floor((weights![i] / wSum) * totalCorpus),
+      expectedReturn: p.klass === "CASH" ? cashRate : p.ret,
+      irrBasis: irrBasisFor(p.klass, p.name),
+      risk: p.risk,
+    }));
+    setHoldings(newHoldings);
+  }
   // Keep cash holdings synced to cashRate input
   const holdingsLive = useMemo(() => holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h), [holdings, cashRate]);
 

@@ -244,7 +244,6 @@ function ResearchTerminal() {
             })}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
             <TopBarTicker />
             <div className="text-[11px] text-muted-foreground border-l border-border pl-3">RM · A. Mehta</div>
           </div>

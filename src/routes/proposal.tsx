@@ -349,14 +349,10 @@ function ProposalPage() {
     <TooltipProvider delayDuration={150}>
       <div className="min-h-screen text-foreground">
         <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
-          <div className="px-6 py-3 flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <img src={kfintechLogo.url} alt="KFintech" className="h-8 w-auto object-contain" />
-              <div className="h-8 w-px bg-border" />
-              <div>
-                <h1 className="text-sm font-semibold leading-tight">mPower Wealth · Proposal Builder</h1>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Construct an ad-hoc model portfolio for a prospect</p>
-              </div>
+          <div className="pl-12 pr-6 py-3 flex items-center gap-4">
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">Proposal Builder</h1>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Construct an ad-hoc model portfolio for a prospect</p>
             </div>
             <button onClick={exportProposal} className="ml-auto text-xs inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary">
               <Download className="w-3.5 h-3.5" /> Export CSV

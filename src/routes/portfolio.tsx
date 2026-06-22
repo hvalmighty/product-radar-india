@@ -165,14 +165,10 @@ function PortfolioImporter() {
   return (
     <div className="min-h-screen text-foreground">
       <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
-        <div className="px-6 py-3 flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <img src={kfintechLogo.url} alt="KFintech" className="h-8 w-auto object-contain" />
-            <div className="h-8 w-px bg-border" />
-            <div>
-              <h1 className="text-sm font-semibold leading-tight">mPower Wealth · Portfolio</h1>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">eCAS Importer · NSDL / CDSL</p>
-            </div>
+        <div className="pl-12 pr-6 py-3 flex items-center gap-4">
+          <div>
+            <h1 className="text-sm font-semibold leading-tight">Portfolio</h1>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">eCAS Importer · NSDL / CDSL</p>
           </div>
           <button onClick={() => setShowSaved(s => !s)} className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 px-2 py-1 border border-border rounded-sm">
             <FolderOpen className="w-3.5 h-3.5" /> Saved ({saved.length})

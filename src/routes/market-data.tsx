@@ -233,16 +233,12 @@ function MarketDataPage() {
   return (
     <div className="min-h-screen text-foreground">
       <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
-        <div className="px-6 py-3 flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <img src={kfintechLogo.url} alt="KFintech" className="h-8 w-auto object-contain" />
-            <div className="h-8 w-px bg-border" />
-            <div>
-              <h1 className="text-sm font-semibold leading-tight tracking-tight">Market Data</h1>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight">
-                Live quotes · News · Macro · Global
-              </p>
-            </div>
+        <div className="pl-12 pr-6 py-3 flex items-center gap-6">
+          <div>
+            <h1 className="text-sm font-semibold leading-tight tracking-tight">Market Data</h1>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight">
+              Live quotes · News · Macro · Global
+            </p>
           </div>
           <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
             <button

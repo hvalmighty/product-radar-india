@@ -183,58 +183,70 @@ function ProposalPage() {
       [...arr].sort((a, b) => score(b) - score(a)).slice(0, n);
     const rs = (r: string) => RISK_SCORE[r] || 3;
 
+    // Risk-profile policy: caps the max risk score of any pick and biases the
+    // class mix (equity/AIF/PMS counts vs FD/Debt/Cash counts).
+    const profile = prospect.riskProfile;
+    const policy =
+      profile === "Conservative"     ? { cap: 3, mfN: 2, eqN: 0, pmsN: 0, aifN: 0, dbtN: 3, fdN: 4, cash: true,  growthBoost: 0.5, defBoost: 1.6 } :
+      profile === "Moderate"         ? { cap: 4, mfN: 3, eqN: 2, pmsN: 1, aifN: 1, dbtN: 2, fdN: 2, cash: true,  growthBoost: 1.0, defBoost: 1.0 } :
+      profile === "Aggressive"       ? { cap: 5, mfN: 3, eqN: 3, pmsN: 2, aifN: 1, dbtN: 1, fdN: 1, cash: false, growthBoost: 1.4, defBoost: 0.6 } :
+                                       { cap: 6, mfN: 2, eqN: 4, pmsN: 2, aifN: 2, dbtN: 0, fdN: 0, cash: false, growthBoost: 1.8, defBoost: 0.3 };
+
+    // Apply risk cap to every candidate pool
+    const within = <T extends Cand>(arr: T[]) => arr.filter(x => rs(x.risk) <= policy.cap);
+    const mfP = within(mf), eqP = within(eq), pmsP = within(pms), aifP = within(aif), dbtP = within(dbt), fdP = within(fd);
+
     let picks: Cand[] = [];
     switch (allocStrategy) {
       case "equal":
-        // Balanced sampler across every class
+        // Balanced sampler — class counts driven by the risk profile
         picks = [
-          ...topBy(mf, 3, x => x.ret),
-          ...topBy(eq, 2, x => x.ret),
-          ...topBy(pms, 1, x => x.ret),
-          ...topBy(aif, 1, x => x.ret),
-          ...topBy(dbt, 1, x => x.ret),
-          ...topBy(fd, 1, x => x.ret),
-          cash,
+          ...topBy(mfP, policy.mfN, x => x.ret),
+          ...topBy(eqP, policy.eqN, x => x.ret),
+          ...topBy(pmsP, policy.pmsN, x => x.ret),
+          ...topBy(aifP, policy.aifN, x => x.ret),
+          ...topBy(dbtP, policy.dbtN, x => x.ret),
+          ...topBy(fdP, policy.fdN, x => x.ret),
+          ...(policy.cash ? [cash] : []),
         ];
         break;
       case "sharpe": {
-        // Best risk-adjusted reward in each class
         const sh = (x: Cand) => (x.ret - RF) / rs(x.risk);
         picks = [
-          ...topBy(mf, 3, sh),
-          ...topBy(eq, 2, sh),
-          ...topBy(pms, 1, sh),
-          ...topBy(aif, 1, sh),
-          ...topBy(dbt, 1, sh),
-          ...topBy(fd, 1, sh),
+          ...topBy(mfP, policy.mfN, sh),
+          ...topBy(eqP, policy.eqN, sh),
+          ...topBy(pmsP, policy.pmsN, sh),
+          ...topBy(aifP, policy.aifN, sh),
+          ...topBy(dbtP, policy.dbtN, sh),
+          ...topBy(fdP, policy.fdN, sh),
         ];
         break;
       }
       case "maxret":
-        // Growth-tilted: heavy equity/PMS/AIF, top returns
+        // Growth-tilted, but eq/PMS/AIF counts still respect the profile
         picks = [
-          ...topBy(eq, 4, x => x.ret),
-          ...topBy(mf.filter(m => /Small|Mid|Flexi|Thematic|Sector/i.test(m.sub)), 3, x => x.ret),
-          ...topBy(pms, 2, x => x.ret),
-          ...topBy(aif, 1, x => x.ret),
+          ...topBy(eqP, Math.max(policy.eqN, 2), x => x.ret),
+          ...topBy(mfP.filter(m => /Small|Mid|Flexi|Thematic|Sector/i.test(m.sub)), policy.mfN, x => x.ret),
+          ...topBy(pmsP, policy.pmsN, x => x.ret),
+          ...topBy(aifP, policy.aifN, x => x.ret),
+          ...topBy(dbtP, policy.dbtN, x => x.ret),
+          ...topBy(fdP, policy.fdN, x => x.ret),
         ];
         break;
       case "minrisk":
-        // Capital preservation: FD heavy, top-rated bonds, low-vol MFs
         picks = [
-          ...topBy(fd, 4, x => x.ret),
-          ...topBy(dbt.filter(b => /AAA|G-Sec|SDL/i.test(b.sub)), 3, x => x.ret),
-          ...topBy(mf.filter(m => /Debt|Liquid|Hybrid|Conservative|Arbitrage/i.test(m.sub)), 2, x => x.ret),
-          cash,
+          ...topBy(fdP, Math.max(policy.fdN, 2), x => x.ret),
+          ...topBy(dbtP.filter(b => /AAA|G-Sec|SDL/i.test(b.sub)), Math.max(policy.dbtN, 2), x => x.ret),
+          ...topBy(mfP.filter(m => /Debt|Liquid|Hybrid|Conservative|Arbitrage/i.test(m.sub)), policy.mfN, x => x.ret),
+          ...(policy.cash ? [cash] : []),
         ];
         break;
       case "maxrisk":
-        // Aggressive: highest-risk equities, thematic MFs, AIF Cat-III, growth PMS
         picks = [
-          ...topBy(eq, 3, x => rs(x.risk) * 1000 + x.ret),
-          ...topBy(aif, 2, x => rs(x.risk) * 1000 + x.ret),
-          ...topBy(pms, 2, x => rs(x.risk) * 1000 + x.ret),
-          ...topBy(mf.filter(m => /Small|Mid|Thematic|Sector/i.test(m.sub)), 3, x => x.ret),
+          ...topBy(eqP, Math.max(policy.eqN, 2), x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(aifP, Math.max(policy.aifN, 1), x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(pmsP, Math.max(policy.pmsN, 1), x => rs(x.risk) * 1000 + x.ret),
+          ...topBy(mfP.filter(m => /Small|Mid|Thematic|Sector/i.test(m.sub)), policy.mfN, x => x.ret),
         ];
         break;
     }

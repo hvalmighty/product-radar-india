@@ -37,6 +37,37 @@ function pctClass(v: number) {
   return v >= 0 ? "text-positive" : "text-negative";
 }
 
+function TopBarTicker() {
+  const q = useQuery({
+    queryKey: ["topbar-indices"],
+    queryFn: () => getTopBarIndices(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const data = q.data ?? [];
+  const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
+      {q.isLoading && !data.length ? (
+        <span className="opacity-60">Loading indices…</span>
+      ) : data.length === 0 ? (
+        <span className="opacity-60">Indices unavailable</span>
+      ) : (
+        data.map((d, i) => (
+          <span key={d.symbol} className="flex items-center gap-1">
+            {i === 0 && <Activity className={`w-3 h-3 ${d.changePct >= 0 ? "text-positive" : "text-negative"}`} />}
+            {i > 0 && <span className="opacity-40 mr-1">|</span>}
+            {d.label} {fmt(d.price)}{" "}
+            <span className={d.changePct >= 0 ? "text-positive" : "text-negative"}>
+              {d.changePct >= 0 ? "+" : ""}{d.changePct.toFixed(2)}%
+            </span>
+          </span>
+        ))
+      )}
+    </div>
+  );
+}
+
 function ResearchTerminal() {
   const [cat, setCat] = useState<Category>("MF");
   const [query, setQuery] = useState("");

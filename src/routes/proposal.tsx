@@ -358,17 +358,9 @@ function ProposalPage() {
                 <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Construct an ad-hoc model portfolio for a prospect</p>
               </div>
             </div>
-            <nav className="hidden md:flex items-center gap-1 text-xs ml-6">
-              <Link to="/" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60">Screener</Link>
-              <Link to="/portfolio" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60">Portfolios</Link>
-              <span className="px-3 py-1.5 rounded-sm bg-secondary text-secondary-foreground">Proposal</span>
-            </nav>
             <button onClick={exportProposal} className="ml-auto text-xs inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary">
               <Download className="w-3.5 h-3.5" /> Export CSV
             </button>
-            <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
-              <ArrowLeft className="w-3.5 h-3.5" /> Back
-            </Link>
           </div>
         </header>
 

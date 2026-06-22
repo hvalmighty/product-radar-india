@@ -143,11 +143,6 @@ function AlertsPage() {
               </p>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1 text-xs ml-2">
-            <Link to="/" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60">
-              <ArrowLeft className="w-3 h-3 inline mr-1" /> Back to Screener
-            </Link>
-          </nav>
           <div className="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className={`w-1.5 h-1.5 rounded-full ${isFetching ? "bg-warning animate-pulse" : "bg-positive"}`} />

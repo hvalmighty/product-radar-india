@@ -228,9 +228,6 @@ function ReportsPage() {
           <Link to="/portfolio" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5" /> Manage Portfolios
           </Link>
-          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Research
-          </Link>
         </div>
       </header>
 

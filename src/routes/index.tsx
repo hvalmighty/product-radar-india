@@ -263,17 +263,6 @@ function ResearchTerminal() {
               <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground leading-tight">RM Intelligence Terminal · IN</p>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1 text-xs">
-            {["Screener", "Proposal", "Portfolios", "Market Data", "Alerts", "Reports"].map((n, i) => {
-              const cls = `px-3 py-1.5 rounded-sm transition-colors ${i === 0 ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`;
-              if (n === "Portfolios") return <Link key={n} to="/portfolio" className={cls}>{n}</Link>;
-              if (n === "Proposal") return <Link key={n} to="/proposal" className={cls}>{n}</Link>;
-              if (n === "Market Data") return <Link key={n} to="/market-data" className={cls}>{n}</Link>;
-              if (n === "Alerts") return <Link key={n} to="/alerts" className={cls}>{n}</Link>;
-              if (n === "Reports") return <Link key={n} to="/reports" className={cls}>{n}</Link>;
-              return <button key={n} className={cls}>{n}</button>;
-            })}
-          </nav>
           <div className="ml-auto flex items-center gap-2">
             <TopBarTicker />
             <div className="text-[11px] text-muted-foreground border-l border-border pl-3">RM · A. Mehta</div>

@@ -244,14 +244,6 @@ function MarketDataPage() {
               </p>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1 text-xs">
-            <Link to="/" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 inline-flex items-center gap-1.5">
-              <ArrowLeft className="w-3 h-3" /> Screener
-            </Link>
-            <Link to="/proposal" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60">Proposal</Link>
-            <Link to="/portfolio" className="px-3 py-1.5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60">Portfolios</Link>
-            <span className="px-3 py-1.5 rounded-sm bg-secondary text-secondary-foreground">Market Data</span>
-          </nav>
           <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
             <button
               onClick={() => { quotesQ.refetch(); newsQ.refetch(); }}

@@ -126,17 +126,14 @@ function RootComponent() {
       <SidebarProvider>
         <div className="min-h-screen flex w-full">
           <AppSidebar />
-          <div className="flex-1 min-w-0 flex flex-col">
-            <div className="sticky top-0 z-40 flex items-center h-8 px-2 border-b border-border bg-surface/80 backdrop-blur">
-              <SidebarTrigger />
-            </div>
-            <div className="flex-1 min-w-0">
-              <Outlet />
-            </div>
+          <div className="flex-1 min-w-0 relative">
+            <SidebarTrigger className="fixed top-2 left-2 z-50 h-7 w-7 bg-surface/80 backdrop-blur border border-border rounded-sm" />
+            <Outlet />
           </div>
         </div>
       </SidebarProvider>
     </QueryClientProvider>
   );
 }
+
 

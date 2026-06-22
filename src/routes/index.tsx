@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type Category } from "@/lib/research-data";
+import { getTopBarIndices } from "@/lib/market-data.functions";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 

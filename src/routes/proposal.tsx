@@ -474,9 +474,16 @@ function ProposalPage() {
                     <option value="maxrisk">Max Risk (Aggressive)</option>
                   </select>
                 </Field>
+                <button onClick={autoCreatePortfolio}
+                  className="w-full text-xs px-2 py-1.5 border border-foreground/30 bg-foreground text-background rounded-sm hover:bg-foreground/90 font-medium inline-flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-3 h-3" /> Auto Portfolio Creator
+                </button>
+                <div className="text-[10px] text-muted-foreground -mt-1 leading-snug">
+                  Builds a curated portfolio across asset classes tuned to the selected strategy and sizes each holding by the same weights.
+                </div>
                 <button onClick={() => autoAllocate()} disabled={holdings.length === 0}
                   className="w-full text-xs px-2 py-1.5 border border-border rounded-sm hover:bg-secondary disabled:opacity-40 font-medium">
-                  Apply Allocation
+                  Apply Allocation (re-weight current holdings)
                 </button>
               </div>
             </section>

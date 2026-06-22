@@ -261,7 +261,8 @@ function ProposalPage() {
     });
     if (picks.length === 0) return;
 
-    // Compute weights for this strategy
+    // Compute weights for this strategy, then tilt by risk profile
+    // (growthBoost favors higher-risk holdings, defBoost favors lower-risk)
     let weights: number[];
     switch (allocStrategy) {
       case "equal":   weights = picks.map(() => 1); break;
@@ -270,6 +271,12 @@ function ProposalPage() {
       case "maxrisk": weights = picks.map(p => Math.pow(rs(p.risk), 3)); break;
       case "sharpe":  weights = picks.map(p => Math.max(0.001, (p.ret - RF) / rs(p.risk))); break;
     }
+    weights = weights!.map((w, i) => {
+      const score = rs(picks[i].risk);
+      const growthTilt = Math.pow(score / 3, policy.growthBoost - 1);
+      const defTilt    = Math.pow(3 / score, policy.defBoost - 1);
+      return w * growthTilt * defTilt;
+    });
     const wSum = weights!.reduce((s, w) => s + w, 0) || 1;
 
     const stamp = Date.now();

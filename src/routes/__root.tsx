@@ -8,6 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -121,8 +123,20 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full">
+          <AppSidebar />
+          <div className="flex-1 min-w-0 flex flex-col">
+            <div className="sticky top-0 z-40 flex items-center h-8 px-2 border-b border-border bg-surface/80 backdrop-blur">
+              <SidebarTrigger />
+            </div>
+            <div className="flex-1 min-w-0">
+              <Outlet />
+            </div>
+          </div>
+        </div>
+      </SidebarProvider>
     </QueryClientProvider>
   );
 }
+

@@ -245,12 +245,7 @@ function ResearchTerminal() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
-              <span className="flex items-center gap-1"><Activity className="w-3 h-3 text-positive" /> NIFTY 24,856.20 <span className="text-positive">+0.42%</span></span>
-              <span className="opacity-40">|</span>
-              <span>SENSEX 81,432.10 <span className="text-positive">+0.38%</span></span>
-              <span className="opacity-40">|</span>
-              <span>10Y G-Sec 6.92%</span>
-            </div>
+            <TopBarTicker />
             <div className="text-[11px] text-muted-foreground border-l border-border pl-3">RM · A. Mehta</div>
           </div>
         </div>

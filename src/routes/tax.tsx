@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calculator, ArrowLeft, ChevronRight, Info, Users, User, Download, Printer, Wand2, TrendingDown, Clock, Layers, CheckCircle2, RotateCcw } from "lucide-react";
 import type { Holding } from "@/lib/ecas-parser";
 import {
@@ -996,7 +996,7 @@ function OptimisationPanel({ base, opt, steps, deferred, harvested, onClose }: {
 }) {
   const saving = Math.max(0, base.totalTax - opt.totalTax);
   const pct = base.totalTax > 0 ? (saving / base.totalTax) * 100 : 0;
-  const iconFor: Record<OptStep["kind"], React.ReactNode> = {
+  const iconFor: Record<OptStep["kind"], ReactNode> = {
     DEFER: <Clock className="w-3.5 h-3.5" />,
     HARVEST: <TrendingDown className="w-3.5 h-3.5" />,
     EXEMPTION: <CheckCircle2 className="w-3.5 h-3.5" />,

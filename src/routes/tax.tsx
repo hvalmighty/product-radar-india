@@ -996,7 +996,7 @@ function OptimisationPanel({ base, opt, steps, deferred, harvested, onClose }: {
 }) {
   const saving = Math.max(0, base.totalTax - opt.totalTax);
   const pct = base.totalTax > 0 ? (saving / base.totalTax) * 100 : 0;
-  const iconFor: Record<OptStep["kind"], JSX.Element> = {
+  const iconFor: Record<OptStep["kind"], React.ReactNode> = {
     DEFER: <Clock className="w-3.5 h-3.5" />,
     HARVEST: <TrendingDown className="w-3.5 h-3.5" />,
     EXEMPTION: <CheckCircle2 className="w-3.5 h-3.5" />,

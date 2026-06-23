@@ -844,8 +844,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
         )}
       </Section>
 
-      {/* SECTION 5: Drilldown */}
-      <Section id="drilldown" title="5. Portfolio Drilldown" icon={<TrendingUp className="w-4 h-4" />}>
+      {/* SECTION 6: Drilldown */}
+      <Section id="drilldown" title="6. Portfolio Drilldown" icon={<TrendingUp className="w-4 h-4" />}>
         <div className="grid md:grid-cols-2 gap-4">
           <Card title="Top 10 Issuers">
             <div className="h-64">

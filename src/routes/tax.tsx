@@ -1,0 +1,756 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Calculator, ArrowLeft, ChevronRight, Info, Users, User, Download, Printer } from "lucide-react";
+import type { Holding } from "@/lib/ecas-parser";
+import {
+  SAMPLE_FAMILIES,
+  SAMPLE_PORTFOLIOS,
+  seedSamplePortfolios,
+  STORAGE_KEY,
+  type SavedPortfolio,
+} from "@/lib/sample-portfolios";
+
+export const Route = createFileRoute("/tax")({
+  head: () => ({
+    meta: [
+      { title: "Tax Liability · mPower Wealth" },
+      {
+        name: "description",
+        content:
+          "View per-transaction short-term and long-term capital gains tax liability for client and family portfolios under Indian Income Tax rules (FY 2025-26).",
+      },
+    ],
+  }),
+  component: TaxPage,
+});
+
+// ---------------- Helpers ----------------
+function loadSaved(): SavedPortfolio[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function fmtINR(n: number) {
+  if (!isFinite(n)) return "₹0";
+  const a = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(2)} Cr`;
+  if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(2)} L`;
+  if (a >= 1000) return `${sign}₹${(a / 1000).toFixed(1)}K`;
+  return `${sign}₹${a.toFixed(0)}`;
+}
+function fmtINRFull(n: number) {
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+function seedNum(seed: string, min: number, max: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const r = ((h >>> 0) % 100000) / 100000;
+  return min + r * (max - min);
+}
+
+// ---------------- Tax Engine (India, FY 2025-26) ----------------
+// Reference rules implemented:
+//   • Listed Equity / Equity MF (>65% eq) / Equity ETF (STT paid):
+//       STCG (≤12m) u/s 111A — 20% (post 23-Jul-2024)
+//       LTCG (>12m) u/s 112A — 12.5% on gains exceeding ₹1,25,000 (FY25-26 limit)
+//       Grandfathering: shares/units acquired before 01-Feb-2018 →
+//         Deemed cost = max(actualCost, min(FMV on 31-Jan-2018, saleConsideration))
+//   • Listed Bonds / NCD / G-Sec: STCG (≤12m) at slab; LTCG (>12m) @ 12.5%
+//   • Mutual Fund – Debt:
+//       Acquired on/after 01-Apr-2023 → always STCG (slab), no indexation (Finance Act 2023)
+//       Acquired before 01-Apr-2023 → LTCG (>24m post 23-Jul-2024) @ 12.5% w/o indexation; else slab
+//   • REIT / InvIT units (listed): >12m LTCG u/s 112A @12.5% (1.25L exempt); ≤12m STCG @ 20%
+//   • PMS → look-through equity rules
+//   • AIF Cat I/II → unlisted equity rules: LTCG >24m @ 12.5%; else slab
+//   • AIF Cat III → fund-level taxation, modelled here as equity
+//   • Private Equity (unlisted) → >24m LTCG @ 12.5%; else slab
+//   • Real Estate → >24m LTCG @ 12.5% w/o indexation (post 23-Jul-2024).
+//        For property acquired before 23-Jul-2024, resident assessees may choose
+//        20% with indexation if lower. Engine picks the lower of the two.
+//   • Hybrid MF → treated as equity-oriented (assumes >65% equity) for simplicity.
+
+const FY = "FY 2025-26";
+const ASSESSMENT_DATE = new Date("2026-06-23"); // current date in app
+const NEW_REGIME_CUTOFF = new Date("2024-07-23"); // Finance (No.2) Act 2024
+const DEBT_MF_CUTOFF = new Date("2023-04-01"); // Finance Act 2023
+const GRANDFATHER_CUTOFF = new Date("2018-02-01");
+const LTCG_112A_EXEMPTION = 125000;
+
+type TaxRegime = {
+  slabRate: number; // marginal rate %, applied to slab-taxed STCG/debt gains
+  surcharge: number; // % surcharge on tax (post LTCG cap rules — 15% max on 111A/112A)
+  cessRate: number; // health & education cess (4%)
+};
+
+type TaxBucket =
+  | "EQUITY_STCG_111A" // 20%
+  | "EQUITY_LTCG_112A" // 12.5% over 1.25L
+  | "DEBT_LTCG_125" // 12.5% (listed bonds, old debt MF LTCG, RE LTCG, unlisted LTCG)
+  | "SLAB" // taxed at marginal slab rate
+  | "RE_LTCG_20_INDEX"; // 20% with indexation alternative
+
+type Txn = {
+  holding: Holding;
+  acquiredOn: Date;
+  costBasis: number;
+  deemedCost: number; // after grandfathering if applicable
+  saleValue: number; // current value (assumed disposal today)
+  gain: number;
+  holdingDays: number;
+  bucket: TaxBucket;
+  rate: number; // marginal % for display (before cess/surcharge)
+  taxable: number;
+  taxBeforeCess: number;
+  note: string;
+  category: string;
+  grandfathered: boolean;
+};
+
+function categoryOf(h: Holding): string {
+  if (h.productCategory) return h.productCategory;
+  if (h.type === "Mutual Fund") return "Mutual Fund - Equity";
+  if (h.type === "Bond") return "Direct Debt";
+  if (h.type === "ETF") return "ETF";
+  if (h.type === "Equity") return "Direct Equity";
+  return "Other";
+}
+
+// Synthesise deterministic acquisition date & cost basis for each holding
+function synthAcquisition(h: Holding): { acquiredOn: Date; costBasis: number } {
+  const cat = categoryOf(h);
+  // Months back depending on category profile
+  let minM = 6, maxM = 96;
+  if (cat === "Direct Equity") { minM = 12; maxM = 130; }
+  else if (cat === "Mutual Fund - Equity") { minM = 8; maxM = 96; }
+  else if (cat === "Mutual Fund - Hybrid") { minM = 10; maxM = 60; }
+  else if (cat === "Mutual Fund - Debt") { minM = 6; maxM = 84; }
+  else if (cat === "Direct Debt") { minM = 12; maxM = 84; }
+  else if (cat === "ETF") { minM = 6; maxM = 60; }
+  else if (cat === "PMS") { minM = 18; maxM = 96; }
+  else if (cat === "AIF") { minM = 24; maxM = 96; }
+  else if (cat === "REIT" || cat === "InvIT") { minM = 8; maxM = 60; }
+  else if (cat === "Private Equity") { minM = 30; maxM = 96; }
+  else if (cat === "Real Estate") { minM = 36; maxM = 180; }
+
+  const monthsBack = Math.round(seedNum(h.isin + "m", minM, maxM));
+  const acquiredOn = new Date(ASSESSMENT_DATE);
+  acquiredOn.setMonth(acquiredOn.getMonth() - monthsBack);
+  acquiredOn.setDate(1 + Math.round(seedNum(h.isin + "d", 0, 27)));
+
+  // Cost basis as a fraction of current value (depends on holding period — longer = more appreciation)
+  // Older holdings have lower cost (bigger gain). Some intentionally loss-making.
+  const lossy = seedNum(h.isin + "L", 0, 1) < 0.18;
+  const yearsBack = monthsBack / 12;
+  const baseCAGR = cat.includes("Equity") || cat === "PMS" || cat === "Private Equity"
+    ? seedNum(h.isin + "c", 0.06, 0.18)
+    : cat === "Real Estate"
+    ? seedNum(h.isin + "c", 0.04, 0.11)
+    : cat === "REIT" || cat === "InvIT" || cat === "AIF"
+    ? seedNum(h.isin + "c", 0.05, 0.13)
+    : seedNum(h.isin + "c", 0.03, 0.08); // debt
+  let ratio = 1 / Math.pow(1 + baseCAGR, yearsBack);
+  if (lossy) ratio = ratio * seedNum(h.isin + "x", 1.05, 1.35); // cost > value → loss
+  ratio = Math.min(1.6, Math.max(0.15, ratio));
+  const costBasis = Math.round(h.value * ratio);
+  return { acquiredOn, costBasis };
+}
+
+function diffDays(a: Date, b: Date) {
+  return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function isListedEquityCat(cat: string) {
+  return (
+    cat === "Direct Equity" ||
+    cat === "Mutual Fund - Equity" ||
+    cat === "Mutual Fund - Hybrid" ||
+    cat === "ETF" ||
+    cat === "PMS"
+  );
+}
+
+function computeTxn(h: Holding, slabRate: number): Txn {
+  const cat = categoryOf(h);
+  const { acquiredOn, costBasis } = synthAcquisition(h);
+  const sale = h.value;
+  const days = diffDays(ASSESSMENT_DATE, acquiredOn);
+  const months = days / 30.4375;
+
+  let deemedCost = costBasis;
+  let grandfathered = false;
+  let bucket: TaxBucket = "SLAB";
+  let rate = slabRate;
+  let taxable = 0;
+  let note = "";
+
+  // ---- Listed equity / equity MF / hybrid / ETF / PMS ----
+  if (isListedEquityCat(cat)) {
+    // Grandfathering for shares/units acquired before 1-Feb-2018
+    if (acquiredOn < GRANDFATHER_CUTOFF) {
+      // Simulated FMV on 31-Jan-2018 as a fraction of current sale value
+      const fmv2018 = sale * seedNum(h.isin + "fmv", 0.35, 0.75);
+      const deemed = Math.max(costBasis, Math.min(fmv2018, sale));
+      if (deemed > costBasis) {
+        deemedCost = Math.round(deemed);
+        grandfathered = true;
+      }
+    }
+    const gain = sale - deemedCost;
+    if (months > 12) {
+      bucket = "EQUITY_LTCG_112A";
+      rate = 12.5;
+      taxable = gain; // 1.25L exemption applied at aggregate level
+      note = grandfathered
+        ? "LTCG u/s 112A @ 12.5% over ₹1.25L aggregate. Cost stepped-up under grandfathering (FMV 31-Jan-2018)."
+        : "LTCG u/s 112A @ 12.5% over ₹1.25L aggregate exemption.";
+    } else {
+      bucket = "EQUITY_STCG_111A";
+      rate = 20;
+      taxable = Math.max(0, gain);
+      note = "STCG u/s 111A @ 20% (post 23-Jul-2024).";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, deemedCost, sale, gain, days, bucket, rate, taxable, note, grandfathered);
+  }
+
+  // ---- REIT / InvIT (listed units, STT analog) ----
+  if (cat === "REIT" || cat === "InvIT") {
+    const gain = sale - costBasis;
+    if (months > 12) {
+      bucket = "EQUITY_LTCG_112A";
+      rate = 12.5;
+      taxable = gain;
+      note = "Units of Business Trust: LTCG u/s 112A @ 12.5% over ₹1.25L aggregate.";
+    } else {
+      bucket = "EQUITY_STCG_111A";
+      rate = 20;
+      taxable = Math.max(0, gain);
+      note = "Units of Business Trust: STCG u/s 111A @ 20%.";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+  }
+
+  // ---- Mutual Fund - Debt ----
+  if (cat === "Mutual Fund - Debt") {
+    const gain = sale - costBasis;
+    if (acquiredOn >= DEBT_MF_CUTOFF) {
+      bucket = "SLAB";
+      rate = slabRate;
+      taxable = Math.max(0, gain);
+      note = "Specified Mutual Fund acquired on/after 01-Apr-2023 — entire gain taxed at slab rates u/s 50AA (no LTCG / no indexation).";
+    } else if (months > 24) {
+      bucket = "DEBT_LTCG_125";
+      rate = 12.5;
+      taxable = gain;
+      note = "Pre 01-Apr-2023 debt MF held > 24 months: LTCG @ 12.5% without indexation (post 23-Jul-2024).";
+    } else {
+      bucket = "SLAB";
+      rate = slabRate;
+      taxable = Math.max(0, gain);
+      note = "Pre 01-Apr-2023 debt MF held ≤ 24 months: STCG at slab rate.";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+  }
+
+  // ---- Direct Debt (listed bonds / NCD / G-Sec) ----
+  if (cat === "Direct Debt") {
+    const gain = sale - costBasis;
+    if (months > 12) {
+      bucket = "DEBT_LTCG_125";
+      rate = 12.5;
+      taxable = gain;
+      note = "Listed bond / NCD / G-Sec held > 12 months: LTCG @ 12.5% without indexation.";
+    } else {
+      bucket = "SLAB";
+      rate = slabRate;
+      taxable = Math.max(0, gain);
+      note = "Listed debt security held ≤ 12 months: STCG at slab rate.";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+  }
+
+  // ---- AIF / Private Equity (unlisted) ----
+  if (cat === "AIF" || cat === "Private Equity") {
+    const gain = sale - costBasis;
+    if (months > 24) {
+      bucket = "DEBT_LTCG_125";
+      rate = 12.5;
+      taxable = gain;
+      note =
+        cat === "AIF"
+          ? "AIF (Cat I/II look-through) — unlisted security > 24 months: LTCG @ 12.5%."
+          : "Unlisted PE units > 24 months: LTCG @ 12.5%.";
+    } else {
+      bucket = "SLAB";
+      rate = slabRate;
+      taxable = Math.max(0, gain);
+      note = "Unlisted security ≤ 24 months: STCG at slab rate.";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+  }
+
+  // ---- Real Estate ----
+  if (cat === "Real Estate") {
+    const gain = sale - costBasis;
+    if (months > 24) {
+      // Post 23-Jul-2024: 12.5% without indexation. Pre cutoff acquired property: option of 20% with indexation if lower.
+      const tax125 = Math.max(0, gain) * 0.125;
+      if (acquiredOn < NEW_REGIME_CUTOFF) {
+        // Synthesised CII-based indexed cost
+        const yearsHeld = (ASSESSMENT_DATE.getTime() - acquiredOn.getTime()) / (365.25 * 86400000);
+        const cii = Math.pow(1.05, yearsHeld); // ~5% p.a. CII inflator
+        const indexedCost = costBasis * cii;
+        const indexedGain = Math.max(0, sale - indexedCost);
+        const tax20 = indexedGain * 0.20;
+        if (tax20 < tax125) {
+          bucket = "RE_LTCG_20_INDEX";
+          rate = 20;
+          taxable = indexedGain;
+          note =
+            "Immovable property acquired before 23-Jul-2024 & held > 24 months — 20% with indexation chosen (lower than 12.5% without indexation, as permitted by Finance (No.2) Act 2024 proviso).";
+          return finalise(h, cat, acquiredOn, costBasis, Math.round(indexedCost), sale, indexedGain, days, bucket, rate, taxable, note, false);
+        }
+      }
+      bucket = "DEBT_LTCG_125";
+      rate = 12.5;
+      taxable = gain;
+      note = "Immovable property > 24 months: LTCG @ 12.5% without indexation (post 23-Jul-2024).";
+    } else {
+      bucket = "SLAB";
+      rate = slabRate;
+      taxable = Math.max(0, gain);
+      note = "Immovable property held ≤ 24 months: STCG at slab rate.";
+    }
+    return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+  }
+
+  // ---- Fallback (Other) ----
+  const gain = sale - costBasis;
+  if (months > 24) {
+    bucket = "DEBT_LTCG_125"; rate = 12.5; taxable = gain;
+    note = "Other capital asset > 24 months: LTCG @ 12.5%.";
+  } else {
+    bucket = "SLAB"; rate = slabRate; taxable = Math.max(0, gain);
+    note = "Other capital asset ≤ 24 months: STCG at slab rate.";
+  }
+  return finalise(h, cat, acquiredOn, costBasis, costBasis, sale, gain, days, bucket, rate, taxable, note, false);
+}
+
+function finalise(
+  h: Holding, category: string, acquiredOn: Date, costBasis: number, deemedCost: number,
+  sale: number, gain: number, days: number, bucket: TaxBucket, rate: number, taxable: number,
+  note: string, grandfathered: boolean,
+): Txn {
+  // tax before cess/surcharge — note that 112A's 1.25L exemption is applied aggregate (handled in summary)
+  const taxBeforeCess = Math.max(0, taxable) * (rate / 100);
+  return {
+    holding: h, acquiredOn, costBasis, deemedCost, saleValue: sale,
+    gain, holdingDays: days, bucket, rate, taxable, taxBeforeCess, note, category, grandfathered,
+  };
+}
+
+type Summary = {
+  txns: Txn[];
+  // raw
+  totalSale: number;
+  totalCost: number;
+  totalGain: number;
+  // by bucket
+  equityStcgGain: number;
+  equityLtcgGain: number;
+  debtLtcgGain: number; // 12.5% bucket
+  slabGain: number;
+  reIndexedGain: number;
+  // tax
+  tax_111A: number;
+  tax_112A: number; // after 1.25L exemption
+  tax_125_debt: number;
+  tax_slab: number;
+  tax_RE_indexed: number;
+  taxBeforeSurcharge: number;
+  surcharge: number;
+  cess: number;
+  totalTax: number;
+  shortTermTax: number;
+  longTermTax: number;
+};
+
+function summarise(txns: Txn[], regime: TaxRegime): Summary {
+  let totalSale = 0, totalCost = 0, totalGain = 0;
+  let equityStcgGain = 0, equityLtcgGain = 0, debtLtcgGain = 0, slabGain = 0, reIndexedGain = 0;
+
+  for (const t of txns) {
+    totalSale += t.saleValue;
+    totalCost += t.costBasis;
+    totalGain += t.gain;
+    if (t.bucket === "EQUITY_STCG_111A") equityStcgGain += t.taxable;
+    else if (t.bucket === "EQUITY_LTCG_112A") equityLtcgGain += t.taxable; // net of losses
+    else if (t.bucket === "DEBT_LTCG_125") debtLtcgGain += t.taxable;
+    else if (t.bucket === "SLAB") slabGain += t.taxable;
+    else if (t.bucket === "RE_LTCG_20_INDEX") reIndexedGain += t.taxable;
+  }
+
+  const tax_111A = Math.max(0, equityStcgGain) * 0.20;
+  const ltcg112ATaxable = Math.max(0, equityLtcgGain - LTCG_112A_EXEMPTION);
+  const tax_112A = ltcg112ATaxable * 0.125;
+  const tax_125_debt = Math.max(0, debtLtcgGain) * 0.125;
+  const tax_slab = Math.max(0, slabGain) * (regime.slabRate / 100);
+  const tax_RE_indexed = Math.max(0, reIndexedGain) * 0.20;
+
+  const taxBeforeSurcharge = tax_111A + tax_112A + tax_125_debt + tax_slab + tax_RE_indexed;
+  // Surcharge on 111A/112A capped at 15%; on slab follows the user-set surcharge bracket; we apply a single % proxy.
+  const surcharge = taxBeforeSurcharge * (regime.surcharge / 100);
+  const cess = (taxBeforeSurcharge + surcharge) * (regime.cessRate / 100);
+  const totalTax = taxBeforeSurcharge + surcharge + cess;
+
+  const shortTermTax = tax_111A + tax_slab; // slab gains are short-term in nature here
+  const longTermTax = tax_112A + tax_125_debt + tax_RE_indexed;
+
+  return {
+    txns, totalSale, totalCost, totalGain,
+    equityStcgGain, equityLtcgGain, debtLtcgGain, slabGain, reIndexedGain,
+    tax_111A, tax_112A, tax_125_debt, tax_slab, tax_RE_indexed,
+    taxBeforeSurcharge, surcharge, cess, totalTax,
+    shortTermTax, longTermTax,
+  };
+}
+
+// ---------------- Component ----------------
+function TaxPage() {
+  const [saved, setSaved] = useState<SavedPortfolio[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [slabRate, setSlabRate] = useState<number>(30);
+  const [surcharge, setSurcharge] = useState<number>(10);
+  const [filter, setFilter] = useState<"ALL" | "STCG" | "LTCG" | "LOSS">("ALL");
+
+  useEffect(() => {
+    let s = loadSaved();
+    if (!s.length) s = seedSamplePortfolios();
+    setSaved(s);
+    if (!activeId && s.length) setActiveId(s[0].id);
+  }, []);
+
+  const regime: TaxRegime = { slabRate, surcharge, cessRate: 4 };
+  const active = useMemo(() => saved.find((s) => s.id === activeId) || null, [saved, activeId]);
+
+  const summary = useMemo(() => {
+    if (!active) return null;
+    const txns = active.data.holdings.map((h) => computeTxn(h, slabRate));
+    return summarise(txns, regime);
+  }, [active, slabRate, surcharge]);
+
+  const filteredTxns = useMemo(() => {
+    if (!summary) return [];
+    if (filter === "ALL") return summary.txns;
+    return summary.txns.filter((t) => {
+      const isLT = t.bucket === "EQUITY_LTCG_112A" || t.bucket === "DEBT_LTCG_125" || t.bucket === "RE_LTCG_20_INDEX";
+      if (filter === "LTCG") return isLT;
+      if (filter === "STCG") return t.bucket === "EQUITY_STCG_111A" || t.bucket === "SLAB";
+      if (filter === "LOSS") return t.gain < 0;
+      return true;
+    });
+  }, [summary, filter]);
+
+  // Group portfolios by family for sidebar listing
+  const grouped = useMemo(() => {
+    const families: Record<string, SavedPortfolio[]> = {};
+    const solo: SavedPortfolio[] = [];
+    for (const s of saved) {
+      if (s.family) {
+        (families[s.family] ||= []).push(s);
+      } else solo.push(s);
+    }
+    return { families, solo };
+  }, [saved]);
+
+  return (
+    <div className="min-h-screen text-foreground">
+      <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30 print:hidden">
+        <div className="pl-12 pr-6 py-3 flex items-center gap-4">
+          <div>
+            <h1 className="text-sm font-semibold leading-tight">Tax Liability</h1>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Capital Gains · Indian Income Tax · {FY}
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2 text-[11px]">
+            <button onClick={() => window.print()} className="px-2.5 py-1 border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+              <Printer className="w-3 h-3" /> Print
+            </button>
+            <Link to="/reports" className="px-2.5 py-1 border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+              <ChevronRight className="w-3 h-3" /> Open Reports
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-12 gap-0">
+        {/* LEFT: portfolio picker */}
+        <aside className="col-span-12 lg:col-span-3 border-r border-border min-h-[calc(100vh-49px)] bg-surface/40">
+          <div className="px-4 py-3 border-b border-border">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Select Portfolio</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {saved.length} portfolios across {Object.keys(grouped.families).length} families
+            </div>
+          </div>
+
+          <div className="py-2">
+            {Object.entries(grouped.families).map(([fam, list]) => (
+              <div key={fam} className="px-2 mb-2">
+                <div className="px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground inline-flex items-center gap-1.5">
+                  <Users className="w-3 h-3" /> {fam}
+                </div>
+                {list.map((p) => (
+                  <PickerRow key={p.id} p={p} active={activeId === p.id} onClick={() => setActiveId(p.id)} />
+                ))}
+              </div>
+            ))}
+            {grouped.solo.length > 0 && (
+              <div className="px-2 mb-2">
+                <div className="px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground inline-flex items-center gap-1.5">
+                  <User className="w-3 h-3" /> Individual
+                </div>
+                {grouped.solo.map((p) => (
+                  <PickerRow key={p.id} p={p} active={activeId === p.id} onClick={() => setActiveId(p.id)} />
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* RIGHT: tax report */}
+        <main className="col-span-12 lg:col-span-9 px-6 py-5">
+          {!active || !summary ? (
+            <div className="text-sm text-muted-foreground">Select a portfolio to compute capital-gains tax liability.</div>
+          ) : (
+            <>
+              {/* Header / regime controls */}
+              <div className="flex flex-wrap items-end gap-4 mb-5">
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight">{active.data.investor || active.name}</h2>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    PAN {active.data.pan || "—"} · {active.data.holdings.length} holdings · Market value {fmtINR(active.data.totalValue)}
+                  </div>
+                </div>
+                <div className="ml-auto flex items-end gap-3 text-[11px]">
+                  <label className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Marginal Slab %</span>
+                    <select value={slabRate} onChange={(e) => setSlabRate(Number(e.target.value))}
+                      className="mt-0.5 px-2 py-1 bg-background border border-border rounded-sm">
+                      <option value={5}>5%</option>
+                      <option value={10}>10%</option>
+                      <option value={15}>15%</option>
+                      <option value={20}>20%</option>
+                      <option value={25}>25%</option>
+                      <option value={30}>30%</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Surcharge %</span>
+                    <select value={surcharge} onChange={(e) => setSurcharge(Number(e.target.value))}
+                      className="mt-0.5 px-2 py-1 bg-background border border-border rounded-sm">
+                      <option value={0}>0%</option>
+                      <option value={10}>10%</option>
+                      <option value={15}>15%</option>
+                      <option value={25}>25% (slab only)</option>
+                      <option value={37}>37% (slab only)</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              {/* KPI cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <KPI label="Total Gain (unrealised)" value={fmtINR(summary.totalGain)} tone={summary.totalGain >= 0 ? "pos" : "neg"} />
+                <KPI label="Short-Term Tax" value={fmtINR(summary.shortTermTax)} />
+                <KPI label="Long-Term Tax" value={fmtINR(summary.longTermTax)} />
+                <KPI label={`Total Tax (incl. ${regime.cessRate}% cess)`} value={fmtINR(summary.totalTax)} highlight />
+              </div>
+
+              {/* Bucket breakdown */}
+              <div className="border border-border rounded-md bg-surface mb-5">
+                <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Computation by Tax Bucket
+                </div>
+                <table className="w-full text-xs">
+                  <thead className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary/40">
+                    <tr>
+                      <th className="text-left px-4 py-2">Bucket</th>
+                      <th className="text-right px-3 py-2">Net Gain</th>
+                      <th className="text-right px-3 py-2">Exemption</th>
+                      <th className="text-right px-3 py-2">Taxable</th>
+                      <th className="text-right px-3 py-2">Rate</th>
+                      <th className="text-right px-4 py-2">Tax</th>
+                    </tr>
+                  </thead>
+                  <tbody className="mono-num">
+                    <BucketRow label="Equity STCG u/s 111A" gain={summary.equityStcgGain} exempt={0}
+                      taxable={Math.max(0, summary.equityStcgGain)} rate="20%" tax={summary.tax_111A} />
+                    <BucketRow label="Equity LTCG u/s 112A" gain={summary.equityLtcgGain} exempt={Math.min(LTCG_112A_EXEMPTION, Math.max(0, summary.equityLtcgGain))}
+                      taxable={Math.max(0, summary.equityLtcgGain - LTCG_112A_EXEMPTION)} rate="12.5%" tax={summary.tax_112A} />
+                    <BucketRow label="LTCG @ 12.5% (Bonds / Debt MF pre-Apr-23 / Unlisted / RE)"
+                      gain={summary.debtLtcgGain} exempt={0} taxable={Math.max(0, summary.debtLtcgGain)} rate="12.5%" tax={summary.tax_125_debt} />
+                    <BucketRow label="Real Estate LTCG (20% with indexation option)"
+                      gain={summary.reIndexedGain} exempt={0} taxable={Math.max(0, summary.reIndexedGain)} rate="20%" tax={summary.tax_RE_indexed} />
+                    <BucketRow label="Slab-taxed gains (Debt MF post-Apr-23, STCG on bonds / unlisted, etc.)"
+                      gain={summary.slabGain} exempt={0} taxable={Math.max(0, summary.slabGain)} rate={`${slabRate}%`} tax={summary.tax_slab} />
+                    <tr className="border-t border-border bg-secondary/30 font-semibold">
+                      <td className="px-4 py-2">Tax before surcharge & cess</td>
+                      <td colSpan={4}></td>
+                      <td className="text-right px-4 py-2">{fmtINRFull(summary.taxBeforeSurcharge)}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-1.5 text-muted-foreground">+ Surcharge ({surcharge}%)</td>
+                      <td colSpan={4}></td>
+                      <td className="text-right px-4 py-1.5">{fmtINRFull(summary.surcharge)}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-1.5 text-muted-foreground">+ Health & Education Cess (4%)</td>
+                      <td colSpan={4}></td>
+                      <td className="text-right px-4 py-1.5">{fmtINRFull(summary.cess)}</td>
+                    </tr>
+                    <tr className="border-t border-border bg-foreground text-background font-semibold">
+                      <td className="px-4 py-2">Total Tax Liability</td>
+                      <td colSpan={4}></td>
+                      <td className="text-right px-4 py-2">{fmtINRFull(summary.totalTax)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Transaction-level */}
+              <div className="border border-border rounded-md bg-surface">
+                <div className="px-4 py-2.5 border-b border-border flex items-center gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Transaction-Level Capital Gains ({filteredTxns.length})
+                  </div>
+                  <div className="ml-auto inline-flex border border-border rounded-sm p-0.5 bg-background">
+                    {(["ALL", "STCG", "LTCG", "LOSS"] as const).map((f) => (
+                      <button key={f} onClick={() => setFilter(f)}
+                        className={`px-2.5 py-0.5 text-[10px] rounded-sm ${filter === f ? "bg-foreground text-background" : "text-muted-foreground"}`}>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary/40">
+                      <tr>
+                        <th className="text-left px-3 py-2">Holding</th>
+                        <th className="text-left px-2 py-2">Category</th>
+                        <th className="text-left px-2 py-2">Acquired</th>
+                        <th className="text-right px-2 py-2">Period</th>
+                        <th className="text-right px-2 py-2">Cost</th>
+                        <th className="text-right px-2 py-2">Deemed Cost</th>
+                        <th className="text-right px-2 py-2">Sale Value</th>
+                        <th className="text-right px-2 py-2">Gain / Loss</th>
+                        <th className="text-left px-2 py-2">Treatment</th>
+                        <th className="text-right px-2 py-2">Rate</th>
+                        <th className="text-right px-3 py-2">Tax</th>
+                      </tr>
+                    </thead>
+                    <tbody className="mono-num">
+                      {filteredTxns.map((t, i) => {
+                        const months = (t.holdingDays / 30.4375).toFixed(1);
+                        const isLT = t.bucket === "EQUITY_LTCG_112A" || t.bucket === "DEBT_LTCG_125" || t.bucket === "RE_LTCG_20_INDEX";
+                        return (
+                          <tr key={i} className="border-t border-border/50 hover:bg-secondary/30 align-top">
+                            <td className="px-3 py-2 max-w-[220px]">
+                              <div className="font-medium text-foreground truncate" title={t.holding.name}>{t.holding.name}</div>
+                              <div className="text-[9px] text-muted-foreground">{t.holding.isin}</div>
+                            </td>
+                            <td className="px-2 py-2 text-muted-foreground">{t.category}</td>
+                            <td className="px-2 py-2 text-muted-foreground whitespace-nowrap">{t.acquiredOn.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                            <td className="px-2 py-2 text-right whitespace-nowrap">
+                              {months}m
+                              <div className={`text-[9px] uppercase tracking-wider ${isLT ? "text-positive" : "text-muted-foreground"}`}>{isLT ? "Long-Term" : "Short-Term"}</div>
+                            </td>
+                            <td className="px-2 py-2 text-right">{fmtINR(t.costBasis)}</td>
+                            <td className="px-2 py-2 text-right">
+                              {fmtINR(t.deemedCost)}
+                              {t.grandfathered && <div className="text-[9px] text-amber-500">grandfathered</div>}
+                            </td>
+                            <td className="px-2 py-2 text-right">{fmtINR(t.saleValue)}</td>
+                            <td className={`px-2 py-2 text-right ${t.gain >= 0 ? "text-positive" : "text-negative"}`}>{fmtINR(t.gain)}</td>
+                            <td className="px-2 py-2 text-muted-foreground max-w-[260px]">
+                              <div className="flex items-start gap-1">
+                                <Info className="w-3 h-3 mt-0.5 shrink-0 opacity-60" />
+                                <span className="text-[10px] leading-snug">{t.note}</span>
+                              </div>
+                            </td>
+                            <td className="px-2 py-2 text-right whitespace-nowrap">{t.rate}%</td>
+                            <td className="px-3 py-2 text-right font-semibold">{fmtINR(t.taxBeforeCess)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Footnote */}
+              <div className="mt-4 text-[10px] text-muted-foreground leading-relaxed border border-dashed border-border rounded-sm p-3">
+                <div className="font-medium text-foreground mb-1 inline-flex items-center gap-1.5">
+                  <Info className="w-3 h-3" /> Tax basis ({FY}) — indicative only
+                </div>
+                Computations follow the Income-tax Act, 1961 as amended by the Finance (No.2) Act 2024 and the Finance Act 2025.
+                Listed-equity / equity-MF / REIT-InvIT short-term gains: <span className="text-foreground">20% u/s 111A</span> (post 23-Jul-2024).
+                Long-term gains: <span className="text-foreground">12.5% u/s 112A</span> on aggregate gains exceeding <span className="text-foreground">₹1,25,000</span>.
+                Grandfathering u/s 112A applies to equity acquired before 01-Feb-2018 (deemed cost = max of actual cost and the lower of FMV on 31-Jan-2018 / sale value).
+                Specified Mutual Funds (more than 65% in debt) acquired on or after 01-Apr-2023 are taxed at slab rates u/s 50AA irrespective of holding period.
+                Listed bonds / NCDs / G-Sec held over 12 months and unlisted securities held over 24 months attract LTCG at 12.5% without indexation.
+                Immovable property held over 24 months attracts 12.5% without indexation, with an option of 20% with indexation if acquired before 23-Jul-2024 (engine selects the lower).
+                Cost basis and acquisition dates shown are synthesised for demonstration; actual tax computation should use audited contract notes.
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function PickerRow({ p, active, onClick }: { p: SavedPortfolio; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className={`w-full text-left px-2 py-1.5 rounded-sm text-xs flex items-center gap-2 hover:bg-secondary/60 ${active ? "bg-secondary text-foreground" : "text-muted-foreground"}`}>
+      <span className={`w-1 h-4 rounded-sm ${active ? "bg-foreground" : "bg-transparent"}`} />
+      <span className="flex-1 truncate">{p.name}</span>
+      <span className="text-[9px] mono-num">{fmtINR(p.data.totalValue)}</span>
+    </button>
+  );
+}
+
+function KPI({ label, value, tone, highlight }: { label: string; value: string; tone?: "pos" | "neg"; highlight?: boolean }) {
+  return (
+    <div className={`border rounded-md p-3 ${highlight ? "border-foreground bg-foreground text-background" : "border-border bg-surface"}`}>
+      <div className={`text-[9px] uppercase tracking-[0.18em] ${highlight ? "opacity-70" : "text-muted-foreground"}`}>{label}</div>
+      <div className={`mt-1 text-lg font-semibold mono-num ${tone === "pos" ? "text-positive" : tone === "neg" ? "text-negative" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function BucketRow({ label, gain, exempt, taxable, rate, tax }: {
+  label: string; gain: number; exempt: number; taxable: number; rate: string; tax: number;
+}) {
+  return (
+    <tr className="border-t border-border/50">
+      <td className="px-4 py-2 text-foreground">{label}</td>
+      <td className={`text-right px-3 py-2 ${gain >= 0 ? "" : "text-negative"}`}>{fmtINRFull(gain)}</td>
+      <td className="text-right px-3 py-2 text-muted-foreground">{exempt ? fmtINRFull(exempt) : "—"}</td>
+      <td className="text-right px-3 py-2">{fmtINRFull(taxable)}</td>
+      <td className="text-right px-3 py-2 text-muted-foreground">{rate}</td>
+      <td className="text-right px-4 py-2 font-semibold">{fmtINRFull(tax)}</td>
+    </tr>
+  );
+}

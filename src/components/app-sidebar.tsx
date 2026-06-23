@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText } from "lucide-react";
+import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 import {
@@ -18,10 +18,11 @@ import {
 const items = [
   { title: "Screener",    url: "/",            icon: LayoutGrid },
   { title: "Proposal",    url: "/proposal",    icon: FilePlus2 },
-  { title: "Portfolios",  url: "/portfolio",   icon: Briefcase },
-  { title: "Market Data", url: "/market-data", icon: LineChart },
-  { title: "Alerts",      url: "/alerts",      icon: Bell },
-  { title: "Reports",     url: "/reports",     icon: FileText },
+  { title: "Portfolios",    url: "/portfolio",   icon: Briefcase },
+  { title: "Tax Liability", url: "/tax",         icon: Calculator },
+  { title: "Market Data",   url: "/market-data", icon: LineChart },
+  { title: "Alerts",        url: "/alerts",      icon: Bell },
+  { title: "Reports",       url: "/reports",     icon: FileText },
 ] as const;
 
 export function AppSidebar() {

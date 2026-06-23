@@ -1147,3 +1147,188 @@ function CFStat({ label, value, tone, highlight }: { label: string; value: numbe
     </div>
   );
 }
+
+// ============================================================================
+// Portfolio Commentary
+// ============================================================================
+
+type CommentaryProps = {
+  totalValue: number;
+  byAssetClass: Array<{ name: string; value: number; pct: number; ret: number; bench: { name: string; ret: number } }>;
+  byIssuer: Array<{ name: string; value: number; pct: number }>;
+  bySector: Array<{ name: string; value: number; pct: number }>;
+  byMarketCap: Array<{ name: string; value: number; pct: number }>;
+  byRating: Array<{ name: string; value: number; pct: number }>;
+  liquidity: Array<{ name: string; value: number; pct: number }>;
+  riskProfile: string;
+  equityShare: number;
+  debtShare: number;
+  portfolioCount: number;
+  holdingsCount: number;
+};
+
+function CommentarySection(p: CommentaryProps) {
+  const {
+    totalValue, byAssetClass, byIssuer, bySector, byMarketCap, byRating,
+    liquidity, riskProfile, equityShare, debtShare, portfolioCount, holdingsCount,
+  } = p;
+
+  // ---- Performance ----
+  const weightedReturn = byAssetClass.reduce((s, a) => s + a.ret * (a.pct / 100), 0);
+  const weightedBench = byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0);
+  const alpha = weightedReturn - weightedBench;
+  const bestAsset = [...byAssetClass].sort((a, b) => (b.ret - b.bench.ret) - (a.ret - a.bench.ret))[0];
+  const worstAsset = [...byAssetClass].sort((a, b) => (a.ret - a.bench.ret) - (b.ret - b.bench.ret))[0];
+
+  // ---- Concentration ----
+  const top1 = byIssuer[0];
+  const top5Share = byIssuer.slice(0, 5).reduce((s, i) => s + i.pct, 0);
+  const top10Share = byIssuer.slice(0, 10).reduce((s, i) => s + i.pct, 0);
+  const topSector = bySector[0];
+  const top3Sector = bySector.slice(0, 3).reduce((s, i) => s + i.pct, 0);
+
+  // ---- Risk ----
+  const liquidPct = liquidity.filter(l => /T\+1|T\+3|Short/.test(l.name)).reduce((s, l) => s + l.pct, 0);
+  const illiquidPct = liquidity.filter(l => /Long/.test(l.name)).reduce((s, l) => s + l.pct, 0);
+  const sovereignAAA = byRating.filter(r => /Sovereign|AAA/.test(r.name)).reduce((s, r) => s + r.pct, 0);
+  const subAA = byRating.filter(r => /^A$|AA(?!A|\+)/.test(r.name)).reduce((s, r) => s + r.pct, 0);
+  const largeCap = byMarketCap.find(m => m.name === "Large Cap")?.pct ?? 0;
+  const smallMid = (byMarketCap.find(m => m.name === "Small Cap")?.pct ?? 0) + (byMarketCap.find(m => m.name === "Mid Cap")?.pct ?? 0);
+
+  // ---- Risk score (heuristic 1–10) ----
+  let riskScore = 3;
+  if (equityShare > 0.6) riskScore += 2; else if (equityShare > 0.4) riskScore += 1;
+  if (smallMid > 30) riskScore += 1;
+  if (top5Share > 40) riskScore += 1;
+  if (top3Sector > 60) riskScore += 1;
+  if (subAA > 10) riskScore += 1;
+  if (illiquidPct > 30) riskScore += 1;
+  riskScore = Math.min(10, riskScore);
+  const riskBand = riskScore <= 3 ? "Low" : riskScore <= 6 ? "Moderate" : riskScore <= 8 ? "Moderately High" : "High";
+
+  // ---- Comparative vs risk profile ----
+  const profileEquityTarget: Record<string, number> = { Conservative: 25, Moderate: 50, Aggressive: 75 };
+  const targetEq = profileEquityTarget[riskProfile] ?? 50;
+  const equityGap = equityShare * 100 - targetEq;
+
+  // ---- Build narrative ----
+  type Item = { kind: "good" | "warn" | "info"; text: string };
+  const performance: Item[] = [
+    {
+      kind: alpha >= 0 ? "good" : "warn",
+      text: `Blended portfolio return of ${pct(weightedReturn)} is ${alpha >= 0 ? "ahead of" : "behind"} the blended benchmark (${pct(weightedBench)}) by ${Math.abs(alpha).toFixed(1)}%${alpha >= 0 ? ", indicating positive alpha generation." : ", indicating underperformance that warrants a manager-level review."}`,
+    },
+    bestAsset && {
+      kind: "good" as const,
+      text: `Best-performing sleeve: ${bestAsset.name} delivered ${pct(bestAsset.ret)} vs ${pct(bestAsset.bench.ret)} benchmark (${(bestAsset.ret - bestAsset.bench.ret >= 0 ? "+" : "")}${(bestAsset.ret - bestAsset.bench.ret).toFixed(1)}% alpha).`,
+    },
+    worstAsset && worstAsset.name !== bestAsset?.name && {
+      kind: (worstAsset.ret - worstAsset.bench.ret) < -2 ? "warn" as const : "info" as const,
+      text: `Weakest sleeve: ${worstAsset.name} at ${pct(worstAsset.ret)} vs benchmark ${pct(worstAsset.bench.ret)} (${(worstAsset.ret - worstAsset.bench.ret).toFixed(1)}%). ${(worstAsset.ret - worstAsset.bench.ret) < -2 ? "Consider rebalancing or replacing underperforming schemes." : "Within tolerance — continue monitoring."}`,
+    },
+  ].filter(Boolean) as Item[];
+
+  const concentration: Item[] = [
+    top1 && {
+      kind: top1.pct > 15 ? "warn" : top1.pct > 10 ? "info" : "good" as const,
+      text: `Single-name concentration: largest holding "${top1.name}" represents ${pct(top1.pct)} of portfolio value${top1.pct > 15 ? " — exceeds the 15% prudent threshold and creates idiosyncratic risk." : top1.pct > 10 ? " — within tolerance but worth monitoring." : " — well diversified at the issuer level."}`,
+    },
+    {
+      kind: top5Share > 50 ? "warn" : top5Share > 35 ? "info" : "good",
+      text: `Top 5 issuers account for ${pct(top5Share)} of AUM; top 10 cover ${pct(top10Share)}. ${top5Share > 50 ? "High concentration — diversification benefit is limited." : top5Share > 35 ? "Moderate concentration consistent with conviction investing." : "Diversification is healthy."}`,
+    },
+    topSector && {
+      kind: topSector.pct > 35 ? "warn" : topSector.pct > 25 ? "info" : "good" as const,
+      text: `Sector mix (equity sleeve): ${topSector.name} is the largest at ${pct(topSector.pct)}, top-3 sectors at ${pct(top3Sector)}. ${topSector.pct > 35 ? "Sector-level concentration is elevated — vulnerable to sector-specific drawdowns." : "Sector dispersion is reasonable."}`,
+    },
+  ].filter(Boolean) as Item[];
+
+  const risk: Item[] = [
+    {
+      kind: "info",
+      text: `Composite risk band: ${riskBand} (${riskScore}/10). Equity share at ${pct(equityShare * 100)}, debt/cash at ${pct(debtShare * 100)}.`,
+    },
+    {
+      kind: smallMid > 35 ? "warn" : "info",
+      text: `Market-cap mix: Large Cap ${pct(largeCap)}, Mid+Small ${pct(smallMid)}. ${smallMid > 35 ? "Tilt toward Mid/Small caps elevates beta and drawdown risk in a correction." : "Balanced cap-curve exposure."}`,
+    },
+    {
+      kind: subAA > 10 ? "warn" : "good",
+      text: `Credit quality: Sovereign/AAA ${pct(sovereignAAA)}, sub-AA exposure ${pct(subAA)}. ${subAA > 10 ? "Material allocation to below-AA credit — review issuer-level spread risk." : "Credit profile is conservative."}`,
+    },
+    {
+      kind: illiquidPct > 30 ? "warn" : "info",
+      text: `Liquidity profile: ${pct(liquidPct)} liquid within 1 year, ${pct(illiquidPct)} locked beyond 3 years. ${illiquidPct > 30 ? "Significant illiquid bucket — ensure emergency reserves are adequate." : "Liquidity ladder supports near-term cashflow needs."}`,
+    },
+  ];
+
+  const comparative: Item[] = [
+    {
+      kind: Math.abs(equityGap) > 15 ? "warn" : Math.abs(equityGap) > 7 ? "info" : "good",
+      text: `Against a ${riskProfile} risk profile (target equity ≈ ${targetEq}%), portfolio is ${equityGap > 0 ? "over-weight" : "under-weight"} equity by ${Math.abs(equityGap).toFixed(1)} pp. ${Math.abs(equityGap) > 15 ? "Recommend a rebalancing trade." : Math.abs(equityGap) > 7 ? "Drift is within rebalancing band — review quarterly." : "Aligned with policy."}`,
+    },
+    {
+      kind: "info",
+      text: `Vs blended benchmark (asset-weighted), portfolio alpha is ${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}%. ${alpha >= 2 ? "Strong active value-add." : alpha >= 0 ? "Marginal outperformance — consistent with passive tilt." : alpha >= -2 ? "Mild underperformance — within expected dispersion." : "Material lag — investigate cost/manager selection."}`,
+    },
+    portfolioCount > 1 ? {
+      kind: "info" as const,
+      text: `Family aggregation covers ${portfolioCount} portfolios and ${holdingsCount} holdings totalling ${fmtINR(totalValue)}; commentary above is at the consolidated level.`,
+    } : {
+      kind: "info" as const,
+      text: `Single-customer view across ${holdingsCount} holdings totalling ${fmtINR(totalValue)}.`,
+    },
+  ];
+
+  return (
+    <Section id="commentary" title="2. Portfolio Commentary" icon={<MessageSquare className="w-4 h-4" />}>
+      <div className="grid md:grid-cols-4 gap-3">
+        <Stat label="Blended Return" value={pct(weightedReturn)} hint={`vs ${pct(weightedBench)} bench`} />
+        <Stat label="Portfolio Alpha" value={`${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}%`} hint="asset-weighted" />
+        <Stat label="Risk Band" value={`${riskBand}`} hint={`Score ${riskScore}/10`} />
+        <Stat label="Top 5 Concentration" value={pct(top5Share)} hint={`Top issuer ${top1 ? pct(top1.pct) : "—"}`} />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <CommentaryCard title="Performance" icon={<TrendingUp className="w-4 h-4" />} items={performance} />
+        <CommentaryCard title="Concentration" icon={<Layers className="w-4 h-4" />} items={concentration} />
+        <CommentaryCard title="Risk" icon={<Shield className="w-4 h-4" />} items={risk} />
+        <CommentaryCard title="Comparative Analysis" icon={<PieIcon className="w-4 h-4" />} items={comparative} />
+      </div>
+
+      <Card title="Advisor Summary">
+        <p className="text-xs leading-relaxed text-foreground/90">
+          The {portfolioCount > 1 ? "consolidated family" : "customer"} portfolio of <span className="mono-num font-semibold">{fmtINR(totalValue)}</span> is currently positioned with
+          {" "}<span className="font-semibold">{pct(equityShare * 100, 0)} equity</span> and <span className="font-semibold">{pct(debtShare * 100, 0)} debt/cash</span>,
+          {" "}{Math.abs(equityGap) <= 7 ? "broadly aligned" : equityGap > 0 ? "overweight equity" : "underweight equity"} relative to a <span className="font-semibold">{riskProfile}</span> mandate.
+          {" "}Blended performance of <span className={`mono-num font-semibold ${clsPct(weightedReturn)}`}>{pct(weightedReturn)}</span> delivers
+          {" "}<span className={`mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</span> alpha over the asset-weighted benchmark.
+          {" "}Issuer concentration is {top5Share > 50 ? "high" : top5Share > 35 ? "moderate" : "well diversified"} (top-5 at {pct(top5Share)}), with sector tilt toward
+          {" "}<span className="font-semibold">{topSector?.name ?? "—"}</span> ({pct(topSector?.pct ?? 0)}).
+          {" "}Credit profile is {subAA > 10 ? "carrying meaningful sub-AA risk" : "conservative (Sovereign/AAA dominated)"}, and the liquidity ladder shows
+          {" "}{pct(liquidPct)} accessible within a year. Overall composite risk band: <span className="font-semibold">{riskBand}</span>.
+        </p>
+      </Card>
+    </Section>
+  );
+}
+
+function CommentaryCard({ title, icon, items }: { title: string; icon: ReactNode; items: Array<{ kind: "good" | "warn" | "info"; text: string }> }) {
+  return (
+    <Card title={title}>
+      <ul className="space-y-2.5">
+        {items.map((it, i) => {
+          const Icon = it.kind === "good" ? CheckCircle2 : it.kind === "warn" ? AlertTriangle : Info;
+          const tone = it.kind === "good" ? "text-positive" : it.kind === "warn" ? "text-amber-500" : "text-muted-foreground";
+          return (
+            <li key={i} className="flex gap-2.5 text-xs leading-relaxed">
+              <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${tone}`} />
+              <span className="text-foreground/90">{it.text}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <span className="hidden">{icon}</span>
+    </Card>
+  );
+}

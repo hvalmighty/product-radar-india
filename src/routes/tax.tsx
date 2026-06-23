@@ -624,6 +624,10 @@ function TaxPage() {
   const [slabRate, setSlabRate] = useState<number>(30);
   const [surcharge, setSurcharge] = useState<number>(10);
   const [filter, setFilter] = useState<"ALL" | "STCG" | "LTCG" | "LOSS">("ALL");
+  const [showOpt, setShowOpt] = useState(false);
+
+  // Reset optimisation panel when switching portfolio / regime
+  useEffect(() => { setShowOpt(false); }, [activeId, slabRate, surcharge]);
 
   useEffect(() => {
     let s = loadSaved();
@@ -640,6 +644,11 @@ function TaxPage() {
     const txns = active.data.holdings.map((h) => computeTxn(h, slabRate));
     return summarise(txns, regime);
   }, [active, slabRate, surcharge]);
+
+  const optimisation = useMemo(() => {
+    if (!summary || !active) return null;
+    return optimise(summary.txns, regime);
+  }, [summary, active, slabRate, surcharge]);
 
   const filteredTxns = useMemo(() => {
     if (!summary) return [];

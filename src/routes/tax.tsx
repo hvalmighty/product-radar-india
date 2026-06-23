@@ -778,6 +778,39 @@ function TaxPage() {
                 <KPI label={`Total Tax (incl. ${regime.cessRate}% cess)`} value={fmtINR(summary.totalTax)} highlight />
               </div>
 
+              {/* Tax Optimisation */}
+              {optimisation && (
+                <div className="mb-5">
+                  {!showOpt ? (
+                    <button
+                      onClick={() => setShowOpt(true)}
+                      className="w-full px-4 py-3 rounded-md border border-dashed border-foreground/40 bg-gradient-to-r from-indigo-500/10 via-emerald-500/10 to-amber-500/10 hover:from-indigo-500/15 hover:via-emerald-500/15 hover:to-amber-500/15 flex items-center gap-3 text-left group">
+                      <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center shrink-0">
+                        <Wand2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold">Run Tax Optimisation</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Apply deferral, loss-harvesting, exemption utilisation, indexation choice and SWP staggering to lower this portfolio's capital-gains tax.
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  ) : (
+                    <OptimisationPanel
+                      base={optimisation.baseline}
+                      opt={optimisation.optSummary}
+                      steps={optimisation.steps}
+                      deferred={optimisation.deferred}
+                      harvested={optimisation.harvested}
+                      onClose={() => setShowOpt(false)}
+                    />
+                  )}
+                </div>
+              )}
+
+
+
               {/* Bucket breakdown */}
               <div className="border border-border rounded-md bg-surface mb-5">
                 <div className="px-4 py-2.5 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">

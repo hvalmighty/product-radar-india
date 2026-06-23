@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TaxRouteImport } from './routes/tax'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
@@ -16,6 +17,11 @@ import { Route as MarketDataRouteImport } from './routes/market-data'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TaxRoute = TaxRouteImport.update({
+  id: '/tax',
+  path: '/tax',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
+  '/tax': typeof TaxRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
+  '/tax': typeof TaxRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
+  '/tax': typeof TaxRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,8 +90,16 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/proposal'
     | '/reports'
+    | '/tax'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alerts' | '/market-data' | '/portfolio' | '/proposal' | '/reports'
+  to:
+    | '/'
+    | '/alerts'
+    | '/market-data'
+    | '/portfolio'
+    | '/proposal'
+    | '/reports'
+    | '/tax'
   id:
     | '__root__'
     | '/'
@@ -91,6 +108,7 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/proposal'
     | '/reports'
+    | '/tax'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -100,10 +118,18 @@ export interface RootRouteChildren {
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
   ReportsRoute: typeof ReportsRoute
+  TaxRoute: typeof TaxRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tax': {
+      id: '/tax'
+      path: '/tax'
+      fullPath: '/tax'
+      preLoaderRoute: typeof TaxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -156,17 +182,8 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,
   ReportsRoute: ReportsRoute,
+  TaxRoute: TaxRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

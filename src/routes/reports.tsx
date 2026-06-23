@@ -718,8 +718,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </Card>
       </Section>
 
-      {/* SECTION 3: Liquidity & Cashflows */}
-      <Section id="liquidity" title="3. Portfolio Liquidity & Upcoming Cashflows (180 days)" icon={<Droplet className="w-4 h-4" />}>
+      {/* SECTION 4: Liquidity & Cashflows */}
+      <Section id="liquidity" title="4. Portfolio Liquidity & Upcoming Cashflows (180 days)" icon={<Droplet className="w-4 h-4" />}>
         <div className="grid md:grid-cols-2 gap-4">
           <Card title="Liquidity Profile">
             <div className="h-64">

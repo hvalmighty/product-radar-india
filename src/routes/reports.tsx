@@ -521,12 +521,13 @@ function ReportView({ portfolios, title, mode, onBack }: {
 
   const sections = [
     { id: "exec", label: "1. Executive Summary" },
-    { id: "asset", label: "2. Asset Class Performance" },
-    { id: "liquidity", label: "3. Liquidity & Cashflows" },
-    { id: "products", label: "4. Product Holdings" },
-    { id: "drilldown", label: "5. Portfolio Drilldown" },
-    { id: "mf", label: "6. Mutual Fund Drilldown" },
-    { id: "annex", label: "7. Annexures" },
+    { id: "commentary", label: "2. Portfolio Commentary" },
+    { id: "asset", label: "3. Asset Class Performance" },
+    { id: "liquidity", label: "4. Liquidity & Cashflows" },
+    { id: "products", label: "5. Product Holdings" },
+    { id: "drilldown", label: "6. Portfolio Drilldown" },
+    { id: "mf", label: "7. Mutual Fund Drilldown" },
+    { id: "annex", label: "8. Annexures" },
   ];
 
   return (

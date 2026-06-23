@@ -770,8 +770,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </div>
       </Section>
 
-      {/* SECTION 4: Product Holdings */}
-      <Section id="products" title="4. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
+      {/* SECTION 5: Product Holdings */}
+      <Section id="products" title="5. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
         {byAssetClass.map(ac => (
           <Card key={ac.name} title={`${ac.name} — ${fmtINR(ac.value)} (${pct(ac.pct)})`}>
             <div className="overflow-x-auto">

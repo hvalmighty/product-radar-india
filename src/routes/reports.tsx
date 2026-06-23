@@ -4,6 +4,7 @@ import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
 import {
   ArrowLeft, FileText, Users, User, Printer, Download, ChevronRight,
   TrendingUp, TrendingDown, Droplet, Layers, Building2, Shield, PieChart as PieIcon,
+  MessageSquare, AlertTriangle, CheckCircle2, Info,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,

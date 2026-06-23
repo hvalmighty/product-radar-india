@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
 import {
   ArrowLeft, FileText, Users, User, Printer, Download, ChevronRight,

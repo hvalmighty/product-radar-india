@@ -707,7 +707,7 @@ function TaxPage() {
                 Listed-equity / equity-MF / REIT-InvIT short-term gains: <span className="text-foreground">20% u/s 111A</span> (post 23-Jul-2024).
                 Long-term gains: <span className="text-foreground">12.5% u/s 112A</span> on aggregate gains exceeding <span className="text-foreground">₹1,25,000</span>.
                 Grandfathering u/s 112A applies to equity acquired before 01-Feb-2018 (deemed cost = max of actual cost and the lower of FMV on 31-Jan-2018 / sale value).
-                Specified Mutual Funds (>65% in debt) acquired on or after 01-Apr-2023 are taxed at slab rates u/s 50AA irrespective of holding period.
+                Specified Mutual Funds (more than 65% in debt) acquired on or after 01-Apr-2023 are taxed at slab rates u/s 50AA irrespective of holding period.
                 Listed bonds / NCDs / G-Sec held over 12 months and unlisted securities held over 24 months attract LTCG at 12.5% without indexation.
                 Immovable property held over 24 months attracts 12.5% without indexation, with an option of 20% with indexation if acquired before 23-Jul-2024 (engine selects the lower).
                 Cost basis and acquisition dates shown are synthesised for demonstration; actual tax computation should use audited contract notes.

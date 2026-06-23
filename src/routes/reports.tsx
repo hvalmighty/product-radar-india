@@ -934,14 +934,14 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </Card>
       </Section>
 
-      {/* SECTION 6: MF Drilldown */}
-      <Section id="mf" title="6. Mutual Fund Drilldown" icon={<Layers className="w-4 h-4" />}>
+      {/* SECTION 7: MF Drilldown */}
+      <Section id="mf" title="7. Mutual Fund Drilldown" icon={<Layers className="w-4 h-4" />}>
         <MFOverlap holdings={allHoldings} />
         <FixedIncomeMFAnalysis holdings={allHoldings} />
       </Section>
 
-      {/* SECTION 7: Annexures */}
-      <Section id="annex" title="7. Annexures" icon={<Shield className="w-4 h-4" />}>
+      {/* SECTION 8: Annexures */}
+      <Section id="annex" title="8. Annexures" icon={<Shield className="w-4 h-4" />}>
         <Card title="Annexure A — Asset Class & Benchmark Mapping">
           <table className="w-full text-xs">
             <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">

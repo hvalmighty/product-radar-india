@@ -990,3 +990,119 @@ function BucketRow({ label, gain, exempt, taxable, rate, tax }: {
     </tr>
   );
 }
+
+function OptimisationPanel({ base, opt, steps, deferred, harvested, onClose }: {
+  base: Summary; opt: Summary; steps: OptStep[]; deferred: Txn[]; harvested: Txn[]; onClose: () => void;
+}) {
+  const saving = Math.max(0, base.totalTax - opt.totalTax);
+  const pct = base.totalTax > 0 ? (saving / base.totalTax) * 100 : 0;
+  const iconFor: Record<OptStep["kind"], JSX.Element> = {
+    DEFER: <Clock className="w-3.5 h-3.5" />,
+    HARVEST: <TrendingDown className="w-3.5 h-3.5" />,
+    EXEMPTION: <CheckCircle2 className="w-3.5 h-3.5" />,
+    INDEX: <Layers className="w-3.5 h-3.5" />,
+    STAGGER: <RotateCcw className="w-3.5 h-3.5" />,
+    INFO: <Info className="w-3.5 h-3.5" />,
+  };
+  return (
+    <div className="border border-foreground/30 rounded-md bg-gradient-to-br from-indigo-500/5 via-emerald-500/5 to-amber-500/5">
+      <div className="px-4 py-3 border-b border-border/60 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center">
+          <Wand2 className="w-4 h-4" />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold">Tax-Optimised Plan</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Income-tax Act, Sec 70 / 71 / 74 set-off · 111A · 112A · 50AA · indexation proviso
+          </div>
+        </div>
+        <button onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground border border-border rounded-sm px-2 py-1">
+          Hide
+        </button>
+      </div>
+
+      {/* Headline numbers */}
+      <div className="grid grid-cols-3 divide-x divide-border/60 border-b border-border/60">
+        <div className="px-4 py-3">
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Baseline Tax</div>
+          <div className="text-base font-semibold mono-num">{fmtINRFull(base.totalTax)}</div>
+        </div>
+        <div className="px-4 py-3">
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Optimised Tax</div>
+          <div className="text-base font-semibold mono-num text-positive">{fmtINRFull(opt.totalTax)}</div>
+        </div>
+        <div className="px-4 py-3 bg-foreground text-background">
+          <div className="text-[9px] uppercase tracking-[0.18em] opacity-70">You Save</div>
+          <div className="text-base font-semibold mono-num">
+            {fmtINRFull(saving)} <span className="text-[10px] opacity-80">({pct.toFixed(1)}%)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Steps */}
+      <ol className="divide-y divide-border/40">
+        {steps.length === 0 && (
+          <li className="px-4 py-4 text-xs text-muted-foreground">
+            Portfolio already tax-efficient — no profitable moves identified.
+          </li>
+        )}
+        {steps.map((s, i) => (
+          <li key={i} className="px-4 py-3 flex gap-3 items-start">
+            <div className="mt-0.5 w-6 h-6 rounded-full bg-foreground/10 flex items-center justify-center text-foreground shrink-0">
+              {iconFor[s.kind]}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Step {i + 1}</span>
+                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground">{s.kind}</span>
+                <span className="text-sm font-medium">{s.title}</span>
+                {s.savings > 0 && (
+                  <span className="ml-auto text-[11px] mono-num text-positive">−{fmtINR(s.savings)}</span>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{s.detail}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {/* Affected holdings */}
+      {(deferred.length > 0 || harvested.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border-t border-border/60">
+          {deferred.length > 0 && (
+            <div className="p-4 border-r border-border/60">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2 inline-flex items-center gap-1.5">
+                <Clock className="w-3 h-3" /> Deferred to next FY ({deferred.length})
+              </div>
+              <ul className="space-y-1 text-[11px]">
+                {deferred.slice(0, 8).map((t, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex-1 truncate" title={t.holding.name}>{t.holding.name}</span>
+                    <span className="mono-num text-muted-foreground">{fmtINR(t.gain)}</span>
+                  </li>
+                ))}
+                {deferred.length > 8 && <li className="text-muted-foreground text-[10px]">+{deferred.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
+          {harvested.length > 0 && (
+            <div className="p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2 inline-flex items-center gap-1.5">
+                <TrendingDown className="w-3 h-3" /> Loss-harvested ({harvested.length})
+              </div>
+              <ul className="space-y-1 text-[11px]">
+                {harvested.slice(0, 8).map((t, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex-1 truncate" title={t.holding.name}>{t.holding.name}</span>
+                    <span className="mono-num text-negative">{fmtINR(t.gain)}</span>
+                  </li>
+                ))}
+                {harvested.length > 8 && <li className="text-muted-foreground text-[10px]">+{harvested.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

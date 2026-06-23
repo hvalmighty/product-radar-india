@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Calculator, ArrowLeft, ChevronRight, Info, Users, User, Download, Printer } from "lucide-react";
+import { Calculator, ArrowLeft, ChevronRight, Info, Users, User, Download, Printer, Wand2, TrendingDown, Clock, Layers, CheckCircle2, RotateCcw } from "lucide-react";
 import type { Holding } from "@/lib/ecas-parser";
 import {
   SAMPLE_FAMILIES,
@@ -423,6 +423,200 @@ function summarise(txns: Txn[], regime: TaxRegime): Summary {
   };
 }
 
+// ---------------- Optimiser ----------------
+// Plays the role of a "tax-aware portfolio engineer". Given the synthesised
+// transaction set, it produces an optimised plan + the rationale for each
+// move. Actions modelled:
+//   A. Defer-to-LTCG  — postpone sales that are just shy of the long-term
+//      threshold (12m for listed equity / 24m for unlisted / RE / old-debt-MF).
+//   B. Tax-loss harvesting — recognise losses to offset gains under the
+//      set-off rules of Sec 70/71/74 (STCL → any CG; LTCL → only LTCG).
+//   C. Use ₹1,25,000 LTCG exemption u/s 112A in full.
+//   D. Real-estate indexation alternative — pick the cheaper of 12.5% w/o
+//      indexation vs 20% with indexation (already done in computeTxn, but
+//      surfaced as a step when it triggered).
+//   E. Stagger specified-debt-MF gains via SWP/STP across FYs to stay in a
+//      lower slab.
+
+type OptStep = {
+  kind: "DEFER" | "HARVEST" | "EXEMPTION" | "INDEX" | "STAGGER" | "INFO";
+  title: string;
+  detail: string;
+  savings: number;
+};
+
+function nearLTThresholdMonths(t: Txn): number | null {
+  // Returns months to wait if deferral would convert STCG → LTCG, else null.
+  const months = t.holdingDays / 30.4375;
+  if (t.bucket === "EQUITY_STCG_111A" && months >= 9 && months < 12) return Math.ceil(12 - months);
+  if (t.bucket === "SLAB" && t.gain > 0) {
+    const cat = t.category;
+    // For unlisted / RE / old debt MF — 24m threshold
+    if (cat === "AIF" || cat === "Private Equity" || cat === "Real Estate") {
+      if (months >= 18 && months < 24) return Math.ceil(24 - months);
+    }
+    if (cat === "Direct Debt") {
+      if (months >= 9 && months < 12) return Math.ceil(12 - months);
+    }
+    if (cat === "Mutual Fund - Debt") {
+      // Only pre-Apr-2023 acquisitions get LT treatment; post-Apr-23 always slab.
+      if (t.acquiredOn < DEBT_MF_CUTOFF && months >= 18 && months < 24) return Math.ceil(24 - months);
+    }
+  }
+  return null;
+}
+
+function summariseOptimised(txns: Txn[], regime: TaxRegime, ltcgExemptionRemaining = LTCG_112A_EXEMPTION): Summary {
+  // Signed sums (allow negatives within each bucket so losses net first)
+  let g_111A = 0, g_slab = 0, g_112A = 0, g_125 = 0, g_RE = 0;
+  let totalSale = 0, totalCost = 0, totalGain = 0;
+  for (const t of txns) {
+    totalSale += t.saleValue; totalCost += t.costBasis; totalGain += t.gain;
+    if (t.bucket === "EQUITY_STCG_111A") g_111A += t.gain;
+    else if (t.bucket === "SLAB") g_slab += t.gain;
+    else if (t.bucket === "EQUITY_LTCG_112A") g_112A += t.gain;
+    else if (t.bucket === "DEBT_LTCG_125") g_125 += t.gain;
+    else if (t.bucket === "RE_LTCG_20_INDEX") g_RE += t.gain;
+  }
+  // Pool losses within type (Sec 70 intra-head set-off)
+  let stcl = Math.max(0, -(Math.min(0, g_111A) + Math.min(0, g_slab)));
+  let ltcl = Math.max(0, -(Math.min(0, g_112A) + Math.min(0, g_125) + Math.min(0, g_RE)));
+  let p_111A = Math.max(0, g_111A);
+  let p_slab = Math.max(0, g_slab);
+  let p_112A = Math.max(0, g_112A);
+  let p_125  = Math.max(0, g_125);
+  let p_RE   = Math.max(0, g_RE);
+
+  // STCL → STCG first (proportionally), then LTCG
+  const stcgPos = p_111A + p_slab;
+  const useSTCL_st = Math.min(stcl, stcgPos);
+  if (stcgPos > 0) {
+    p_111A -= useSTCL_st * (p_111A / stcgPos);
+    p_slab -= useSTCL_st * (p_slab / stcgPos);
+  }
+  stcl -= useSTCL_st;
+  // Remaining STCL + all LTCL → LTCG positives proportionally
+  const ltcgPos = p_112A + p_125 + p_RE;
+  const lossToLT = Math.min(stcl + ltcl, ltcgPos);
+  if (ltcgPos > 0) {
+    p_112A -= lossToLT * (p_112A / ltcgPos);
+    p_125  -= lossToLT * (p_125  / ltcgPos);
+    p_RE   -= lossToLT * (p_RE   / ltcgPos);
+  }
+  // 1.25L exemption u/s 112A
+  const exemptUsed = Math.min(ltcgExemptionRemaining, p_112A);
+  const taxable_112A = p_112A - exemptUsed;
+
+  const tax_111A = p_111A * 0.20;
+  const tax_112A = taxable_112A * 0.125;
+  const tax_125_debt = p_125 * 0.125;
+  const tax_slab = p_slab * (regime.slabRate / 100);
+  const tax_RE_indexed = p_RE * 0.20;
+  const taxBeforeSurcharge = tax_111A + tax_112A + tax_125_debt + tax_slab + tax_RE_indexed;
+  const surcharge = taxBeforeSurcharge * (regime.surcharge / 100);
+  const cess = (taxBeforeSurcharge + surcharge) * (regime.cessRate / 100);
+  const totalTax = taxBeforeSurcharge + surcharge + cess;
+
+  return {
+    txns, totalSale, totalCost, totalGain,
+    equityStcgGain: p_111A, equityLtcgGain: p_112A, debtLtcgGain: p_125, slabGain: p_slab, reIndexedGain: p_RE,
+    tax_111A, tax_112A, tax_125_debt, tax_slab, tax_RE_indexed,
+    taxBeforeSurcharge, surcharge, cess, totalTax,
+    shortTermTax: tax_111A + tax_slab,
+    longTermTax: tax_112A + tax_125_debt + tax_RE_indexed,
+  };
+}
+
+function optimise(originalTxns: Txn[], regime: TaxRegime): { steps: OptStep[]; optSummary: Summary; baseline: Summary; kept: Txn[]; deferred: Txn[]; harvested: Txn[]; } {
+  const baseline = summarise(originalTxns, regime);
+  const steps: OptStep[] = [];
+  const deferred: Txn[] = [];
+  const harvested: Txn[] = [];
+  const kept: Txn[] = [];
+
+  // A. Defer near-threshold STCG holdings
+  for (const t of originalTxns) {
+    const wait = nearLTThresholdMonths(t);
+    if (wait !== null && t.gain > 0) {
+      deferred.push(t);
+      // Approx saving = (STCG tax rate − equivalent LT rate) × gain
+      const stRate = t.bucket === "EQUITY_STCG_111A" ? 0.20 : regime.slabRate / 100;
+      const ltRate = t.category === "Real Estate" ? 0.125 : (t.bucket === "EQUITY_STCG_111A" ? 0.125 : 0.125);
+      const saving = t.gain * Math.max(0, stRate - ltRate);
+      steps.push({
+        kind: "DEFER",
+        title: `Defer sale of ${t.holding.name}`,
+        detail: `Hold for another ~${wait} month${wait > 1 ? "s" : ""} to cross the ${t.category === "Real Estate" || t.category === "AIF" || t.category === "Private Equity" ? "24-month" : "12-month"} long-term threshold. Converts STCG @ ${(stRate * 100).toFixed(0)}% to LTCG @ 12.5%.`,
+        savings: saving,
+      });
+    } else {
+      kept.push(t);
+    }
+  }
+
+  // B. Tax-loss harvesting — the loss-making txns inside `kept` are already
+  // counted by summariseOptimised (which nets within bucket + applies STCL/LTCL
+  // set-off). Surface them as an explicit step so the user sees the rationale.
+  const lossTxns = kept.filter((t) => t.gain < 0);
+  if (lossTxns.length) {
+    const totalLoss = lossTxns.reduce((s, t) => s + Math.abs(t.gain), 0);
+    for (const t of lossTxns) harvested.push(t);
+    steps.push({
+      kind: "HARVEST",
+      title: `Harvest losses on ${lossTxns.length} position${lossTxns.length > 1 ? "s" : ""}`,
+      detail: `Book ${fmtINR(totalLoss)} of capital loss across ${lossTxns.slice(0, 3).map(t => t.holding.name.split(" ").slice(0, 3).join(" ")).join(", ")}${lossTxns.length > 3 ? "…" : ""}. STCL sets off against STCG and LTCG (Sec 70/71); unused LTCL carries forward 8 years (Sec 74). Buy back after 30+ days to avoid the wash-sale gray-zone.`,
+      savings: 0, // captured in baseline-vs-opt delta
+    });
+  }
+
+  // Compute optimised summary on `kept` set (deferred sales removed from this FY).
+  const optSummary = summariseOptimised(kept, regime);
+
+  // C. 112A exemption usage
+  if (optSummary.equityLtcgGain > 0) {
+    const used = Math.min(LTCG_112A_EXEMPTION, optSummary.equityLtcgGain);
+    steps.push({
+      kind: "EXEMPTION",
+      title: "Utilise ₹1,25,000 LTCG exemption (112A)",
+      detail: `${fmtINRFull(used)} of equity-LTCG is absorbed by the annual exemption. If LTCG is short of ₹1.25L, consider booking additional gains up to the cap to reset cost basis tax-free.`,
+      savings: used * 0.125,
+    });
+  }
+
+  // D. RE indexation triggered?
+  const indexedRE = originalTxns.filter((t) => t.bucket === "RE_LTCG_20_INDEX");
+  if (indexedRE.length) {
+    steps.push({
+      kind: "INDEX",
+      title: `Use 20%-with-indexation for ${indexedRE.length} immovable-property holding${indexedRE.length > 1 ? "s" : ""}`,
+      detail: `Property acquired before 23-Jul-2024 retains the option of 20% with indexation. Engine picked the lower of (12.5% w/o indexation) vs (20% on indexed gain) per Finance (No.2) Act 2024 proviso.`,
+      savings: 0,
+    });
+  }
+
+  // E. Stagger specified debt MF (post-Apr-2023)
+  const debtMfNew = originalTxns.filter((t) =>
+    t.category === "Mutual Fund - Debt" && t.acquiredOn >= DEBT_MF_CUTOFF && t.gain > 0
+  );
+  if (debtMfNew.length) {
+    const totalGain = debtMfNew.reduce((s, t) => s + t.gain, 0);
+    // Assume staggering across 3 FYs trims effective slab by ~5pp
+    const saving = totalGain * 0.05;
+    steps.push({
+      kind: "STAGGER",
+      title: `Stagger redemption of ${debtMfNew.length} specified debt MF${debtMfNew.length > 1 ? "s" : ""} via SWP`,
+      detail: `Post-01-Apr-2023 debt MF gains are taxed at slab u/s 50AA — no LTCG, no indexation. Spread redemption across 2–3 FYs (SWP) to keep marginal slab lower and avoid surcharge cliffs (₹50L / ₹1 Cr / ₹2 Cr).`,
+      savings: saving,
+    });
+  }
+
+  // Adjust optSummary.totalTax for staggering / exemption "savings" already
+  // baked into bucketing — keep `steps[].savings` informational only. The
+  // headline saving the UI shows = baseline.totalTax − optSummary.totalTax.
+
+  return { steps, optSummary, baseline, kept, deferred, harvested };
+}
+
 // ---------------- Component ----------------
 function TaxPage() {
   const [saved, setSaved] = useState<SavedPortfolio[]>([]);
@@ -430,6 +624,10 @@ function TaxPage() {
   const [slabRate, setSlabRate] = useState<number>(30);
   const [surcharge, setSurcharge] = useState<number>(10);
   const [filter, setFilter] = useState<"ALL" | "STCG" | "LTCG" | "LOSS">("ALL");
+  const [showOpt, setShowOpt] = useState(false);
+
+  // Reset optimisation panel when switching portfolio / regime
+  useEffect(() => { setShowOpt(false); }, [activeId, slabRate, surcharge]);
 
   useEffect(() => {
     let s = loadSaved();
@@ -446,6 +644,11 @@ function TaxPage() {
     const txns = active.data.holdings.map((h) => computeTxn(h, slabRate));
     return summarise(txns, regime);
   }, [active, slabRate, surcharge]);
+
+  const optimisation = useMemo(() => {
+    if (!summary || !active) return null;
+    return optimise(summary.txns, regime);
+  }, [summary, active, slabRate, surcharge]);
 
   const filteredTxns = useMemo(() => {
     if (!summary) return [];
@@ -574,6 +777,39 @@ function TaxPage() {
                 <KPI label="Long-Term Tax" value={fmtINR(summary.longTermTax)} />
                 <KPI label={`Total Tax (incl. ${regime.cessRate}% cess)`} value={fmtINR(summary.totalTax)} highlight />
               </div>
+
+              {/* Tax Optimisation */}
+              {optimisation && (
+                <div className="mb-5">
+                  {!showOpt ? (
+                    <button
+                      onClick={() => setShowOpt(true)}
+                      className="w-full px-4 py-3 rounded-md border border-dashed border-foreground/40 bg-gradient-to-r from-indigo-500/10 via-emerald-500/10 to-amber-500/10 hover:from-indigo-500/15 hover:via-emerald-500/15 hover:to-amber-500/15 flex items-center gap-3 text-left group">
+                      <div className="w-9 h-9 rounded-md bg-foreground text-background flex items-center justify-center shrink-0">
+                        <Wand2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold">Run Tax Optimisation</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Apply deferral, loss-harvesting, exemption utilisation, indexation choice and SWP staggering to lower this portfolio's capital-gains tax.
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  ) : (
+                    <OptimisationPanel
+                      base={optimisation.baseline}
+                      opt={optimisation.optSummary}
+                      steps={optimisation.steps}
+                      deferred={optimisation.deferred}
+                      harvested={optimisation.harvested}
+                      onClose={() => setShowOpt(false)}
+                    />
+                  )}
+                </div>
+              )}
+
+
 
               {/* Bucket breakdown */}
               <div className="border border-border rounded-md bg-surface mb-5">
@@ -752,5 +988,121 @@ function BucketRow({ label, gain, exempt, taxable, rate, tax }: {
       <td className="text-right px-3 py-2 text-muted-foreground">{rate}</td>
       <td className="text-right px-4 py-2 font-semibold">{fmtINRFull(tax)}</td>
     </tr>
+  );
+}
+
+function OptimisationPanel({ base, opt, steps, deferred, harvested, onClose }: {
+  base: Summary; opt: Summary; steps: OptStep[]; deferred: Txn[]; harvested: Txn[]; onClose: () => void;
+}) {
+  const saving = Math.max(0, base.totalTax - opt.totalTax);
+  const pct = base.totalTax > 0 ? (saving / base.totalTax) * 100 : 0;
+  const iconFor: Record<OptStep["kind"], JSX.Element> = {
+    DEFER: <Clock className="w-3.5 h-3.5" />,
+    HARVEST: <TrendingDown className="w-3.5 h-3.5" />,
+    EXEMPTION: <CheckCircle2 className="w-3.5 h-3.5" />,
+    INDEX: <Layers className="w-3.5 h-3.5" />,
+    STAGGER: <RotateCcw className="w-3.5 h-3.5" />,
+    INFO: <Info className="w-3.5 h-3.5" />,
+  };
+  return (
+    <div className="border border-foreground/30 rounded-md bg-gradient-to-br from-indigo-500/5 via-emerald-500/5 to-amber-500/5">
+      <div className="px-4 py-3 border-b border-border/60 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-md bg-foreground text-background flex items-center justify-center">
+          <Wand2 className="w-4 h-4" />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold">Tax-Optimised Plan</div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Income-tax Act, Sec 70 / 71 / 74 set-off · 111A · 112A · 50AA · indexation proviso
+          </div>
+        </div>
+        <button onClick={onClose} className="text-[11px] text-muted-foreground hover:text-foreground border border-border rounded-sm px-2 py-1">
+          Hide
+        </button>
+      </div>
+
+      {/* Headline numbers */}
+      <div className="grid grid-cols-3 divide-x divide-border/60 border-b border-border/60">
+        <div className="px-4 py-3">
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Baseline Tax</div>
+          <div className="text-base font-semibold mono-num">{fmtINRFull(base.totalTax)}</div>
+        </div>
+        <div className="px-4 py-3">
+          <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Optimised Tax</div>
+          <div className="text-base font-semibold mono-num text-positive">{fmtINRFull(opt.totalTax)}</div>
+        </div>
+        <div className="px-4 py-3 bg-foreground text-background">
+          <div className="text-[9px] uppercase tracking-[0.18em] opacity-70">You Save</div>
+          <div className="text-base font-semibold mono-num">
+            {fmtINRFull(saving)} <span className="text-[10px] opacity-80">({pct.toFixed(1)}%)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Steps */}
+      <ol className="divide-y divide-border/40">
+        {steps.length === 0 && (
+          <li className="px-4 py-4 text-xs text-muted-foreground">
+            Portfolio already tax-efficient — no profitable moves identified.
+          </li>
+        )}
+        {steps.map((s, i) => (
+          <li key={i} className="px-4 py-3 flex gap-3 items-start">
+            <div className="mt-0.5 w-6 h-6 rounded-full bg-foreground/10 flex items-center justify-center text-foreground shrink-0">
+              {iconFor[s.kind]}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Step {i + 1}</span>
+                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-secondary text-muted-foreground">{s.kind}</span>
+                <span className="text-sm font-medium">{s.title}</span>
+                {s.savings > 0 && (
+                  <span className="ml-auto text-[11px] mono-num text-positive">−{fmtINR(s.savings)}</span>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{s.detail}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      {/* Affected holdings */}
+      {(deferred.length > 0 || harvested.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border-t border-border/60">
+          {deferred.length > 0 && (
+            <div className="p-4 border-r border-border/60">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2 inline-flex items-center gap-1.5">
+                <Clock className="w-3 h-3" /> Deferred to next FY ({deferred.length})
+              </div>
+              <ul className="space-y-1 text-[11px]">
+                {deferred.slice(0, 8).map((t, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex-1 truncate" title={t.holding.name}>{t.holding.name}</span>
+                    <span className="mono-num text-muted-foreground">{fmtINR(t.gain)}</span>
+                  </li>
+                ))}
+                {deferred.length > 8 && <li className="text-muted-foreground text-[10px]">+{deferred.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
+          {harvested.length > 0 && (
+            <div className="p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2 inline-flex items-center gap-1.5">
+                <TrendingDown className="w-3 h-3" /> Loss-harvested ({harvested.length})
+              </div>
+              <ul className="space-y-1 text-[11px]">
+                {harvested.slice(0, 8).map((t, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <span className="flex-1 truncate" title={t.holding.name}>{t.holding.name}</span>
+                    <span className="mono-num text-negative">{fmtINR(t.gain)}</span>
+                  </li>
+                ))}
+                {harvested.length > 8 && <li className="text-muted-foreground text-[10px]">+{harvested.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

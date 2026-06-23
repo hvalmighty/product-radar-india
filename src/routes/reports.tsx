@@ -660,8 +660,24 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </div>
       </Section>
 
-      {/* SECTION 2: Asset Class Performance */}
-      <Section id="asset" title="2. Asset Class Performance" icon={<Layers className="w-4 h-4" />}>
+      {/* SECTION 2: Portfolio Commentary */}
+      <CommentarySection
+        totalValue={totalValue}
+        byAssetClass={byAssetClass}
+        byIssuer={byIssuer}
+        bySector={bySector}
+        byMarketCap={byMarketCap}
+        byRating={byRating}
+        liquidity={liquidity}
+        riskProfile={riskProfile}
+        equityShare={equityShare}
+        debtShare={debtShare}
+        portfolioCount={portfolios.length}
+        holdingsCount={allHoldings.length}
+      />
+
+      {/* SECTION 3: Asset Class Performance */}
+      <Section id="asset" title="3. Asset Class Performance" icon={<Layers className="w-4 h-4" />}>
         <Card title="Asset Class Holdings & Performance">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

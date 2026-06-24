@@ -910,7 +910,7 @@ function PortfolioAnalytics() {
                   const key = m.key;
                   const open = expanded.has(key);
                   return (
-                    <FragmentRow key={key}>
+                    <Fragment key={key}>
                       <tr key={key} className="border-t border-border">
                         <td className="p-2">
                           {isMf ? (
@@ -964,7 +964,7 @@ function PortfolioAnalytics() {
                           </td>
                         </tr>
                       )}
-                    </FragmentRow>
+                    </Fragment>
                   );
                 })}
               </tbody>

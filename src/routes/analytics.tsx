@@ -123,6 +123,8 @@ const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec
 
 function AnalyticsPage() {
   const [period, setPeriod] = useState<"YTD" | "TTM" | "FY25" | "QTD">("TTM");
+  const [tab, setTab] = useState<"business" | "portfolio">("business");
+
 
   // KPI top cards
   const latestAUM = aumTrend[aumTrend.length - 1].AUM;

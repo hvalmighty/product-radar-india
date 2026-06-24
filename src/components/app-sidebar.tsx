@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator } from "lucide-react";
+import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 import {
@@ -22,6 +22,7 @@ const items = [
   { title: "Tax Liability", url: "/tax",         icon: Calculator },
   { title: "Market Data",   url: "/market-data", icon: LineChart },
   { title: "Alerts",        url: "/alerts",      icon: Bell },
+  { title: "Analytics",     url: "/analytics",   icon: BarChart3 },
   { title: "Reports",       url: "/reports",     icon: FileText },
 ] as const;
 

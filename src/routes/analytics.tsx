@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   ArrowLeft, BarChart3, TrendingUp, TrendingDown, Users, Briefcase, Wallet, Target,
   Award, AlertCircle, Activity, IndianRupee, UserCheck, ArrowUpRight, ArrowDownRight,
+  Search, AlertTriangle, ChevronRight, ChevronDown, PieChart as PieIcon, Layers,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -13,8 +14,8 @@ import {
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
-      { title: "Business Analytics · mPower Wealth" },
-      { name: "description", content: "CXO business analytics: AUM trend, revenue growth across MF/PMS/AIF, advisor performance, client segmentation and attribution for wealth management leadership." },
+      { title: "Analytics · mPower Wealth" },
+      { name: "description", content: "Business analytics for CXOs plus portfolio analytics: underperformance, concentration, and security-level drilldown across client holdings including MF underlyings." },
     ],
   }),
   component: AnalyticsPage,
@@ -122,6 +123,8 @@ const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec
 
 function AnalyticsPage() {
   const [period, setPeriod] = useState<"YTD" | "TTM" | "FY25" | "QTD">("TTM");
+  const [tab, setTab] = useState<"business" | "portfolio">("business");
+
 
   // KPI top cards
   const latestAUM = aumTrend[aumTrend.length - 1].AUM;
@@ -145,13 +148,27 @@ function AnalyticsPage() {
             </Link>
             <div>
               <h1 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" /> Business Analytics
+                <BarChart3 className="h-5 w-5 text-primary" /> Analytics
               </h1>
-              <p className="text-[11px] text-muted-foreground">CXO cockpit · Advisor performance, AUM growth, revenue, client analytics</p>
+              <p className="text-[11px] text-muted-foreground">
+                {tab === "business"
+                  ? "CXO cockpit · Advisor performance, AUM growth, revenue, client analytics"
+                  : "Portfolio cockpit · Underperformance, concentration & security-level drilldown"}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {(["QTD","YTD","TTM","FY25"] as const).map(p => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setTab("business")}
+                className={`px-3 py-1 text-[11px] ${tab === "business" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}
+              >Business</button>
+              <button
+                onClick={() => setTab("portfolio")}
+                className={`px-3 py-1 text-[11px] border-l border-border ${tab === "portfolio" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}
+              >Portfolio</button>
+            </div>
+            {tab === "business" && (["QTD","YTD","TTM","FY25"] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
@@ -162,6 +179,7 @@ function AnalyticsPage() {
         </div>
       </header>
 
+      {tab === "portfolio" ? <PortfolioAnalytics /> : (
       <main className="px-4 sm:px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
         {/* KPI strip */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -429,6 +447,7 @@ function AnalyticsPage() {
           Illustrative analytics for demo purposes. Data reflects an Indian wealth-management firm with diversified MF / PMS / AIF / direct securities exposure.
         </p>
       </main>
+      )}
     </div>
   );
 }
@@ -478,5 +497,485 @@ function MiniStat({ icon, label, value, delta, suffix = "%", reverse = false }: 
         </div>
       </div>
     </div>
+  );
+}
+
+// ==================== Portfolio Analytics ====================
+
+type Holding = {
+  security: string;
+  issuer: string;
+  amc?: string;
+  product: "MF" | "PMS" | "AIF" | "Equity" | "Bond";
+  sector: string;
+  value: number; // ₹ Cr
+  // for MF: underlying issuer breakdown of the holding (% of holding value)
+  underlyings?: { issuer: string; sector: string; weight: number }[];
+};
+
+type ClientPortfolio = {
+  id: string;
+  client: string;
+  segment: string;
+  rm: string;
+  benchmark: string;
+  ytdReturn: number;   // %
+  benchmarkReturn: number; // %
+  aum: number; // ₹ Cr
+  holdings: Holding[];
+};
+
+const MF_UNDERLYINGS: Record<string, { issuer: string; sector: string; weight: number }[]> = {
+  "HDFC Flexi Cap Fund": [
+    { issuer: "HDFC Bank",      sector: "Financials", weight: 9.2 },
+    { issuer: "ICICI Bank",     sector: "Financials", weight: 7.8 },
+    { issuer: "Reliance Inds.", sector: "Energy",     weight: 6.4 },
+    { issuer: "Infosys",        sector: "IT",         weight: 5.1 },
+    { issuer: "L&T",            sector: "Industrials",weight: 4.2 },
+    { issuer: "Others",         sector: "Mixed",      weight: 67.3 },
+  ],
+  "Mirae Asset Large Cap": [
+    { issuer: "HDFC Bank",      sector: "Financials", weight: 8.9 },
+    { issuer: "Reliance Inds.", sector: "Energy",     weight: 8.1 },
+    { issuer: "ICICI Bank",     sector: "Financials", weight: 7.2 },
+    { issuer: "TCS",            sector: "IT",         weight: 5.8 },
+    { issuer: "Bharti Airtel",  sector: "Telecom",    weight: 3.6 },
+    { issuer: "Others",         sector: "Mixed",      weight: 66.4 },
+  ],
+  "Axis Bluechip Fund": [
+    { issuer: "ICICI Bank",     sector: "Financials", weight: 9.0 },
+    { issuer: "HDFC Bank",      sector: "Financials", weight: 8.4 },
+    { issuer: "Infosys",        sector: "IT",         weight: 6.7 },
+    { issuer: "Bajaj Finance",  sector: "Financials", weight: 4.8 },
+    { issuer: "Others",         sector: "Mixed",      weight: 71.1 },
+  ],
+  "SBI Small Cap Fund": [
+    { issuer: "Blue Star",      sector: "Consumer",   weight: 3.4 },
+    { issuer: "CDSL",           sector: "Financials", weight: 3.1 },
+    { issuer: "Carborundum",    sector: "Industrials",weight: 2.8 },
+    { issuer: "Others",         sector: "Mixed",      weight: 90.7 },
+  ],
+  "ICICI Pru Corporate Bond": [
+    { issuer: "REC Ltd",        sector: "Financials", weight: 9.2 },
+    { issuer: "PFC Ltd",        sector: "Financials", weight: 8.1 },
+    { issuer: "HDFC Bank",      sector: "Financials", weight: 6.4 },
+    { issuer: "GoI Bonds",      sector: "Sovereign",  weight: 18.6 },
+    { issuer: "Others",         sector: "Mixed",      weight: 57.7 },
+  ],
+};
+
+function mfHolding(name: string, amc: string, value: number): Holding {
+  return {
+    security: name, issuer: name, amc, product: "MF",
+    sector: "Diversified", value, underlyings: MF_UNDERLYINGS[name] ?? [],
+  };
+}
+
+const clientPortfolios: ClientPortfolio[] = [
+  {
+    id: "C001", client: "Rajiv Malhotra", segment: "UHNI", rm: "Anika Mehra",
+    benchmark: "Nifty 50 TRI", ytdReturn: 9.4, benchmarkReturn: 12.6, aum: 42.6,
+    holdings: [
+      mfHolding("HDFC Flexi Cap Fund", "HDFC AMC", 6.8),
+      mfHolding("Mirae Asset Large Cap", "Mirae AMC", 4.2),
+      mfHolding("ICICI Pru Corporate Bond", "ICICI Pru AMC", 5.1),
+      { security: "HDFC Bank",      issuer: "HDFC Bank",      product: "Equity", sector: "Financials", value: 8.4 },
+      { security: "Reliance Inds.", issuer: "Reliance Inds.", product: "Equity", sector: "Energy",     value: 6.2 },
+      { security: "Kotak PMS - India Focus", issuer: "Kotak AMC", amc: "Kotak AMC", product: "PMS", sector: "Diversified", value: 7.4 },
+      { security: "Edelweiss AIF Cat-II", issuer: "Edelweiss", amc: "Edelweiss", product: "AIF", sector: "Credit", value: 4.5 },
+    ],
+  },
+  {
+    id: "C002", client: "Suman Iyer Family Trust", segment: "UHNI", rm: "Karthik Iyer",
+    benchmark: "Crisil Hybrid 65+35", ytdReturn: 11.2, benchmarkReturn: 10.4, aum: 38.2,
+    holdings: [
+      mfHolding("Axis Bluechip Fund", "Axis AMC", 7.8),
+      mfHolding("SBI Small Cap Fund", "SBI AMC", 3.4),
+      { security: "ICICI Bank",     issuer: "ICICI Bank",    product: "Equity", sector: "Financials", value: 6.2 },
+      { security: "Infosys",        issuer: "Infosys",       product: "Equity", sector: "IT",         value: 5.4 },
+      { security: "Motilal PMS - Value Strategy", issuer: "Motilal Oswal AMC", amc: "Motilal Oswal AMC", product: "PMS", sector: "Diversified", value: 9.8 },
+      { security: "GoI 7.18% 2033", issuer: "GoI Bonds",     product: "Bond",   sector: "Sovereign",  value: 5.6 },
+    ],
+  },
+  {
+    id: "C003", client: "Priya Kapoor", segment: "HNI", rm: "Priya Nair",
+    benchmark: "Nifty 50 TRI", ytdReturn: 6.8, benchmarkReturn: 12.6, aum: 14.8,
+    holdings: [
+      mfHolding("HDFC Flexi Cap Fund", "HDFC AMC", 4.6),
+      mfHolding("Axis Bluechip Fund", "Axis AMC", 3.2),
+      { security: "HDFC Bank", issuer: "HDFC Bank", product: "Equity", sector: "Financials", value: 3.4 },
+      { security: "TCS",       issuer: "TCS",       product: "Equity", sector: "IT",         value: 2.1 },
+      { security: "Bajaj Finance", issuer: "Bajaj Finance", product: "Equity", sector: "Financials", value: 1.5 },
+    ],
+  },
+  {
+    id: "C004", client: "Arun Khanna HUF", segment: "HNI", rm: "Vikram Sethi",
+    benchmark: "Nifty 500 TRI", ytdReturn: 14.6, benchmarkReturn: 13.1, aum: 22.4,
+    holdings: [
+      mfHolding("Mirae Asset Large Cap", "Mirae AMC", 5.2),
+      mfHolding("SBI Small Cap Fund", "SBI AMC", 4.4),
+      { security: "Reliance Inds.", issuer: "Reliance Inds.", product: "Equity", sector: "Energy", value: 4.2 },
+      { security: "Edelweiss AIF Cat-III", issuer: "Edelweiss", amc: "Edelweiss", product: "AIF", sector: "Long-Short", value: 8.6 },
+    ],
+  },
+  {
+    id: "C005", client: "Sunita Reddy", segment: "Affluent", rm: "Sneha Kapoor",
+    benchmark: "Crisil Hybrid 65+35", ytdReturn: 4.2, benchmarkReturn: 10.4, aum: 4.8,
+    holdings: [
+      mfHolding("HDFC Flexi Cap Fund", "HDFC AMC", 2.2),
+      mfHolding("ICICI Pru Corporate Bond", "ICICI Pru AMC", 1.6),
+      { security: "HDFC Bank", issuer: "HDFC Bank", product: "Equity", sector: "Financials", value: 1.0 },
+    ],
+  },
+  {
+    id: "C006", client: "Vivek Shah Family Office", segment: "UHNI", rm: "Anika Mehra",
+    benchmark: "Nifty 50 TRI", ytdReturn: 8.1, benchmarkReturn: 12.6, aum: 56.2,
+    holdings: [
+      mfHolding("HDFC Flexi Cap Fund", "HDFC AMC", 9.8),
+      mfHolding("Axis Bluechip Fund", "Axis AMC", 8.4),
+      mfHolding("ICICI Pru Corporate Bond", "ICICI Pru AMC", 7.2),
+      { security: "HDFC Bank",  issuer: "HDFC Bank",  product: "Equity", sector: "Financials", value: 10.4 },
+      { security: "ICICI Bank", issuer: "ICICI Bank", product: "Equity", sector: "Financials", value: 6.2 },
+      { security: "Kotak PMS - India Focus", issuer: "Kotak AMC", amc: "Kotak AMC", product: "PMS", sector: "Diversified", value: 14.2 },
+    ],
+  },
+];
+
+// ---- portfolio-level concentration helpers ----
+function concentrationFor(p: ClientPortfolio) {
+  const byIssuer = new Map<string, number>();
+  const byAmc = new Map<string, number>();
+  const byProduct = new Map<string, number>();
+  for (const h of p.holdings) {
+    byIssuer.set(h.issuer, (byIssuer.get(h.issuer) ?? 0) + h.value);
+    if (h.amc) byAmc.set(h.amc, (byAmc.get(h.amc) ?? 0) + h.value);
+    byProduct.set(h.product, (byProduct.get(h.product) ?? 0) + h.value);
+  }
+  const top = (m: Map<string, number>) => {
+    const arr = [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const [name, val] = arr[0] ?? ["—", 0];
+    return { name, val, pct: p.aum ? (val / p.aum) * 100 : 0 };
+  };
+  return { issuer: top(byIssuer), amc: top(byAmc), product: top(byProduct) };
+}
+
+function PortfolioAnalytics() {
+  const [view, setView] = useState<"underperform" | "concentration" | "lookup">("underperform");
+
+  const underperformers = useMemo(
+    () => clientPortfolios
+      .map(p => ({ ...p, alpha: p.ytdReturn - p.benchmarkReturn }))
+      .filter(p => p.alpha < 0)
+      .sort((a, b) => a.alpha - b.alpha),
+    []
+  );
+
+  const concentrationRows = useMemo(
+    () => clientPortfolios.map(p => ({ p, c: concentrationFor(p) }))
+      .sort((a, b) => Math.max(b.c.issuer.pct, b.c.amc.pct, b.c.product.pct) - Math.max(a.c.issuer.pct, a.c.amc.pct, a.c.product.pct)),
+    []
+  );
+
+  // Single-client security/issuer lookup
+  const [clientId, setClientId] = useState(clientPortfolios[0].id);
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const selectedClient = clientPortfolios.find(c => c.id === clientId)!;
+
+  const lookupResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    type Match = {
+      key: string; holding: Holding; matchType: "direct" | "underlying";
+      underlying?: { issuer: string; sector: string; weight: number };
+      effectiveValue: number;
+    };
+    const out: Match[] = [];
+    for (const h of selectedClient.holdings) {
+      const direct = h.security.toLowerCase().includes(q) || h.issuer.toLowerCase().includes(q) || (h.amc ?? "").toLowerCase().includes(q);
+      if (direct) out.push({ key: h.security + ":direct", holding: h, matchType: "direct", effectiveValue: h.value });
+      if (h.product === "MF" && h.underlyings) {
+        for (const u of h.underlyings) {
+          if (u.issuer.toLowerCase().includes(q) || u.sector.toLowerCase().includes(q)) {
+            out.push({
+              key: h.security + ":" + u.issuer,
+              holding: h, matchType: "underlying", underlying: u,
+              effectiveValue: +(h.value * u.weight / 100).toFixed(3),
+            });
+          }
+        }
+      }
+    }
+    return out;
+  }, [selectedClient, query]);
+
+  const totalExposure = lookupResults.reduce((s, m) => s + m.effectiveValue, 0);
+
+  const toggle = (k: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  };
+
+  return (
+    <main className="px-4 sm:px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
+      {/* sub-tabs */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          { k: "underperform",  label: "Underperformance vs Benchmark", icon: <TrendingDown className="h-3.5 w-3.5" /> },
+          { k: "concentration", label: "Concentration Risk",            icon: <AlertTriangle className="h-3.5 w-3.5" /> },
+          { k: "lookup",        label: "Security / Issuer Lookup",      icon: <Search className="h-3.5 w-3.5" /> },
+        ] as const).map(t => (
+          <button
+            key={t.k}
+            onClick={() => setView(t.k)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-md border ${view === t.k ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted"}`}
+          >{t.icon}{t.label}</button>
+        ))}
+      </div>
+
+      {/* KPI strip */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={<Briefcase className="h-4 w-4" />} label="Portfolios" value={clientPortfolios.length.toString()} delta={6.2} sub="QoQ" />
+        <KpiCard icon={<TrendingDown className="h-4 w-4" />} label="Underperforming" value={underperformers.length.toString()} delta={-12.5} sub="vs prev" />
+        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="High Concentration (>25%)" value={concentrationRows.filter(r => Math.max(r.c.issuer.pct, r.c.amc.pct, r.c.product.pct) > 25).length.toString()} delta={-8.3} sub="vs prev" />
+        <KpiCard icon={<Layers className="h-4 w-4" />} label="Combined Portfolio AUM" value={fmtCr(clientPortfolios.reduce((s, p) => s + p.aum, 0))} delta={9.1} sub="YoY" />
+      </section>
+
+      {view === "underperform" && (
+        <Panel title="Portfolios Underperforming Their Benchmark" subtitle="YTD return vs assigned benchmark (negative alpha)">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2">Client</th>
+                  <th className="text-left p-2">Segment</th>
+                  <th className="text-left p-2">RM</th>
+                  <th className="text-right p-2">AUM</th>
+                  <th className="text-left p-2">Benchmark</th>
+                  <th className="text-right p-2">Portfolio YTD</th>
+                  <th className="text-right p-2">Benchmark YTD</th>
+                  <th className="text-right p-2">Alpha</th>
+                  <th className="text-left p-2">Gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                {underperformers.map(p => {
+                  const gap = Math.abs(p.alpha);
+                  return (
+                    <tr key={p.id} className="border-t border-border">
+                      <td className="p-2 font-medium">{p.client}</td>
+                      <td className="p-2"><span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{p.segment}</span></td>
+                      <td className="p-2">{p.rm}</td>
+                      <td className="text-right p-2 tabular-nums">{fmtCr(p.aum)}</td>
+                      <td className="p-2 text-muted-foreground">{p.benchmark}</td>
+                      <td className="text-right p-2 tabular-nums">{p.ytdReturn.toFixed(1)}%</td>
+                      <td className="text-right p-2 tabular-nums text-muted-foreground">{p.benchmarkReturn.toFixed(1)}%</td>
+                      <td className={`text-right p-2 tabular-nums font-medium ${clsPct(p.alpha)}`}>{pct(p.alpha)}</td>
+                      <td className="p-2 w-32">
+                        <div className="h-1.5 bg-muted rounded">
+                          <div className="h-1.5 rounded bg-negative" style={{ width: `${Math.min(100, (gap / 8) * 100)}%` }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {underperformers.length === 0 && (
+                  <tr><td colSpan={9} className="p-4 text-center text-muted-foreground">No portfolios are underperforming their benchmarks.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+
+      {view === "concentration" && (
+        <Panel title="Concentration Risk by Portfolio" subtitle="Largest single-issuer, single-AMC and single-product exposure per portfolio (% of AUM)">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2">Client</th>
+                  <th className="text-right p-2">AUM</th>
+                  <th className="text-left p-2">Top Issuer</th>
+                  <th className="text-right p-2">% AUM</th>
+                  <th className="text-left p-2">Top AMC</th>
+                  <th className="text-right p-2">% AUM</th>
+                  <th className="text-left p-2">Top Product</th>
+                  <th className="text-right p-2">% AUM</th>
+                  <th className="text-left p-2">Flag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {concentrationRows.map(({ p, c }) => {
+                  const maxPct = Math.max(c.issuer.pct, c.amc.pct, c.product.pct);
+                  const flag = maxPct > 35 ? "High" : maxPct > 25 ? "Elevated" : "OK";
+                  const flagCls = flag === "High" ? "bg-negative/15 text-negative" : flag === "Elevated" ? "bg-amber-500/15 text-amber-600" : "bg-positive/15 text-positive";
+                  const cellPct = (n: number) => n > 35 ? "text-negative font-medium" : n > 25 ? "text-amber-600 font-medium" : "";
+                  return (
+                    <tr key={p.id} className="border-t border-border">
+                      <td className="p-2 font-medium">{p.client}</td>
+                      <td className="text-right p-2 tabular-nums">{fmtCr(p.aum)}</td>
+                      <td className="p-2">{c.issuer.name}</td>
+                      <td className={`text-right p-2 tabular-nums ${cellPct(c.issuer.pct)}`}>{c.issuer.pct.toFixed(1)}%</td>
+                      <td className="p-2">{c.amc.name}</td>
+                      <td className={`text-right p-2 tabular-nums ${cellPct(c.amc.pct)}`}>{c.amc.pct.toFixed(1)}%</td>
+                      <td className="p-2">{c.product.name}</td>
+                      <td className={`text-right p-2 tabular-nums ${cellPct(c.product.pct)}`}>{c.product.pct.toFixed(1)}%</td>
+                      <td className="p-2"><span className={`px-1.5 py-0.5 rounded text-[10px] ${flagCls}`}>{flag}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-3">Policy thresholds (illustrative): Issuer/AMC/Product exposure &gt; 25% = Elevated, &gt; 35% = High.</p>
+        </Panel>
+      )}
+
+      {view === "lookup" && (
+        <Panel title="Security / Issuer Lookup Across Client Holdings" subtitle="Search any security, issuer, AMC or sector — includes MF underlying drilldown">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Client</label>
+              <select
+                value={clientId}
+                onChange={(e) => { setClientId(e.target.value); setExpanded(new Set()); }}
+                className="mt-1 w-full bg-card border border-border rounded-md px-2 py-1.5 text-xs"
+              >
+                {clientPortfolios.map(c => (
+                  <option key={c.id} value={c.id}>{c.client} · {c.segment} · {fmtCr(c.aum)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Search security / issuer / AMC / sector</label>
+              <div className="mt-1 flex items-center gap-2 bg-card border border-border rounded-md px-2">
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. HDFC Bank, Reliance, Axis AMC, Financials…"
+                  className="flex-1 bg-transparent py-1.5 text-xs focus:outline-none"
+                />
+                {query && (
+                  <button onClick={() => setQuery("")} className="text-[10px] text-muted-foreground hover:text-foreground">clear</button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {["HDFC Bank","Reliance Inds.","ICICI Bank","Infosys","Axis AMC","Financials"].map(s => (
+                  <button key={s} onClick={() => setQuery(s)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-card hover:bg-muted">{s}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {query && (
+            <div className="mb-3 p-3 rounded-md bg-primary/5 border border-primary/20 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs">
+                <span className="font-medium">{lookupResults.length}</span> match{lookupResults.length === 1 ? "" : "es"} for
+                <span className="font-medium"> "{query}"</span> in <span className="font-medium">{selectedClient.client}</span>'s portfolio
+              </div>
+              <div className="text-xs">
+                Total effective exposure: <span className="font-semibold tabular-nums">{fmtCr(totalExposure)}</span>
+                <span className="text-muted-foreground"> ({selectedClient.aum ? (totalExposure / selectedClient.aum * 100).toFixed(2) : "0"}% of AUM)</span>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 w-6"></th>
+                  <th className="text-left p-2">Holding</th>
+                  <th className="text-left p-2">Issuer / AMC</th>
+                  <th className="text-left p-2">Product</th>
+                  <th className="text-left p-2">Match Type</th>
+                  <th className="text-right p-2">Holding Value</th>
+                  <th className="text-right p-2">Effective Exposure</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!query && (
+                  <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Enter a security, issuer, AMC or sector to search across all holdings of the selected client.</td></tr>
+                )}
+                {query && lookupResults.length === 0 && (
+                  <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No matches in {selectedClient.client}'s portfolio.</td></tr>
+                )}
+                {lookupResults.map(m => {
+                  const isMf = m.holding.product === "MF";
+                  const key = m.key;
+                  const open = expanded.has(key);
+                  return (
+                    <Fragment key={key}>
+                      <tr key={key} className="border-t border-border">
+                        <td className="p-2">
+                          {isMf ? (
+                            <button onClick={() => toggle(key)} className="text-muted-foreground hover:text-foreground">
+                              {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                            </button>
+                          ) : null}
+                        </td>
+                        <td className="p-2 font-medium">{m.holding.security}</td>
+                        <td className="p-2">{m.holding.amc ?? m.holding.issuer}</td>
+                        <td className="p-2"><span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{m.holding.product}</span></td>
+                        <td className="p-2">
+                          {m.matchType === "direct" ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">Direct</span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600">
+                              Underlying · {m.underlying?.issuer} ({m.underlying?.weight.toFixed(1)}%)
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-right p-2 tabular-nums text-muted-foreground">{fmtCr(m.holding.value)}</td>
+                        <td className="text-right p-2 tabular-nums font-medium">{fmtCr(m.effectiveValue)}</td>
+                      </tr>
+                      {isMf && open && (
+                        <tr className="bg-muted/20">
+                          <td></td>
+                          <td colSpan={6} className="p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+                              <PieIcon className="h-3 w-3" /> {m.holding.security} · Underlying issuer breakdown
+                            </div>
+                            <table className="w-full text-[11px]">
+                              <thead className="text-muted-foreground">
+                                <tr>
+                                  <th className="text-left py-1">Underlying Issuer</th>
+                                  <th className="text-left py-1">Sector</th>
+                                  <th className="text-right py-1">Weight</th>
+                                  <th className="text-right py-1">Effective Value</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(m.holding.underlyings ?? []).map(u => (
+                                  <tr key={u.issuer} className="border-t border-border/60">
+                                    <td className="py-1">{u.issuer}</td>
+                                    <td className="py-1 text-muted-foreground">{u.sector}</td>
+                                    <td className="text-right py-1 tabular-nums">{u.weight.toFixed(1)}%</td>
+                                    <td className="text-right py-1 tabular-nums">{fmtCr(+(m.holding.value * u.weight / 100).toFixed(3))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+
+      <p className="text-[10px] text-muted-foreground text-center pt-2">
+        Illustrative portfolio analytics. Returns, benchmarks and MF underlying weights are synthetic for demonstration.
+      </p>
+    </main>
   );
 }

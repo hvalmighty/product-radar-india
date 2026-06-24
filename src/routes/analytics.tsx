@@ -910,7 +910,7 @@ function PortfolioAnalytics() {
                   const key = m.key;
                   const open = expanded.has(key);
                   return (
-                    <>
+                    <FragmentRow key={key}>
                       <tr key={key} className="border-t border-border">
                         <td className="p-2">
                           {isMf ? (

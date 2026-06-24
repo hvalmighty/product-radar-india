@@ -447,6 +447,7 @@ function AnalyticsPage() {
           Illustrative analytics for demo purposes. Data reflects an Indian wealth-management firm with diversified MF / PMS / AIF / direct securities exposure.
         </p>
       </main>
+      )}
     </div>
   );
 }

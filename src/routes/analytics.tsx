@@ -148,13 +148,27 @@ function AnalyticsPage() {
             </Link>
             <div>
               <h1 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" /> Business Analytics
+                <BarChart3 className="h-5 w-5 text-primary" /> Analytics
               </h1>
-              <p className="text-[11px] text-muted-foreground">CXO cockpit · Advisor performance, AUM growth, revenue, client analytics</p>
+              <p className="text-[11px] text-muted-foreground">
+                {tab === "business"
+                  ? "CXO cockpit · Advisor performance, AUM growth, revenue, client analytics"
+                  : "Portfolio cockpit · Underperformance, concentration & security-level drilldown"}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {(["QTD","YTD","TTM","FY25"] as const).map(p => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setTab("business")}
+                className={`px-3 py-1 text-[11px] ${tab === "business" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}
+              >Business</button>
+              <button
+                onClick={() => setTab("portfolio")}
+                className={`px-3 py-1 text-[11px] border-l border-border ${tab === "portfolio" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted"}`}
+              >Portfolio</button>
+            </div>
+            {tab === "business" && (["QTD","YTD","TTM","FY25"] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
@@ -165,6 +179,7 @@ function AnalyticsPage() {
         </div>
       </header>
 
+      {tab === "portfolio" ? <PortfolioAnalytics /> : (
       <main className="px-4 sm:px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
         {/* KPI strip */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">

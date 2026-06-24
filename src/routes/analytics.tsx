@@ -964,7 +964,7 @@ function PortfolioAnalytics() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </FragmentRow>
                   );
                 })}
               </tbody>

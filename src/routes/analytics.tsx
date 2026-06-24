@@ -14,8 +14,8 @@ import {
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
-      { title: "Business Analytics · mPower Wealth" },
-      { name: "description", content: "CXO business analytics: AUM trend, revenue growth across MF/PMS/AIF, advisor performance, client segmentation and attribution for wealth management leadership." },
+      { title: "Analytics · mPower Wealth" },
+      { name: "description", content: "Business analytics for CXOs plus portfolio analytics: underperformance, concentration, and security-level drilldown across client holdings including MF underlyings." },
     ],
   }),
   component: AnalyticsPage,

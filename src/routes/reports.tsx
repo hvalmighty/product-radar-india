@@ -116,20 +116,21 @@ const ASSET_BENCHMARKS: Record<string, { name: string; ret: number }> = {
   "Other": { name: "—", ret: 0 },
 };
 
-const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#64748b"];
+// Red & Black only palette — gradients across reds and blacks
+const COLORS = ["#ef4444", "#000000", "#b91c1c", "#1f1f1f", "#dc2626", "#404040", "#7f1d1d", "#262626", "#f87171", "#525252"];
 
 // Gradient palette tuned for charts (top → bottom for bars, center → edge for pies)
 const GRAD_PAIRS: Array<[string, string]> = [
-  ["#818cf8", "#4f46e5"], // indigo
-  ["#34d399", "#059669"], // emerald
-  ["#fbbf24", "#d97706"], // amber
-  ["#fb7185", "#e11d48"], // rose
-  ["#a78bfa", "#7c3aed"], // violet
-  ["#22d3ee", "#0891b2"], // cyan
-  ["#f472b6", "#db2777"], // pink
-  ["#a3e635", "#65a30d"], // lime
-  ["#fb923c", "#ea580c"], // orange
-  ["#94a3b8", "#475569"], // slate
+  ["#ef4444", "#7f1d1d"], // bright red → dark red
+  ["#1f1f1f", "#000000"], // charcoal → black
+  ["#f87171", "#b91c1c"], // light red → deep red
+  ["#4b4b4b", "#111111"], // graphite → near-black
+  ["#dc2626", "#450a0a"], // red → almost-black red
+  ["#737373", "#171717"], // gray → black
+  ["#fca5a5", "#991b1b"], // pale red → crimson
+  ["#262626", "#000000"], // black variant
+  ["#b91c1c", "#000000"], // red → black blend
+  ["#9ca3af", "#1f1f1f"], // light gray → dark
 ];
 
 /** Reusable SVG gradient defs — rendered as a hidden, document-level <svg>
@@ -176,7 +177,7 @@ function NiceTooltip({ active, payload, label, formatter }: any) {
       {label !== undefined && <div className="font-semibold text-foreground mb-1">{label}</div>}
       {payload.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color || p.payload?.fill || "#6366f1" }} />
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color || p.payload?.fill || "#ef4444" }} />
           <span className="text-muted-foreground">{p.name}:</span>
           <span className="mono-num font-semibold text-foreground">{formatter ? formatter(p.value) : p.value}</span>
         </div>
@@ -1045,7 +1046,7 @@ function MFOverlap({ holdings }: { holdings: Holding[] }) {
                 <td className="text-left pr-3 py-1 max-w-[180px] truncate">{row.name}</td>
                 {row.values.map((v, j) => {
                   const intensity = v / 100;
-                  const bg = i === j ? "#374151" : `rgba(99, 102, 241, ${intensity})`;
+                  const bg = i === j ? "#000000" : `rgba(239, 68, 68, ${intensity})`;
                   return (
                     <td key={j} className="text-center mono-num text-[10px] font-medium" style={{ background: bg, color: intensity > 0.5 ? "#fff" : "inherit", width: 32, height: 28 }}>
                       {v}

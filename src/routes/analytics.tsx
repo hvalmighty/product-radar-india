@@ -32,7 +32,7 @@ function pct(n: number, d = 1) { return `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`; 
 function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; }
 function classNames(...a: (string | false | undefined)[]) { return a.filter(Boolean).join(" "); }
 
-const COLORS = ["#ef4444","#000000","#b91c1c","#1f1f1f","#dc2626","#404040","#7f1d1d","#262626","#f87171","#525252","#991b1b","#737373"];
+const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#14b8a6","#a855f7","#eab308"];
 
 // ============================================================
 // SYNTHETIC BUSINESS FACT TABLE
@@ -603,15 +603,15 @@ function BusinessAnalytics() {
             <AreaChart data={aumTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="aumG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.6} />
-                  <stop offset="95%" stopColor="#000000" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.5} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
-              <Area type="monotone" dataKey="AUM" stroke="#ef4444" strokeWidth={2} fill="url(#aumG)" />
+              <Area type="monotone" dataKey="AUM" stroke="#6366f1" strokeWidth={2} fill="url(#aumG)" />
             </AreaChart>
           </ResponsiveContainer>
         </Panel>
@@ -620,7 +620,7 @@ function BusinessAnalytics() {
           <ResponsiveContainer width="100%" height={260}>
             <Treemap
               data={pivot.rows.map((r, i) => ({ name: r, size: pivot.rowTotals[r] ?? 0, fill: COLORS[i % COLORS.length] }))}
-              dataKey="size" stroke="#000000"
+              dataKey="size" stroke="#fff"
             />
           </ResponsiveContainer>
         </Panel>

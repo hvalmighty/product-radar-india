@@ -32,7 +32,7 @@ function pct(n: number, d = 1) { return `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`; 
 function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; }
 function classNames(...a: (string | false | undefined)[]) { return a.filter(Boolean).join(" "); }
 
-const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#14b8a6","#a855f7","#eab308"];
+const COLORS = ["#ef4444","#000000","#b91c1c","#1f1f1f","#dc2626","#404040","#7f1d1d","#262626","#f87171","#525252","#991b1b","#737373"];
 
 // ============================================================
 // SYNTHETIC BUSINESS FACT TABLE

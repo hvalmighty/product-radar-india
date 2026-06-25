@@ -177,7 +177,7 @@ function NiceTooltip({ active, payload, label, formatter }: any) {
       {label !== undefined && <div className="font-semibold text-foreground mb-1">{label}</div>}
       {payload.map((p: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color || p.payload?.fill || "#6366f1" }} />
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: p.color || p.payload?.fill || "#ef4444" }} />
           <span className="text-muted-foreground">{p.name}:</span>
           <span className="mono-num font-semibold text-foreground">{formatter ? formatter(p.value) : p.value}</span>
         </div>

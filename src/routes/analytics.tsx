@@ -1201,21 +1201,25 @@ function UnderperformView() {
 }
 
 // ---- Lookup ----
+type LookupMode = "client" | "firm";
 function LookupView() {
+  const [mode, setMode] = useState<LookupMode>("firm");
   const [clientId, setClientId] = useState(clientPortfolios[0].id);
   const [query, setQuery] = useState("");
+  const [includeLookthrough, setIncludeLookthrough] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const selectedClient = clientPortfolios.find(c => c.id === clientId)!;
 
-  const results = useMemo(() => {
+  // ---- Single-client results ----
+  const clientResults = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    if (!q || mode !== "client") return [];
     type Match = { key: string; holding: Holding; matchType: "direct" | "underlying"; underlying?: { issuer: string; sector: string; weight: number }; effectiveValue: number; };
     const out: Match[] = [];
     for (const h of selectedClient.holdings) {
       const direct = h.security.toLowerCase().includes(q) || h.issuer.toLowerCase().includes(q) || (h.amc ?? "").toLowerCase().includes(q) || h.sector.toLowerCase().includes(q);
       if (direct) out.push({ key: h.security + ":direct", holding: h, matchType: "direct", effectiveValue: h.value });
-      if (h.product === "MF" && h.underlyings) {
+      if (includeLookthrough && h.product === "MF" && h.underlyings) {
         for (const u of h.underlyings) {
           if (u.issuer.toLowerCase().includes(q) || u.sector.toLowerCase().includes(q)) {
             out.push({ key: h.security + ":" + u.issuer, holding: h, matchType: "underlying", underlying: u, effectiveValue: +(h.value * u.weight / 100).toFixed(3) });
@@ -1224,28 +1228,93 @@ function LookupView() {
       }
     }
     return out;
-  }, [selectedClient, query]);
+  }, [selectedClient, query, mode, includeLookthrough]);
 
-  const totalExposure = results.reduce((s, m) => s + m.effectiveValue, 0);
+  // ---- Firm-wide results (grouped per portfolio) ----
+  type FirmMatch = { key: string; holding: Holding; matchType: "direct" | "underlying"; underlying?: { issuer: string; sector: string; weight: number }; effectiveValue: number; };
+  type FirmGroup = { clientId: string; client: string; segment: BSegment; rm: BRm; aum: number; matches: FirmMatch[]; totalExposure: number; };
+  const firmGroups = useMemo<FirmGroup[]>(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || mode !== "firm") return [];
+    const groups: FirmGroup[] = [];
+    for (const p of clientPortfolios) {
+      const matches: FirmMatch[] = [];
+      for (const h of p.holdings) {
+        const direct = h.security.toLowerCase().includes(q) || h.issuer.toLowerCase().includes(q) || (h.amc ?? "").toLowerCase().includes(q) || h.sector.toLowerCase().includes(q);
+        if (direct) matches.push({ key: p.id + ":" + h.security + ":direct", holding: h, matchType: "direct", effectiveValue: h.value });
+        if (includeLookthrough && h.product === "MF" && h.underlyings) {
+          for (const u of h.underlyings) {
+            if (u.issuer.toLowerCase().includes(q) || u.sector.toLowerCase().includes(q)) {
+              matches.push({ key: p.id + ":" + h.security + ":" + u.issuer, holding: h, matchType: "underlying", underlying: u, effectiveValue: +(h.value * u.weight / 100).toFixed(3) });
+            }
+          }
+        }
+      }
+      if (matches.length) {
+        const totalExposure = matches.reduce((s, m) => s + m.effectiveValue, 0);
+        groups.push({ clientId: p.id, client: p.client, segment: p.segment, rm: p.rm, aum: p.aum, matches, totalExposure });
+      }
+    }
+    groups.sort((a, b) => b.totalExposure - a.totalExposure);
+    return groups;
+  }, [query, mode, includeLookthrough]);
+
+  const clientTotalExposure = clientResults.reduce((s, m) => s + m.effectiveValue, 0);
+  const firmTotalExposure = firmGroups.reduce((s, g) => s + g.totalExposure, 0);
+  const firmTotalMatches = firmGroups.reduce((s, g) => s + g.matches.length, 0);
+  const firmTotalAum = firmGroups.reduce((s, g) => s + g.aum, 0);
   const toggle = (k: string) => setExpanded(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
+  // Firm-wide top issuer / sector concentration mini-summary (across matched portfolios)
+  const firmIssuerSplit = useMemo(() => {
+    const m = new Map<string, number>();
+    firmGroups.forEach(g => g.matches.forEach(x => {
+      const key = x.matchType === "underlying" ? (x.underlying?.issuer ?? x.holding.issuer) : x.holding.issuer;
+      m.set(key, (m.get(key) ?? 0) + x.effectiveValue);
+    }));
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [firmGroups]);
+
   return (
-    <Panel title="Security / Issuer Lookup Across Client Holdings" subtitle="Search any security, issuer, AMC or sector — includes MF underlying drilldown">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Client</label>
-          <select value={clientId} onChange={(e) => { setClientId(e.target.value); setExpanded(new Set()); }} className="mt-1 w-full bg-card border border-border rounded-md px-2 py-1.5 text-xs">
-            {clientPortfolios.map(c => <option key={c.id} value={c.id}>{c.client} · {c.segment} · {fmtCr(c.aum)}</option>)}
-          </select>
+    <Panel title="Security / Issuer Lookup" subtitle="Search a security, issuer, AMC or sector — across a single client or firm-wide across all portfolios. Includes MF underlying drilldown.">
+      {/* Mode + controls */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
+        <div className="md:col-span-3">
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Scope</label>
+          <div className="mt-1 inline-flex rounded-md border border-border bg-card p-0.5 w-full">
+            {([
+              { k: "firm" as const, label: "Firm-wide" },
+              { k: "client" as const, label: "Single Client" },
+            ]).map(o => (
+              <button
+                key={o.k}
+                onClick={() => { setMode(o.k); setExpanded(new Set()); }}
+                className={`flex-1 text-[11px] px-2 py-1.5 rounded ${mode === o.k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >{o.label}</button>
+            ))}
+          </div>
         </div>
-        <div className="md:col-span-2">
+        {mode === "client" && (
+          <div className="md:col-span-4">
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Client</label>
+            <select value={clientId} onChange={(e) => { setClientId(e.target.value); setExpanded(new Set()); }} className="mt-1 w-full bg-card border border-border rounded-md px-2 py-1.5 text-xs">
+              {clientPortfolios.map(c => <option key={c.id} value={c.id}>{c.client} · {c.segment} · {fmtCr(c.aum)}</option>)}
+            </select>
+          </div>
+        )}
+        <div className={mode === "client" ? "md:col-span-5" : "md:col-span-9"}>
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Search security / issuer / AMC / sector</label>
           <div className="mt-1 flex items-center gap-2 bg-card border border-border rounded-md px-2">
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. HDFC Bank, Reliance, Axis AMC, Financials…" className="flex-1 bg-transparent py-1.5 text-xs focus:outline-none" />
             {query && <button onClick={() => setQuery("")} className="text-[10px] text-muted-foreground hover:text-foreground">clear</button>}
           </div>
-          <div className="flex flex-wrap gap-1.5 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <label className="text-[10px] flex items-center gap-1 text-muted-foreground">
+              <input type="checkbox" checked={includeLookthrough} onChange={e => setIncludeLookthrough(e.target.checked)} className="h-3 w-3" />
+              Include MF look-through
+            </label>
+            <span className="text-[10px] text-muted-foreground">·</span>
             {["HDFC Bank","Reliance Inds.","ICICI Bank","Infosys","Axis AMC","Financials"].map(s => (
               <button key={s} onClick={() => setQuery(s)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-card hover:bg-muted">{s}</button>
             ))}
@@ -1253,70 +1322,194 @@ function LookupView() {
         </div>
       </div>
 
-      {query && (
-        <div className="mb-3 p-3 rounded-md bg-primary/5 border border-primary/20 flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs"><span className="font-medium">{results.length}</span> match{results.length === 1 ? "" : "es"} for <span className="font-medium">"{query}"</span> in <span className="font-medium">{selectedClient.client}</span>'s portfolio</div>
-          <div className="text-xs">Total effective exposure: <span className="font-semibold tabular-nums">{fmtCr(totalExposure)}</span> <span className="text-muted-foreground">({selectedClient.aum ? (totalExposure / selectedClient.aum * 100).toFixed(2) : "0"}% of AUM)</span></div>
-        </div>
+      {/* ===== Single-client mode ===== */}
+      {mode === "client" && (
+        <>
+          {query && (
+            <div className="mb-3 p-3 rounded-md bg-primary/5 border border-primary/20 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs"><span className="font-medium">{clientResults.length}</span> match{clientResults.length === 1 ? "" : "es"} for <span className="font-medium">"{query}"</span> in <span className="font-medium">{selectedClient.client}</span>'s portfolio</div>
+              <div className="text-xs">Total effective exposure: <span className="font-semibold tabular-nums">{fmtCr(clientTotalExposure)}</span> <span className="text-muted-foreground">({selectedClient.aum ? (clientTotalExposure / selectedClient.aum * 100).toFixed(2) : "0"}% of AUM)</span></div>
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 w-6"></th>
+                  <th className="text-left p-2">Holding</th>
+                  <th className="text-left p-2">Issuer / AMC</th>
+                  <th className="text-left p-2">Product</th>
+                  <th className="text-left p-2">Match Type</th>
+                  <th className="text-right p-2">Holding Value</th>
+                  <th className="text-right p-2">Effective Exposure</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!query && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Enter a security, issuer, AMC or sector to search across all holdings of the selected client.</td></tr>}
+                {query && clientResults.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No matches in {selectedClient.client}'s portfolio.</td></tr>}
+                {clientResults.map(m => {
+                  const isMf = m.holding.product === "MF";
+                  const open = expanded.has(m.key);
+                  return (
+                    <Fragment key={m.key}>
+                      <tr className="border-t border-border">
+                        <td className="p-2">{isMf ? <button onClick={() => toggle(m.key)} className="text-muted-foreground hover:text-foreground">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button> : null}</td>
+                        <td className="p-2 font-medium">{m.holding.security}</td>
+                        <td className="p-2">{m.holding.amc ?? m.holding.issuer}</td>
+                        <td className="p-2"><span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{m.holding.product}</span></td>
+                        <td className="p-2">{m.matchType === "direct" ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">Direct</span> : <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600">Underlying · {m.underlying?.issuer} ({m.underlying?.weight.toFixed(1)}%)</span>}</td>
+                        <td className="text-right p-2 tabular-nums text-muted-foreground">{fmtCr(m.holding.value)}</td>
+                        <td className="text-right p-2 tabular-nums font-medium">{fmtCr(m.effectiveValue)}</td>
+                      </tr>
+                      {isMf && open && (
+                        <tr className="bg-muted/20">
+                          <td></td>
+                          <td colSpan={6} className="p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1"><PieIcon className="h-3 w-3" /> {m.holding.security} · Underlying issuer breakdown</div>
+                            <table className="w-full text-[11px]">
+                              <thead className="text-muted-foreground"><tr><th className="text-left py-1">Underlying Issuer</th><th className="text-left py-1">Sector</th><th className="text-right py-1">Weight</th><th className="text-right py-1">Effective Value</th></tr></thead>
+                              <tbody>
+                                {(m.holding.underlyings ?? []).map(u => (
+                                  <tr key={u.issuer} className="border-t border-border/60">
+                                    <td className="py-1">{u.issuer}</td>
+                                    <td className="py-1 text-muted-foreground">{u.sector}</td>
+                                    <td className="text-right py-1 tabular-nums">{u.weight.toFixed(1)}%</td>
+                                    <td className="text-right py-1 tabular-nums">{fmtCr(+(m.holding.value * u.weight / 100).toFixed(3))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="bg-muted/40 text-muted-foreground">
-            <tr>
-              <th className="text-left p-2 w-6"></th>
-              <th className="text-left p-2">Holding</th>
-              <th className="text-left p-2">Issuer / AMC</th>
-              <th className="text-left p-2">Product</th>
-              <th className="text-left p-2">Match Type</th>
-              <th className="text-right p-2">Holding Value</th>
-              <th className="text-right p-2">Effective Exposure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!query && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Enter a security, issuer, AMC or sector to search across all holdings of the selected client.</td></tr>}
-            {query && results.length === 0 && <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No matches in {selectedClient.client}'s portfolio.</td></tr>}
-            {results.map(m => {
-              const isMf = m.holding.product === "MF";
-              const open = expanded.has(m.key);
-              return (
-                <Fragment key={m.key}>
-                  <tr className="border-t border-border">
-                    <td className="p-2">{isMf ? <button onClick={() => toggle(m.key)} className="text-muted-foreground hover:text-foreground">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button> : null}</td>
-                    <td className="p-2 font-medium">{m.holding.security}</td>
-                    <td className="p-2">{m.holding.amc ?? m.holding.issuer}</td>
-                    <td className="p-2"><span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{m.holding.product}</span></td>
-                    <td className="p-2">{m.matchType === "direct" ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">Direct</span> : <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600">Underlying · {m.underlying?.issuer} ({m.underlying?.weight.toFixed(1)}%)</span>}</td>
-                    <td className="text-right p-2 tabular-nums text-muted-foreground">{fmtCr(m.holding.value)}</td>
-                    <td className="text-right p-2 tabular-nums font-medium">{fmtCr(m.effectiveValue)}</td>
-                  </tr>
-                  {isMf && open && (
-                    <tr className="bg-muted/20">
-                      <td></td>
-                      <td colSpan={6} className="p-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1"><PieIcon className="h-3 w-3" /> {m.holding.security} · Underlying issuer breakdown</div>
-                        <table className="w-full text-[11px]">
-                          <thead className="text-muted-foreground"><tr><th className="text-left py-1">Underlying Issuer</th><th className="text-left py-1">Sector</th><th className="text-right py-1">Weight</th><th className="text-right py-1">Effective Value</th></tr></thead>
-                          <tbody>
-                            {(m.holding.underlyings ?? []).map(u => (
-                              <tr key={u.issuer} className="border-t border-border/60">
-                                <td className="py-1">{u.issuer}</td>
-                                <td className="py-1 text-muted-foreground">{u.sector}</td>
-                                <td className="text-right py-1 tabular-nums">{u.weight.toFixed(1)}%</td>
-                                <td className="text-right py-1 tabular-nums">{fmtCr(+(m.holding.value * u.weight / 100).toFixed(3))}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* ===== Firm-wide mode ===== */}
+      {mode === "firm" && (
+        <>
+          {query && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
+              <div className="p-2.5 rounded-md bg-primary/5 border border-primary/20">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolios w/ exposure</div>
+                <div className="text-base font-semibold tabular-nums">{firmGroups.length}<span className="text-[10px] text-muted-foreground font-normal"> / {clientPortfolios.length}</span></div>
+              </div>
+              <div className="p-2.5 rounded-md bg-card border border-border">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total matches</div>
+                <div className="text-base font-semibold tabular-nums">{firmTotalMatches}</div>
+              </div>
+              <div className="p-2.5 rounded-md bg-card border border-border">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Aggregate exposure</div>
+                <div className="text-base font-semibold tabular-nums">{fmtCr(firmTotalExposure)}</div>
+              </div>
+              <div className="p-2.5 rounded-md bg-card border border-border">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">% of impacted AUM</div>
+                <div className="text-base font-semibold tabular-nums">{firmTotalAum ? (firmTotalExposure / firmTotalAum * 100).toFixed(2) : "0"}%</div>
+              </div>
+              <div className="p-2.5 rounded-md bg-card border border-border">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Largest holder</div>
+                <div className="text-[11px] font-medium truncate">{firmGroups[0]?.client ?? "—"}</div>
+                <div className="text-[10px] text-muted-foreground tabular-nums">{firmGroups[0] ? fmtCr(firmGroups[0].totalExposure) : ""}</div>
+              </div>
+            </div>
+          )}
+
+          {query && firmIssuerSplit.length > 1 && (
+            <div className="mb-3 p-3 rounded-md bg-card border border-border">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Exposure split by matched issuer (firm-wide)</div>
+              <div className="flex flex-wrap gap-2">
+                {firmIssuerSplit.map(([iss, val]) => (
+                  <div key={iss} className="text-[10px] px-2 py-1 rounded border border-border bg-muted/40">
+                    <span className="font-medium">{iss}</span>
+                    <span className="text-muted-foreground"> · {fmtCr(val)} ({firmTotalExposure ? (val / firmTotalExposure * 100).toFixed(1) : "0"}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2 w-6"></th>
+                  <th className="text-left p-2">Client / Portfolio</th>
+                  <th className="text-left p-2">Segment</th>
+                  <th className="text-left p-2">RM</th>
+                  <th className="text-right p-2">Portfolio AUM</th>
+                  <th className="text-center p-2">Matches</th>
+                  <th className="text-right p-2">Exposure</th>
+                  <th className="text-right p-2">% of Portfolio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!query && <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">Enter a security, issuer, AMC or sector to find every client portfolio that holds it.</td></tr>}
+                {query && firmGroups.length === 0 && <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">No portfolio across the firm holds "{query}".</td></tr>}
+                {firmGroups.map(g => {
+                  const open = expanded.has(g.clientId);
+                  const pct = g.aum ? (g.totalExposure / g.aum * 100) : 0;
+                  const pctTone = pct >= 10 ? "text-rose-600" : pct >= 5 ? "text-amber-600" : "text-foreground";
+                  return (
+                    <Fragment key={g.clientId}>
+                      <tr className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => toggle(g.clientId)}>
+                        <td className="p-2"><button className="text-muted-foreground hover:text-foreground">{open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</button></td>
+                        <td className="p-2 font-medium">{g.client}</td>
+                        <td className="p-2"><span className="text-[10px] px-1.5 py-0.5 rounded bg-muted">{g.segment}</span></td>
+                        <td className="p-2 text-muted-foreground">{g.rm}</td>
+                        <td className="text-right p-2 tabular-nums text-muted-foreground">{fmtCr(g.aum)}</td>
+                        <td className="text-center p-2 tabular-nums">{g.matches.length}</td>
+                        <td className="text-right p-2 tabular-nums font-semibold">{fmtCr(g.totalExposure)}</td>
+                        <td className={`text-right p-2 tabular-nums font-medium ${pctTone}`}>{pct.toFixed(2)}%</td>
+                      </tr>
+                      {open && (
+                        <tr className="bg-muted/20">
+                          <td></td>
+                          <td colSpan={7} className="p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Matching holdings in {g.client}</div>
+                            <table className="w-full text-[11px]">
+                              <thead className="text-muted-foreground">
+                                <tr>
+                                  <th className="text-left py-1">Holding</th>
+                                  <th className="text-left py-1">Issuer / AMC</th>
+                                  <th className="text-left py-1">Product</th>
+                                  <th className="text-left py-1">Match</th>
+                                  <th className="text-right py-1">Holding Value</th>
+                                  <th className="text-right py-1">Effective Exposure</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {g.matches.map(m => (
+                                  <tr key={m.key} className="border-t border-border/60">
+                                    <td className="py-1 font-medium">{m.holding.security}</td>
+                                    <td className="py-1">{m.holding.amc ?? m.holding.issuer}</td>
+                                    <td className="py-1"><span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">{m.holding.product}</span></td>
+                                    <td className="py-1">{m.matchType === "direct"
+                                      ? <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">Direct</span>
+                                      : <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600">Underlying · {m.underlying?.issuer} ({m.underlying?.weight.toFixed(1)}%)</span>}
+                                    </td>
+                                    <td className="text-right py-1 tabular-nums text-muted-foreground">{fmtCr(m.holding.value)}</td>
+                                    <td className="text-right py-1 tabular-nums font-medium">{fmtCr(m.effectiveValue)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </Panel>
   );
 }

@@ -1046,7 +1046,7 @@ function MFOverlap({ holdings }: { holdings: Holding[] }) {
                 <td className="text-left pr-3 py-1 max-w-[180px] truncate">{row.name}</td>
                 {row.values.map((v, j) => {
                   const intensity = v / 100;
-                  const bg = i === j ? "#374151" : `rgba(99, 102, 241, ${intensity})`;
+                  const bg = i === j ? "#000000" : `rgba(239, 68, 68, ${intensity})`;
                   return (
                     <td key={j} className="text-center mono-num text-[10px] font-medium" style={{ background: bg, color: intensity > 0.5 ? "#fff" : "inherit", width: 32, height: 28 }}>
                       {v}

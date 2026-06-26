@@ -1335,16 +1335,19 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
             <div className="max-h-[40vh] overflow-y-auto px-6 py-3">
               <table className="w-full text-xs">
                 <thead className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground border-b border-border">
-                  <tr><th className="text-left py-2">Instrument</th><th className="text-left">Type</th>{cat === "MF" && <th className="text-left">Route</th>}<th className="text-right">Amount</th></tr>
+                  <tr><th className="text-left py-2">Instrument</th><th className="text-left">Type</th>{cat === "MF" && <th className="text-left">Route</th>}{cat === "MF" && <th className="text-left">Mandate</th>}<th className="text-right">Amount</th></tr>
                 </thead>
                 <tbody>
                   {Object.values(lines).map(l => {
                     const p = products.find(x => x.id === l.id)!;
+                    const m = MANDATES.find(x => x.id === l.mandateId);
+                    const needsMandate = l.txn === "SIP" || l.txn === "STP";
                     return (
                       <tr key={l.id} className="border-b border-border/60">
                         <td className="py-2"><div className="font-medium">{p.name}</div><div className="text-[10px] text-muted-foreground">{(p as any).amc || (p as any).issuer || (p as any).insurer || (p as any).manager}</div></td>
                         <td>{l.txn}{l.txn === "SIP" ? ` · ${l.sipDate}th × ${l.sipTenure}m` : ""}</td>
                         {cat === "MF" && <td className="text-[11px]">{MF_ROUTES.find(r => r.id === l.route)?.label}</td>}
+                        {cat === "MF" && <td className="text-[11px]">{needsMandate && m ? <span>{m.type} · {m.bank} {m.accountMasked}</span> : <span className="text-muted-foreground">—</span>}</td>}
                         <td className="text-right mono-num">{fmtINR(l.amount)}</td>
                       </tr>
                     );
@@ -1352,7 +1355,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border font-semibold">
-                    <td className="py-2" colSpan={cat === "MF" ? 3 : 2}>Basket Total</td>
+                    <td className="py-2" colSpan={cat === "MF" ? 4 : 2}>Basket Total</td>
                     <td className="text-right mono-num text-primary">{fmtINR(total)}</td>
                   </tr>
                 </tfoot>

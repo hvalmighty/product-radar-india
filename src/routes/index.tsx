@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type Category } from "@/lib/research-data";
 import { getTopBarIndices } from "@/lib/market-data.functions";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -76,6 +76,7 @@ function ResearchTerminal() {
   const [groupBy, setGroupBy] = useState<string>("none");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  const [showOrder, setShowOrder] = useState(false);
 
   // category-specific filters
   const [mfSub, setMfSub] = useState<string>("All");
@@ -389,9 +390,15 @@ function ResearchTerminal() {
                   <button
                     onClick={() => setShowCompare(true)}
                     disabled={selected.size < 2}
-                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
+                  </button>
+                  <button
+                    onClick={() => setShowOrder(true)}
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5"
+                  >
+                    <ShoppingCart className="w-3 h-3" /> Place Order ({selected.size})
                   </button>
                 </>
               )}
@@ -551,6 +558,13 @@ function ResearchTerminal() {
           onRemove={(id) => {
             setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
           }}
+        />
+      )}
+      {showOrder && (
+        <OrderModal
+          cat={cat}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes].filter(p => selected.has(p.id))}
+          onClose={() => setShowOrder(false)}
         />
       )}
     </div>
@@ -951,6 +965,337 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
           <span><Trophy className="w-3 h-3 inline mr-1 text-positive" /> Best value highlighted per metric</span>
           <button onClick={onClose} className="px-3 py-1.5 rounded-sm border border-border hover:bg-secondary text-foreground normal-case tracking-normal text-[11px]">Close</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= Order Placement =============
+
+type MfRoute = "BSE" | "NSE" | "CP" | "MFC";
+type OrderTxn = "BUY" | "SIP" | "SWP" | "STP" | "REDEEM" | "SWITCH";
+
+const MF_ROUTES: { id: MfRoute; label: string; sub: string; icon: typeof Building2; settle: string }[] = [
+  { id: "BSE", label: "BSE StAR MF", sub: "Exchange-routed · T+1 NAV cutoff 3:00 PM", icon: Building2, settle: "T+1 / T+2" },
+  { id: "NSE", label: "NSE MF Platform", sub: "Exchange-routed · Bulk & systematic friendly", icon: Network, settle: "T+1 / T+2" },
+  { id: "CP", label: "Channel Partner (RTA)", sub: "Direct via KFintech / CAMS feed", icon: Wallet, settle: "T+1 (RTA pickup)" },
+  { id: "MFC", label: "MF Central", sub: "Investor-consent flow (RTA jointly)", icon: Globe, settle: "T+2 (consent flow)" },
+];
+
+type OrderLine = {
+  id: string;
+  txn: OrderTxn;
+  amount: number;
+  folio?: string;
+  sipDate?: number;
+  sipTenure?: number;
+  route?: MfRoute;
+};
+
+function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[]; onClose: () => void }) {
+  const products = items.filter(p => p.category === cat);
+  const [client, setClient] = useState("Aarav Mehta · HUF · KYC ✓");
+  const [globalRoute, setGlobalRoute] = useState<MfRoute>("BSE");
+  const [lines, setLines] = useState<Record<string, OrderLine>>(() => {
+    const m: Record<string, OrderLine> = {};
+    products.forEach(p => {
+      const min = (p as any).minInvestment ?? 5000;
+      m[p.id] = {
+        id: p.id,
+        txn: cat === "MF" ? "BUY" : cat === "FD" ? "BUY" : "BUY",
+        amount: min,
+        sipDate: 5,
+        sipTenure: 36,
+        route: cat === "MF" ? "BSE" : undefined,
+      };
+    });
+    return m;
+  });
+  const [stage, setStage] = useState<"build" | "review" | "submitted">("build");
+  const [ackTerms, setAckTerms] = useState(false);
+
+  const update = (id: string, patch: Partial<OrderLine>) => {
+    setLines(prev => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  };
+
+  const applyRouteAll = (r: MfRoute) => {
+    setGlobalRoute(r);
+    setLines(prev => {
+      const n: Record<string, OrderLine> = {};
+      Object.entries(prev).forEach(([k, v]) => (n[k] = { ...v, route: r }));
+      return n;
+    });
+  };
+
+  const total = Object.values(lines).reduce((acc, l) => acc + (Number.isFinite(l.amount) ? l.amount : 0), 0);
+  const sipMonthly = Object.values(lines)
+    .filter(l => l.txn === "SIP")
+    .reduce((acc, l) => acc + (l.amount || 0), 0);
+
+  const catLabel = cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS" : "AIF";
+
+  if (products.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+        <div className="bg-surface border border-border rounded-md p-8 max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="text-sm text-muted-foreground mb-4">No products from the current category ({catLabel}) selected. Switch tab to place orders for other product types.</div>
+          <button onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-sm border border-border hover:bg-secondary">Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-surface border border-border rounded-md w-full max-w-6xl my-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Order Pad · {catLabel}</div>
+            <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-primary" /> {products.length} instrument{products.length > 1 ? "s" : ""} · {stage === "build" ? "Build Order" : stage === "review" ? "Review & Confirm" : "Submitted"}
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-secondary"><X className="w-4 h-4" /></button>
+        </div>
+
+        {stage === "submitted" ? (
+          <div className="p-10 text-center">
+            <CheckCircle2 className="w-12 h-12 text-positive mx-auto mb-3" />
+            <div className="text-base font-semibold">Order basket submitted</div>
+            <div className="text-xs text-muted-foreground mt-1">Confirmation reference: <span className="mono-num text-foreground">ORD-{Date.now().toString().slice(-8)}</span></div>
+            <div className="mt-6 grid grid-cols-3 gap-3 max-w-xl mx-auto text-left">
+              {Object.values(lines).map(l => {
+                const p = products.find(x => x.id === l.id)!;
+                return (
+                  <div key={l.id} className="border border-border rounded-sm p-3 bg-background/40">
+                    <div className="text-[10px] uppercase text-muted-foreground tracking-wider">{l.txn}{l.route ? ` · ${l.route}` : ""}</div>
+                    <div className="text-xs font-medium truncate">{p.name}</div>
+                    <div className="text-[11px] mono-num text-primary mt-1">{fmtINR(l.amount)}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={onClose} className="mt-6 text-[11px] px-4 py-2 rounded-sm bg-primary text-primary-foreground">Done</button>
+          </div>
+        ) : stage === "build" ? (
+          <>
+            {/* Client + Route bar */}
+            <div className="px-6 py-3 border-b border-border bg-background/30 grid md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Client / Folio Owner</label>
+                <select value={client} onChange={(e) => setClient(e.target.value)} className="mt-1 w-full bg-surface border border-border rounded-sm px-2 py-1.5 text-xs">
+                  <option>Aarav Mehta · HUF · KYC ✓</option>
+                  <option>Priya Nair · Resident Individual · KYC ✓</option>
+                  <option>Rohan Kapoor · NRI (Non-PIS) · KYC ✓</option>
+                  <option>Lakshmi Iyer · Resident Individual · KYC ✓</option>
+                  <option>Vikram Singh · Corporate · KYC ✓</option>
+                </select>
+              </div>
+              {cat === "MF" && (
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Default Execution Route (apply to all)</label>
+                  <div className="mt-1 grid grid-cols-4 gap-1">
+                    {MF_ROUTES.map(r => {
+                      const Icon = r.icon;
+                      const active = globalRoute === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => applyRouteAll(r.id)}
+                          className={`flex items-center justify-center gap-1 text-[10px] px-2 py-1.5 rounded-sm border ${active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary"}`}
+                          title={r.sub}
+                        >
+                          <Icon className="w-3 h-3" /> {r.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Lines */}
+            <div className="max-h-[55vh] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-surface border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Instrument</th>
+                    <th className="px-3 py-2 text-left">Transaction</th>
+                    <th className="px-3 py-2 text-right">Amount (₹)</th>
+                    {cat === "MF" && <th className="px-3 py-2 text-left">SIP Date / Tenure</th>}
+                    {cat === "MF" && <th className="px-3 py-2 text-left">Route</th>}
+                    {cat !== "MF" && <th className="px-3 py-2 text-left">Reference</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map(p => {
+                    const l = lines[p.id];
+                    const min = (p as any).minInvestment ?? 0;
+                    const below = l.amount < min;
+                    return (
+                      <tr key={p.id} className="border-b border-border/60 hover:bg-secondary/20">
+                        <td className="px-3 py-2">
+                          <div className="font-medium truncate max-w-[260px]">{p.name}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {(p as any).amc || (p as any).issuer || (p as any).insurer || (p as any).manager} · Min {fmtINR(min)}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <select value={l.txn} onChange={(e) => update(p.id, { txn: e.target.value as OrderTxn })} className="bg-background border border-border rounded-sm px-1.5 py-1 text-[11px]">
+                            {cat === "MF" && <>
+                              <option value="BUY">Lumpsum Buy</option>
+                              <option value="SIP">SIP</option>
+                              <option value="STP">STP</option>
+                              <option value="SWP">SWP</option>
+                              <option value="SWITCH">Switch</option>
+                              <option value="REDEEM">Redeem</option>
+                            </>}
+                            {cat === "FD" && <>
+                              <option value="BUY">Book FD</option>
+                              <option value="REDEEM">Premature Withdrawal</option>
+                            </>}
+                            {cat === "INS" && <option value="BUY">New Policy</option>}
+                            {cat === "PMS" && <>
+                              <option value="BUY">Onboard / Top-up</option>
+                              <option value="REDEEM">Partial Withdrawal</option>
+                            </>}
+                            {cat === "AIF" && <option value="BUY">Commitment / Drawdown</option>}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            value={l.amount}
+                            onChange={(e) => update(p.id, { amount: Number(e.target.value) })}
+                            className={`w-32 bg-background border rounded-sm px-2 py-1 text-right mono-num text-[11px] ${below ? "border-negative text-negative" : "border-border"}`}
+                          />
+                          {below && (
+                            <div className="text-[9px] text-negative flex items-center justify-end gap-1 mt-1">
+                              <AlertTriangle className="w-2.5 h-2.5" /> Below min
+                            </div>
+                          )}
+                        </td>
+                        {cat === "MF" && (
+                          <td className="px-3 py-2">
+                            {l.txn === "SIP" || l.txn === "STP" || l.txn === "SWP" ? (
+                              <div className="flex items-center gap-1">
+                                <select value={l.sipDate} onChange={(e) => update(p.id, { sipDate: Number(e.target.value) })} className="bg-background border border-border rounded-sm px-1 py-1 text-[11px]">
+                                  {[1, 5, 10, 15, 20, 25].map(d => <option key={d} value={d}>{d}th</option>)}
+                                </select>
+                                <span className="text-[10px] text-muted-foreground">×</span>
+                                <input type="number" value={l.sipTenure} onChange={(e) => update(p.id, { sipTenure: Number(e.target.value) })} className="w-14 bg-background border border-border rounded-sm px-1.5 py-1 text-[11px] mono-num" />
+                                <span className="text-[10px] text-muted-foreground">mo</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        )}
+                        {cat === "MF" && (
+                          <td className="px-3 py-2">
+                            <select value={l.route} onChange={(e) => update(p.id, { route: e.target.value as MfRoute })} className="bg-background border border-border rounded-sm px-1.5 py-1 text-[11px]">
+                              {MF_ROUTES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                            </select>
+                          </td>
+                        )}
+                        {cat !== "MF" && (
+                          <td className="px-3 py-2 text-[10px] text-muted-foreground">
+                            {cat === "FD" ? "Direct issuer booking" : cat === "INS" ? "POSP / Broker portal" : cat === "PMS" ? "Drawdown notice + DDP" : "Capital call notice"}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-border flex items-center justify-between bg-background/30">
+              <div className="text-[11px] text-muted-foreground">
+                Basket total: <span className="text-foreground font-semibold mono-num">{fmtINR(total)}</span>
+                {sipMonthly > 0 && <> · SIP/mo: <span className="text-primary mono-num">{fmtINR(sipMonthly)}</span></>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={onClose} className="text-[11px] px-3 py-1.5 rounded-sm border border-border hover:bg-secondary">Cancel</button>
+                <button onClick={() => setStage("review")} className="text-[11px] px-3 py-1.5 rounded-sm bg-primary text-primary-foreground flex items-center gap-1.5">
+                  Review Order <ChevronDown className="w-3 h-3 -rotate-90" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* REVIEW */
+          <>
+            <div className="px-6 py-4 border-b border-border bg-background/30">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Client</div>
+              <div className="text-sm font-medium">{client}</div>
+            </div>
+
+            {cat === "MF" && (
+              <div className="px-6 py-4 border-b border-border grid md:grid-cols-4 gap-2">
+                {MF_ROUTES.map(r => {
+                  const count = Object.values(lines).filter(l => l.route === r.id).length;
+                  const sum = Object.values(lines).filter(l => l.route === r.id).reduce((a, l) => a + l.amount, 0);
+                  const Icon = r.icon;
+                  return (
+                    <div key={r.id} className={`border rounded-sm p-3 ${count > 0 ? "border-primary/40 bg-primary/5" : "border-border opacity-60"}`}>
+                      <div className="flex items-center gap-2 text-xs font-medium"><Icon className="w-3.5 h-3.5" /> {r.label}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">{r.sub}</div>
+                      <div className="text-[10px] text-muted-foreground">Settlement: {r.settle}</div>
+                      <div className="text-[11px] mono-num mt-1.5">{count} order{count !== 1 ? "s" : ""} · {fmtINR(sum)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="max-h-[40vh] overflow-y-auto px-6 py-3">
+              <table className="w-full text-xs">
+                <thead className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground border-b border-border">
+                  <tr><th className="text-left py-2">Instrument</th><th className="text-left">Type</th>{cat === "MF" && <th className="text-left">Route</th>}<th className="text-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {Object.values(lines).map(l => {
+                    const p = products.find(x => x.id === l.id)!;
+                    return (
+                      <tr key={l.id} className="border-b border-border/60">
+                        <td className="py-2"><div className="font-medium">{p.name}</div><div className="text-[10px] text-muted-foreground">{(p as any).amc || (p as any).issuer || (p as any).insurer || (p as any).manager}</div></td>
+                        <td>{l.txn}{l.txn === "SIP" ? ` · ${l.sipDate}th × ${l.sipTenure}m` : ""}</td>
+                        {cat === "MF" && <td className="text-[11px]">{MF_ROUTES.find(r => r.id === l.route)?.label}</td>}
+                        <td className="text-right mono-num">{fmtINR(l.amount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border font-semibold">
+                    <td className="py-2" colSpan={cat === "MF" ? 3 : 2}>Basket Total</td>
+                    <td className="text-right mono-num text-primary">{fmtINR(total)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="px-6 py-3 border-t border-border bg-background/30 space-y-2">
+              <label className="flex items-start gap-2 text-[11px] text-muted-foreground cursor-pointer">
+                <input type="checkbox" checked={ackTerms} onChange={(e) => setAckTerms(e.target.checked)} className="mt-0.5 accent-primary" />
+                <span>I confirm suitability assessment is complete, the client has been provided the Scheme Information / Key Information Document, and consent is captured per SEBI / AMFI guidelines. {cat === "MF" && "Orders before NAV cutoff (3:00 PM lumpsum / 3:00 PM SIP) will receive same-day NAV."}</span>
+              </label>
+              <div className="flex items-center justify-between">
+                <button onClick={() => setStage("build")} className="text-[11px] px-3 py-1.5 rounded-sm border border-border hover:bg-secondary">Back to edit</button>
+                <button
+                  onClick={() => setStage("submitted")}
+                  disabled={!ackTerms}
+                  className="text-[11px] px-4 py-1.5 rounded-sm bg-primary text-primary-foreground flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 className="w-3 h-3" /> Submit Basket
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

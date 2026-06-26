@@ -1134,6 +1134,34 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                   </div>
                 </div>
               )}
+              {cat === "MF" && (
+                <div className="md:col-span-2">
+                  <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Default SIP / STP Mandate (apply to all)</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <select
+                      value={globalMandate}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setGlobalMandate(v);
+                        setLines(prev => {
+                          const n: Record<string, OrderLine> = {};
+                          Object.entries(prev).forEach(([k, l]) => (n[k] = { ...l, mandateId: v }));
+                          return n;
+                        });
+                      }}
+                      className="flex-1 bg-surface border border-border rounded-sm px-2 py-1.5 text-xs"
+                    >
+                      {MANDATES.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.id} · {m.type} · {m.bank} {m.accountMasked} · Cap ₹{(m.limit / 1000).toFixed(0)}k · Valid till {m.validTill} {m.status !== "Active" ? `· ${m.status}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="text-[10px] px-2 py-1.5 rounded-sm border border-border hover:bg-secondary whitespace-nowrap">+ New Mandate</button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Mandates apply to SIP / STP lines. Per-line override available below. Lumpsum, SWP, Switch & Redeem don't require a mandate.</div>
+                </div>
+              )}
             </div>
 
             {/* Lines */}

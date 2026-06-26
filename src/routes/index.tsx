@@ -390,9 +390,15 @@ function ResearchTerminal() {
                   <button
                     onClick={() => setShowCompare(true)}
                     disabled={selected.size < 2}
-                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     <TrendingUp className="w-3 h-3" /> Compare ({selected.size})
+                  </button>
+                  <button
+                    onClick={() => setShowOrder(true)}
+                    className="text-[11px] px-2.5 py-1.5 rounded-sm bg-primary text-primary-foreground hover:opacity-90 flex items-center gap-1.5"
+                  >
+                    <ShoppingCart className="w-3 h-3" /> Place Order ({selected.size})
                   </button>
                 </>
               )}

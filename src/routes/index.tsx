@@ -1216,6 +1216,37 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                         )}
                         {cat === "MF" && (
                           <td className="px-3 py-2">
+                            {l.txn === "SIP" || l.txn === "STP" ? (() => {
+                              const m = MANDATES.find(x => x.id === l.mandateId);
+                              const insufficient = m && l.amount > m.limit;
+                              return (
+                                <div>
+                                  <select
+                                    value={l.mandateId ?? ""}
+                                    onChange={(e) => update(p.id, { mandateId: e.target.value })}
+                                    className={`bg-background border rounded-sm px-1.5 py-1 text-[11px] max-w-[180px] ${insufficient ? "border-negative text-negative" : "border-border"}`}
+                                  >
+                                    {MANDATES.filter(x => x.status !== "Exhausted").map(x => (
+                                      <option key={x.id} value={x.id}>
+                                        {x.type} · {x.bank} {x.accountMasked} · ₹{(x.limit / 1000).toFixed(0)}k{x.status === "Pending" ? " (Pending)" : ""}
+                                      </option>
+                                    ))}
+                                    <option value="__new__">+ Register new mandate…</option>
+                                  </select>
+                                  {insufficient && (
+                                    <div className="text-[9px] text-negative flex items-center gap-1 mt-1">
+                                      <AlertTriangle className="w-2.5 h-2.5" /> Amount exceeds mandate cap
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })() : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        )}
+                        {cat === "MF" && (
+                          <td className="px-3 py-2">
                             <select value={l.route} onChange={(e) => update(p.id, { route: e.target.value as MfRoute })} className="bg-background border border-border rounded-sm px-1.5 py-1 text-[11px]">
                               {MF_ROUTES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                             </select>

@@ -990,12 +990,32 @@ type OrderLine = {
   sipDate?: number;
   sipTenure?: number;
   route?: MfRoute;
+  mandateId?: string;
 };
+
+type Mandate = {
+  id: string;
+  type: "NACH" | "eNACH" | "UPI AutoPay" | "Debit Card AutoPay";
+  bank: string;
+  accountMasked: string;
+  limit: number; // per-debit cap
+  validTill: string;
+  status: "Active" | "Pending" | "Exhausted";
+};
+
+const MANDATES: Mandate[] = [
+  { id: "MND-00231", type: "NACH",              bank: "HDFC Bank",  accountMasked: "XXXX4421", limit: 100000, validTill: "31-Dec-2030", status: "Active" },
+  { id: "MND-00418", type: "eNACH",             bank: "ICICI Bank", accountMasked: "XXXX8810", limit: 50000,  validTill: "15-Aug-2028", status: "Active" },
+  { id: "MND-00502", type: "UPI AutoPay",       bank: "Axis Bank",  accountMasked: "UPI@axis", limit: 15000,  validTill: "30-Jun-2027", status: "Active" },
+  { id: "MND-00611", type: "Debit Card AutoPay",bank: "SBI",        accountMasked: "XXXX2207", limit: 25000,  validTill: "20-Mar-2027", status: "Active" },
+  { id: "MND-00702", type: "NACH",              bank: "Kotak Bank", accountMasked: "XXXX9912", limit: 200000, validTill: "10-Nov-2029", status: "Pending" },
+];
 
 function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[]; onClose: () => void }) {
   const products = items.filter(p => p.category === cat);
   const [client, setClient] = useState("Aarav Mehta · HUF · KYC ✓");
   const [globalRoute, setGlobalRoute] = useState<MfRoute>("BSE");
+  const [globalMandate, setGlobalMandate] = useState<string>(MANDATES[0].id);
   const [lines, setLines] = useState<Record<string, OrderLine>>(() => {
     const m: Record<string, OrderLine> = {};
     products.forEach(p => {
@@ -1007,6 +1027,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
         sipDate: 5,
         sipTenure: 36,
         route: cat === "MF" ? "BSE" : undefined,
+        mandateId: MANDATES[0].id,
       };
     });
     return m;

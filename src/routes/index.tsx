@@ -990,12 +990,32 @@ type OrderLine = {
   sipDate?: number;
   sipTenure?: number;
   route?: MfRoute;
+  mandateId?: string;
 };
+
+type Mandate = {
+  id: string;
+  type: "NACH" | "eNACH" | "UPI AutoPay" | "Debit Card AutoPay";
+  bank: string;
+  accountMasked: string;
+  limit: number; // per-debit cap
+  validTill: string;
+  status: "Active" | "Pending" | "Exhausted";
+};
+
+const MANDATES: Mandate[] = [
+  { id: "MND-00231", type: "NACH",              bank: "HDFC Bank",  accountMasked: "XXXX4421", limit: 100000, validTill: "31-Dec-2030", status: "Active" },
+  { id: "MND-00418", type: "eNACH",             bank: "ICICI Bank", accountMasked: "XXXX8810", limit: 50000,  validTill: "15-Aug-2028", status: "Active" },
+  { id: "MND-00502", type: "UPI AutoPay",       bank: "Axis Bank",  accountMasked: "UPI@axis", limit: 15000,  validTill: "30-Jun-2027", status: "Active" },
+  { id: "MND-00611", type: "Debit Card AutoPay",bank: "SBI",        accountMasked: "XXXX2207", limit: 25000,  validTill: "20-Mar-2027", status: "Active" },
+  { id: "MND-00702", type: "NACH",              bank: "Kotak Bank", accountMasked: "XXXX9912", limit: 200000, validTill: "10-Nov-2029", status: "Pending" },
+];
 
 function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[]; onClose: () => void }) {
   const products = items.filter(p => p.category === cat);
   const [client, setClient] = useState("Aarav Mehta · HUF · KYC ✓");
   const [globalRoute, setGlobalRoute] = useState<MfRoute>("BSE");
+  const [globalMandate, setGlobalMandate] = useState<string>(MANDATES[0].id);
   const [lines, setLines] = useState<Record<string, OrderLine>>(() => {
     const m: Record<string, OrderLine> = {};
     products.forEach(p => {
@@ -1007,6 +1027,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
         sipDate: 5,
         sipTenure: 36,
         route: cat === "MF" ? "BSE" : undefined,
+        mandateId: MANDATES[0].id,
       };
     });
     return m;
@@ -1113,6 +1134,34 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                   </div>
                 </div>
               )}
+              {cat === "MF" && (
+                <div className="md:col-span-2">
+                  <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Default SIP / STP Mandate (apply to all)</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <select
+                      value={globalMandate}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setGlobalMandate(v);
+                        setLines(prev => {
+                          const n: Record<string, OrderLine> = {};
+                          Object.entries(prev).forEach(([k, l]) => (n[k] = { ...l, mandateId: v }));
+                          return n;
+                        });
+                      }}
+                      className="flex-1 bg-surface border border-border rounded-sm px-2 py-1.5 text-xs"
+                    >
+                      {MANDATES.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.id} · {m.type} · {m.bank} {m.accountMasked} · Cap ₹{(m.limit / 1000).toFixed(0)}k · Valid till {m.validTill} {m.status !== "Active" ? `· ${m.status}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="text-[10px] px-2 py-1.5 rounded-sm border border-border hover:bg-secondary whitespace-nowrap">+ New Mandate</button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-1">Mandates apply to SIP / STP lines. Per-line override available below. Lumpsum, SWP, Switch & Redeem don't require a mandate.</div>
+                </div>
+              )}
             </div>
 
             {/* Lines */}
@@ -1124,6 +1173,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                     <th className="px-3 py-2 text-left">Transaction</th>
                     <th className="px-3 py-2 text-right">Amount (₹)</th>
                     {cat === "MF" && <th className="px-3 py-2 text-left">SIP Date / Tenure</th>}
+                    {cat === "MF" && <th className="px-3 py-2 text-left">Mandate</th>}
                     {cat === "MF" && <th className="px-3 py-2 text-left">Route</th>}
                     {cat !== "MF" && <th className="px-3 py-2 text-left">Reference</th>}
                   </tr>
@@ -1194,6 +1244,37 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                         )}
                         {cat === "MF" && (
                           <td className="px-3 py-2">
+                            {l.txn === "SIP" || l.txn === "STP" ? (() => {
+                              const m = MANDATES.find(x => x.id === l.mandateId);
+                              const insufficient = m && l.amount > m.limit;
+                              return (
+                                <div>
+                                  <select
+                                    value={l.mandateId ?? ""}
+                                    onChange={(e) => update(p.id, { mandateId: e.target.value })}
+                                    className={`bg-background border rounded-sm px-1.5 py-1 text-[11px] max-w-[180px] ${insufficient ? "border-negative text-negative" : "border-border"}`}
+                                  >
+                                    {MANDATES.filter(x => x.status !== "Exhausted").map(x => (
+                                      <option key={x.id} value={x.id}>
+                                        {x.type} · {x.bank} {x.accountMasked} · ₹{(x.limit / 1000).toFixed(0)}k{x.status === "Pending" ? " (Pending)" : ""}
+                                      </option>
+                                    ))}
+                                    <option value="__new__">+ Register new mandate…</option>
+                                  </select>
+                                  {insufficient && (
+                                    <div className="text-[9px] text-negative flex items-center gap-1 mt-1">
+                                      <AlertTriangle className="w-2.5 h-2.5" /> Amount exceeds mandate cap
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })() : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        )}
+                        {cat === "MF" && (
+                          <td className="px-3 py-2">
                             <select value={l.route} onChange={(e) => update(p.id, { route: e.target.value as MfRoute })} className="bg-background border border-border rounded-sm px-1.5 py-1 text-[11px]">
                               {MF_ROUTES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
                             </select>
@@ -1254,16 +1335,19 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
             <div className="max-h-[40vh] overflow-y-auto px-6 py-3">
               <table className="w-full text-xs">
                 <thead className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground border-b border-border">
-                  <tr><th className="text-left py-2">Instrument</th><th className="text-left">Type</th>{cat === "MF" && <th className="text-left">Route</th>}<th className="text-right">Amount</th></tr>
+                  <tr><th className="text-left py-2">Instrument</th><th className="text-left">Type</th>{cat === "MF" && <th className="text-left">Route</th>}{cat === "MF" && <th className="text-left">Mandate</th>}<th className="text-right">Amount</th></tr>
                 </thead>
                 <tbody>
                   {Object.values(lines).map(l => {
                     const p = products.find(x => x.id === l.id)!;
+                    const m = MANDATES.find(x => x.id === l.mandateId);
+                    const needsMandate = l.txn === "SIP" || l.txn === "STP";
                     return (
                       <tr key={l.id} className="border-b border-border/60">
                         <td className="py-2"><div className="font-medium">{p.name}</div><div className="text-[10px] text-muted-foreground">{(p as any).amc || (p as any).issuer || (p as any).insurer || (p as any).manager}</div></td>
                         <td>{l.txn}{l.txn === "SIP" ? ` · ${l.sipDate}th × ${l.sipTenure}m` : ""}</td>
                         {cat === "MF" && <td className="text-[11px]">{MF_ROUTES.find(r => r.id === l.route)?.label}</td>}
+                        {cat === "MF" && <td className="text-[11px]">{needsMandate && m ? <span>{m.type} · {m.bank} {m.accountMasked}</span> : <span className="text-muted-foreground">—</span>}</td>}
                         <td className="text-right mono-num">{fmtINR(l.amount)}</td>
                       </tr>
                     );
@@ -1271,7 +1355,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border font-semibold">
-                    <td className="py-2" colSpan={cat === "MF" ? 3 : 2}>Basket Total</td>
+                    <td className="py-2" colSpan={cat === "MF" ? 4 : 2}>Basket Total</td>
                     <td className="text-right mono-num text-primary">{fmtINR(total)}</td>
                   </tr>
                 </tfoot>

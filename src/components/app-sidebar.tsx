@@ -18,7 +18,7 @@ import {
 const items = [
   { title: "Screener",    url: "/",            icon: LayoutGrid },
   { title: "Proposal",    url: "/proposal",    icon: FilePlus2 },
-  { title: "Portfolios",    url: "/portfolio",   icon: Briefcase },
+  { title: "Held Away Assets", url: "/portfolio",   icon: Briefcase },
   { title: "Tax Liability", url: "/tax",         icon: Calculator },
   { title: "Market Data",   url: "/market-data", icon: LineChart },
   { title: "Alerts",        url: "/alerts",      icon: Bell },

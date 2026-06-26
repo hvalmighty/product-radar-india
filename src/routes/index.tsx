@@ -76,6 +76,7 @@ function ResearchTerminal() {
   const [groupBy, setGroupBy] = useState<string>("none");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  const [showOrder, setShowOrder] = useState(false);
 
   // category-specific filters
   const [mfSub, setMfSub] = useState<string>("All");

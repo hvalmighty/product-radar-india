@@ -560,6 +560,13 @@ function ResearchTerminal() {
           }}
         />
       )}
+      {showOrder && (
+        <OrderModal
+          cat={cat}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes].filter(p => selected.has(p.id))}
+          onClose={() => setShowOrder(false)}
+        />
+      )}
     </div>
   );
 }

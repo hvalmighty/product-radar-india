@@ -1145,6 +1145,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                     <th className="px-3 py-2 text-left">Transaction</th>
                     <th className="px-3 py-2 text-right">Amount (₹)</th>
                     {cat === "MF" && <th className="px-3 py-2 text-left">SIP Date / Tenure</th>}
+                    {cat === "MF" && <th className="px-3 py-2 text-left">Mandate</th>}
                     {cat === "MF" && <th className="px-3 py-2 text-left">Route</th>}
                     {cat !== "MF" && <th className="px-3 py-2 text-left">Reference</th>}
                   </tr>

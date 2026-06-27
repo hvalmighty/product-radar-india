@@ -13,7 +13,14 @@ export type AssistantThread = {
 
 const threads = new Map<string, AssistantThread>();
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+let snapshot: AssistantThread[] = [];
+function recompute() {
+  snapshot = [...threads.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+const emit = () => {
+  recompute();
+  listeners.forEach((l) => l());
+};
 
 function makeId() {
   return `t_${Math.random().toString(36).slice(2, 10)}`;
@@ -41,18 +48,24 @@ export function getOrCreateThread(id: string): AssistantThread {
 }
 
 export function listThreads(): AssistantThread[] {
-  return [...threads.values()].sort((a, b) => b.createdAt - a.createdAt);
+  return snapshot;
 }
 
 export function updateThread(id: string, patch: Partial<AssistantThread>) {
   const t = threads.get(id);
   if (!t) return;
-  threads.set(id, { ...t, ...patch });
+  const next = { ...t, ...patch };
+  // Skip emit if nothing actually changed (avoids loops from message-effect updates).
+  if (t.title === next.title && t.messages === next.messages) {
+    threads.set(id, next);
+    return;
+  }
+  threads.set(id, next);
   emit();
 }
 
 export function deleteThread(id: string) {
-  threads.delete(id);
+  if (!threads.delete(id)) return;
   emit();
 }
 
@@ -62,9 +75,6 @@ function subscribe(cb: () => void) {
 }
 
 export function useThreads() {
-  return useSyncExternalStore(
-    subscribe,
-    () => listThreads(),
-    () => [] as AssistantThread[],
-  );
+  return useSyncExternalStore(subscribe, listThreads, listThreads);
 }
+

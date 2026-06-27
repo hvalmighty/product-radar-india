@@ -14,9 +14,13 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as MarketDataRouteImport } from './routes/market-data'
+import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssistantIndexRouteImport } from './routes/assistant.index'
+import { Route as AssistantThreadIdRouteImport } from './routes/assistant.$threadId'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 
 const TaxRoute = TaxRouteImport.update({
   id: '/tax',
@@ -43,6 +47,11 @@ const MarketDataRoute = MarketDataRouteImport.update({
   path: '/market-data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -58,16 +67,35 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantIndexRoute = AssistantIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AssistantRoute,
+} as any)
+const AssistantThreadIdRoute = AssistantThreadIdRouteImport.update({
+  id: '/$threadId',
+  path: '/$threadId',
+  getParentRoute: () => AssistantRoute,
+} as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
+  '/assistant': typeof AssistantRouteWithChildren
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
   '/tax': typeof TaxRoute
+  '/api/chat': typeof ApiChatRoute
+  '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/assistant/': typeof AssistantIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,17 +106,24 @@ export interface FileRoutesByTo {
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
   '/tax': typeof TaxRoute
+  '/api/chat': typeof ApiChatRoute
+  '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/assistant': typeof AssistantIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
+  '/assistant': typeof AssistantRouteWithChildren
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
   '/tax': typeof TaxRoute
+  '/api/chat': typeof ApiChatRoute
+  '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/assistant/': typeof AssistantIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,11 +131,15 @@ export interface FileRouteTypes {
     | '/'
     | '/alerts'
     | '/analytics'
+    | '/assistant'
     | '/market-data'
     | '/portfolio'
     | '/proposal'
     | '/reports'
     | '/tax'
+    | '/api/chat'
+    | '/assistant/$threadId'
+    | '/assistant/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,27 +150,36 @@ export interface FileRouteTypes {
     | '/proposal'
     | '/reports'
     | '/tax'
+    | '/api/chat'
+    | '/assistant/$threadId'
+    | '/assistant'
   id:
     | '__root__'
     | '/'
     | '/alerts'
     | '/analytics'
+    | '/assistant'
     | '/market-data'
     | '/portfolio'
     | '/proposal'
     | '/reports'
     | '/tax'
+    | '/api/chat'
+    | '/assistant/$threadId'
+    | '/assistant/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
   AnalyticsRoute: typeof AnalyticsRoute
+  AssistantRoute: typeof AssistantRouteWithChildren
   MarketDataRoute: typeof MarketDataRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
   ReportsRoute: typeof ReportsRoute
   TaxRoute: typeof TaxRoute
+  ApiChatRoute: typeof ApiChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -171,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/analytics': {
       id: '/analytics'
       path: '/analytics'
@@ -192,18 +247,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistant/': {
+      id: '/assistant/'
+      path: '/'
+      fullPath: '/assistant/'
+      preLoaderRoute: typeof AssistantIndexRouteImport
+      parentRoute: typeof AssistantRoute
+    }
+    '/assistant/$threadId': {
+      id: '/assistant/$threadId'
+      path: '/$threadId'
+      fullPath: '/assistant/$threadId'
+      preLoaderRoute: typeof AssistantThreadIdRouteImport
+      parentRoute: typeof AssistantRoute
+    }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
+
+interface AssistantRouteChildren {
+  AssistantThreadIdRoute: typeof AssistantThreadIdRoute
+  AssistantIndexRoute: typeof AssistantIndexRoute
+}
+
+const AssistantRouteChildren: AssistantRouteChildren = {
+  AssistantThreadIdRoute: AssistantThreadIdRoute,
+  AssistantIndexRoute: AssistantIndexRoute,
+}
+
+const AssistantRouteWithChildren = AssistantRoute._addFileChildren(
+  AssistantRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   AnalyticsRoute: AnalyticsRoute,
+  AssistantRoute: AssistantRouteWithChildren,
   MarketDataRoute: MarketDataRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,
   ReportsRoute: ReportsRoute,
   TaxRoute: TaxRoute,
+  ApiChatRoute: ApiChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

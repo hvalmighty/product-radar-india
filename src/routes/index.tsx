@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type Category } from "@/lib/research-data";
+import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, equityStocks, bonds, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type EquityStock, type Bond, type Category } from "@/lib/research-data";
 import { getTopBarIndices } from "@/lib/market-data.functions";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
@@ -20,6 +20,8 @@ type SortDir = "asc" | "desc";
 
 const CATEGORIES: { key: Category; label: string; count: number; tone: string }[] = [
   { key: "MF", label: "Mutual Funds", count: mutualFunds.length, tone: "text-mf" },
+  { key: "EQ", label: "Equity", count: equityStocks.length, tone: "text-eq" },
+  { key: "BOND", label: "Fixed Income", count: bonds.length, tone: "text-bond" },
   { key: "PMS", label: "PMS", count: pmsSchemes.length, tone: "text-pms" },
   { key: "AIF", label: "AIF", count: aifSchemes.length, tone: "text-aif" },
   { key: "FD", label: "Fixed Deposits", count: fixedDeposits.length, tone: "text-fd" },
@@ -105,6 +107,19 @@ function ResearchTerminal() {
   const [aifMinIRR, setAifMinIRR] = useState<number>(0);
   const [aifVintageFrom, setAifVintageFrom] = useState<number>(2018);
 
+  // Equity filters
+  const [eqMarketCap, setEqMarketCap] = useState<string>("All");
+  const [eqSector, setEqSector] = useState<string>("All");
+  const [eqMinCagr, setEqMinCagr] = useState<number>(0);
+  const [eqMaxPe, setEqMaxPe] = useState<number>(90);
+
+  // Bond filters
+  const [bondType, setBondType] = useState<string>("All");
+  const [bondRating, setBondRating] = useState<string>("All");
+  const [bondMinYtm, setBondMinYtm] = useState<number>(6);
+  const [bondMaxTenor, setBondMaxTenor] = useState<number>(40);
+  const [bondTaxFree, setBondTaxFree] = useState<boolean>(false);
+
   const data = useMemo(() => {
     if (cat === "MF") {
       return mutualFunds.filter(p => {
@@ -148,15 +163,36 @@ function ResearchTerminal() {
         return true;
       });
     }
-    return aifSchemes.filter(p => {
-      if (aifCategory !== "All" && p.sebiCategory !== aifCategory) return false;
-      if (aifStrategy !== "All" && p.subStrategy !== aifStrategy) return false;
-      if (p.netIRR < aifMinIRR) return false;
-      if (p.vintage < aifVintageFrom) return false;
-      if (query && !`${p.name} ${p.manager} ${p.subStrategy} ${p.sebiCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (cat === "AIF") {
+      return aifSchemes.filter(p => {
+        if (aifCategory !== "All" && p.sebiCategory !== aifCategory) return false;
+        if (aifStrategy !== "All" && p.subStrategy !== aifStrategy) return false;
+        if (p.netIRR < aifMinIRR) return false;
+        if (p.vintage < aifVintageFrom) return false;
+        if (query && !`${p.name} ${p.manager} ${p.subStrategy} ${p.sebiCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+      });
+    }
+    if (cat === "EQ") {
+      return equityStocks.filter(p => {
+        if (eqMarketCap !== "All" && p.marketCap !== eqMarketCap) return false;
+        if (eqSector !== "All" && p.sector !== eqSector) return false;
+        if (p.cagr3y < eqMinCagr) return false;
+        if (p.pe > eqMaxPe) return false;
+        if (query && !`${p.name} ${p.ticker} ${p.sector}`.toLowerCase().includes(query.toLowerCase())) return false;
+        return true;
+      });
+    }
+    return bonds.filter(p => {
+      if (bondType !== "All" && p.bondType !== bondType) return false;
+      if (bondRating !== "All" && p.rating !== bondRating) return false;
+      if (p.ytm < bondMinYtm) return false;
+      if (p.residualTenorYears > bondMaxTenor) return false;
+      if (bondTaxFree && p.taxable) return false;
+      if (query && !`${p.name} ${p.issuer} ${p.bondType} ${p.rating}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom]);
+  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
 
   const sorted = useMemo(() => {
     const arr = [...data] as any[];
@@ -202,7 +238,11 @@ function ResearchTerminal() {
         ? [["none", "No Grouping"], ["insurer", "Insurer"], ["subCategory", "Product Type"], ["rating", "Rating"]]
         : cat === "PMS"
           ? [["none", "No Grouping"], ["manager", "Manager"], ["strategy", "Strategy"], ["structure", "Structure"], ["risk", "Risk"]]
-          : [["none", "No Grouping"], ["manager", "Manager"], ["sebiCategory", "SEBI Category"], ["subStrategy", "Sub-Strategy"], ["vintage", "Vintage"], ["domicile", "Domicile"]];
+          : cat === "AIF"
+            ? [["none", "No Grouping"], ["manager", "Manager"], ["sebiCategory", "SEBI Category"], ["subStrategy", "Sub-Strategy"], ["vintage", "Vintage"], ["domicile", "Domicile"]]
+            : cat === "EQ"
+              ? [["none", "No Grouping"], ["sector", "Sector"], ["marketCap", "Market Cap"], ["risk", "Risk"]]
+              : [["none", "No Grouping"], ["issuer", "Issuer"], ["bondType", "Bond Type"], ["rating", "Credit Rating"], ["payout", "Payout"]];
 
   // Quick stats
   const stats = useMemo(() => {
@@ -242,12 +282,30 @@ function ResearchTerminal() {
         { l: "Top AUM", v: a.length ? fmtINR(Math.max(...a.map(x => x.aum)) * 1e7) : "—" },
       ];
     }
-    const a = sorted as AIF[];
+    if (cat === "AIF") {
+      const a = sorted as AIF[];
+      return [
+        { l: "Funds", v: a.length },
+        { l: "Avg Net IRR", v: a.length ? `${(a.reduce((s, x) => s + x.netIRR, 0) / a.length).toFixed(2)}%` : "—" },
+        { l: "Total Corpus", v: a.length ? fmtINR(a.reduce((s, x) => s + x.corpusTarget, 0) * 1e7) : "—" },
+        { l: "Cat-III Funds", v: a.filter(x => x.sebiCategory === "Category III").length },
+      ];
+    }
+    if (cat === "EQ") {
+      const a = sorted as EquityStock[];
+      return [
+        { l: "Stocks", v: a.length },
+        { l: "Avg 3Y CAGR", v: a.length ? `${(a.reduce((s, x) => s + x.cagr3y, 0) / a.length).toFixed(2)}%` : "—" },
+        { l: "Avg P/E", v: a.length ? (a.reduce((s, x) => s + x.pe, 0) / a.length).toFixed(1) : "—" },
+        { l: "Large Cap", v: `${a.filter(x => x.marketCap === "Large Cap").length}/${a.length}` },
+      ];
+    }
+    const a = sorted as Bond[];
     return [
-      { l: "Funds", v: a.length },
-      { l: "Avg Net IRR", v: a.length ? `${(a.reduce((s, x) => s + x.netIRR, 0) / a.length).toFixed(2)}%` : "—" },
-      { l: "Total Corpus", v: a.length ? fmtINR(a.reduce((s, x) => s + x.corpusTarget, 0) * 1e7) : "—" },
-      { l: "Cat-III Funds", v: a.filter(x => x.sebiCategory === "Category III").length },
+      { l: "Securities", v: a.length },
+      { l: "Best YTM", v: a.length ? `${Math.max(...a.map(x => x.ytm)).toFixed(2)}%` : "—" },
+      { l: "Avg YTM", v: a.length ? `${(a.reduce((s, x) => s + x.ytm, 0) / a.length).toFixed(2)}%` : "—" },
+      { l: "Tax-Free", v: a.filter(x => !x.taxable).length },
     ];
   }, [sorted, cat]);
 
@@ -271,14 +329,18 @@ function ResearchTerminal() {
           {CATEGORIES.map(c => (
             <button
               key={c.key}
-              onClick={() => { setCat(c.key); setSortKey(c.key === "MF" ? "returns3y" : c.key === "FD" ? "interestRate" : c.key === "INS" ? "claimSettlement" : c.key === "PMS" ? "returns3y" : "netIRR"); setGroupBy("none"); setSelected(new Set()); }}
+              onClick={() => {
+                setCat(c.key);
+                const def: Record<Category, string> = { MF: "returns3y", FD: "interestRate", INS: "claimSettlement", PMS: "returns3y", AIF: "netIRR", EQ: "cagr3y", BOND: "ytm" };
+                setSortKey(def[c.key]); setGroupBy("none"); setSelected(new Set());
+              }}
               className={`px-4 py-2.5 text-xs font-medium tracking-wide border-b-2 -mb-px transition-colors flex items-center gap-2 ${
                 cat === c.key
                   ? `border-foreground text-foreground ${c.tone}`
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${c.key === "MF" ? "bg-mf" : c.key === "FD" ? "bg-fd" : c.key === "INS" ? "bg-ins" : c.key === "PMS" ? "bg-pms" : "bg-aif"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${c.key === "MF" ? "bg-mf" : c.key === "FD" ? "bg-fd" : c.key === "INS" ? "bg-ins" : c.key === "PMS" ? "bg-pms" : c.key === "AIF" ? "bg-aif" : c.key === "EQ" ? "bg-eq" : "bg-bond"}`} />
               {c.label.toUpperCase()}
               <span className="text-[10px] opacity-60 mono-num">[{c.count}]</span>
             </button>
@@ -353,6 +415,29 @@ function ResearchTerminal() {
                 <div className="text-[10px] text-muted-foreground italic pt-1">SEBI min ticket: ₹1 Crore</div>
               </>
             )}
+            {cat === "EQ" && (
+              <>
+                <FilterSelect label="Market Cap" value={eqMarketCap} onChange={setEqMarketCap}
+                  options={["All", "Large Cap", "Mid Cap", "Small Cap"]} />
+                <FilterSelect label="Sector" value={eqSector} onChange={setEqSector}
+                  options={["All", ...Array.from(new Set(equityStocks.map(s => s.sector))).sort()]} />
+                <FilterRange label="Min 3Y CAGR" value={eqMinCagr} onChange={setEqMinCagr} min={-10} max={40} step={1} suffix="%" />
+                <FilterRange label="Max P/E" value={eqMaxPe} onChange={setEqMaxPe} min={10} max={100} step={1} format={v => v >= 100 ? "Any" : `${v}x`} />
+                <div className="text-[10px] text-muted-foreground italic pt-1">Universe: Nifty 500 top constituents</div>
+              </>
+            )}
+            {cat === "BOND" && (
+              <>
+                <FilterSelect label="Bond Type" value={bondType} onChange={setBondType}
+                  options={["All", "G-Sec", "State Dev Loan", "PSU Bond", "Corporate Bond", "Tax-Free Bond", "NCD", "Perpetual / AT1", "Covered Bond", "Zero Coupon"]} />
+                <FilterSelect label="Credit Rating" value={bondRating} onChange={setBondRating}
+                  options={["All", "Sovereign", "AAA", "AA+", "AA", "A+", "A"]} />
+                <FilterRange label="Min YTM" value={bondMinYtm} onChange={setBondMinYtm} min={5} max={12} step={0.1} suffix="%" />
+                <FilterRange label="Max Tenor" value={bondMaxTenor} onChange={setBondMaxTenor} min={1} max={40} step={1} format={v => `${v}Y`} />
+                <FilterToggle label="Tax-Free Only" value={bondTaxFree} onChange={setBondTaxFree} />
+              </>
+            )}
+
 
             <div className="pt-4 border-t border-border space-y-2">
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>
@@ -373,13 +458,13 @@ function ResearchTerminal() {
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={query} onChange={e => setQuery(e.target.value)}
-                placeholder={`Search ${cat === "MF" ? "funds, AMCs, categories" : cat === "FD" ? "issuers, schemes" : cat === "INS" ? "policies, insurers" : cat === "PMS" ? "PMS strategies, managers" : "AIF funds, managers"}…`}
+                placeholder={`Search ${cat === "MF" ? "funds, AMCs, categories" : cat === "FD" ? "issuers, schemes" : cat === "INS" ? "policies, insurers" : cat === "PMS" ? "PMS strategies, managers" : cat === "AIF" ? "AIF funds, managers" : cat === "EQ" ? "tickers, companies, sectors" : "issuers, bonds, NCDs"}…`}
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-border rounded-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/70"
               />
             </div>
             <ToolbarSelect icon={<Layers className="w-3 h-3" />} label="Group by" value={groupBy} onChange={setGroupBy} options={groupOptions as [string, string][]} />
             <div className="text-[11px] text-muted-foreground mono-num">
-              <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : cat === "INS" ? insurance.length : cat === "PMS" ? pmsSchemes.length : aifSchemes.length} results
+              <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : cat === "INS" ? insurance.length : cat === "PMS" ? pmsSchemes.length : cat === "AIF" ? aifSchemes.length : cat === "EQ" ? equityStocks.length : bonds.length} results
             </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
@@ -519,6 +604,39 @@ function ResearchTerminal() {
                           <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                         </>
                       )}
+                      {cat === "EQ" && (
+                        <>
+                          <Th label="Stock" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Sector" k="sector" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Cap" k="marketCap" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="LTP" k="price" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="P/E" k="pe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="P/B" k="pb" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Div Y%" k="dividendYield" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="ROE %" k="roe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="3Y CAGR" k="cagr3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="5Y CAGR" k="cagr5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Exp Rtn" k="expectedReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                        </>
+                      )}
+                      {cat === "BOND" && (
+                        <>
+                          <Th label="Security" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Issuer" k="issuer" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Type" k="bondType" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Coupon %" k="couponRate" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="YTM %" k="ytm" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Tenor (Y)" k="residualTenorYears" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Face ₹" k="faceValue" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Min ₹" k="minInvestment" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Payout" k="payout" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Taxable" k="taxable" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -532,6 +650,8 @@ function ResearchTerminal() {
                         {cat === "INS" && <INSRow p={p as Insurance} />}
                         {cat === "PMS" && <PMSRow p={p as PMS} />}
                         {cat === "AIF" && <AIFRow p={p as AIF} />}
+                        {cat === "EQ" && <EQRow p={p as EquityStock} />}
+                        {cat === "BOND" && <BONDRow p={p as Bond} />}
                       </tr>
                     ))}
                     {g.items.length === 0 && (
@@ -553,7 +673,7 @@ function ResearchTerminal() {
       {showCompare && (
         <CompareModal
           cat={cat}
-          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes].filter(p => selected.has(p.id))}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes, ...equityStocks, ...bonds].filter(p => selected.has(p.id))}
           onClose={() => setShowCompare(false)}
           onRemove={(id) => {
             setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
@@ -563,7 +683,7 @@ function ResearchTerminal() {
       {showOrder && (
         <OrderModal
           cat={cat}
-          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes].filter(p => selected.has(p.id))}
+          items={[...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes, ...equityStocks, ...bonds].filter(p => selected.has(p.id))}
           onClose={() => setShowOrder(false)}
         />
       )}
@@ -718,6 +838,57 @@ function AIFRow({ p }: { p: AIF }) {
   );
 }
 
+function EQRow({ p }: { p: EquityStock }) {
+  const capTone = p.marketCap === "Large Cap" ? "bg-info/15 text-info" : p.marketCap === "Mid Cap" ? "bg-warning/20 text-warning" : "bg-negative/15 text-negative";
+  return (
+    <>
+      <td className="px-3 py-2.5">
+        <div className="font-medium text-[12.5px]">{p.ticker}</div>
+        <div className="text-[10px] text-muted-foreground">{p.name}</div>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">
+        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-eq" />{p.sector}</span>
+      </td>
+      <td className="px-3 py-2.5"><span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span></td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.roe.toFixed(1)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
+      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.cagr3y)}`}>{p.cagr3y > 0 ? "+" : ""}{p.cagr3y.toFixed(2)}%</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.cagr5y)}`}>{p.cagr5y > 0 ? "+" : ""}{p.cagr5y.toFixed(2)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num text-primary font-medium">{p.expectedReturn.toFixed(2)}%</td>
+      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+    </>
+  );
+}
+
+function BONDRow({ p }: { p: Bond }) {
+  return (
+    <>
+      <td className="px-3 py-2.5">
+        <div className="font-medium text-[12.5px]">{p.name}</div>
+        <div className="text-[10px] text-muted-foreground mono-num">{p.id}</div>
+      </td>
+      <td className="px-3 py-2.5 text-[11px]">{p.issuer}</td>
+      <td className="px-3 py-2.5 text-[11px]">
+        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-bond" />{p.bondType}</span>
+      </td>
+      <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.couponRate.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num font-semibold text-bond">{p.ytm.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.residualTenorYears}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.faceValue.toLocaleString("en-IN")}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>
+      <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>
+      <td className="px-3 py-2.5 text-[11px]">{p.taxable ? <span className="text-muted-foreground">Taxable</span> : <span className="text-positive">Tax-Free</span>}</td>
+      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+    </>
+  );
+}
+
+
 function RiskPill({ r }: { r: string }) {
   const tone = r === "Low" || r === "Low-Mod" ? "bg-positive/15 text-positive"
     : r === "Moderate" ? "bg-info/15 text-info"
@@ -787,7 +958,7 @@ function ToolbarSelect({ icon, label, value, onChange, options }: { icon: React.
   );
 }
 
-type AnyProduct = MutualFund | FixedDeposit | Insurance | PMS | AIF;
+type AnyProduct = MutualFund | FixedDeposit | Insurance | PMS | AIF | EquityStock | Bond;
 
 function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items: AnyProduct[]; onClose: () => void; onRemove: (id: string) => void }) {
   // Filter to current category only to keep comparison apples-to-apples
@@ -864,7 +1035,8 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         { k: "risk", label: "Risk Level", type: "text" as const },
         { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
       ]
-    : [
+    : cat === "AIF"
+    ? [
         { k: "manager", label: "Manager", type: "text" as const },
         { k: "sebiCategory", label: "SEBI Category", type: "text" as const },
         { k: "subStrategy", label: "Sub-Strategy", type: "text" as const },
@@ -884,6 +1056,35 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         { k: "domicile", label: "Domicile", type: "text" as const },
         { k: "risk", label: "Risk Level", type: "text" as const },
         { k: "rating", label: "Rating", type: "stars" as const, best: "high" as const },
+      ]
+    : cat === "EQ"
+    ? [
+        { k: "ticker", label: "Ticker", type: "text" as const },
+        { k: "sector", label: "Sector", type: "text" as const },
+        { k: "marketCap", label: "Market Cap", type: "text" as const },
+        { k: "price", label: "LTP (₹)", type: "num" as const, dp: 2 },
+        { k: "pe", label: "P/E", type: "num" as const, dp: 2, best: "low" as const },
+        { k: "pb", label: "P/B", type: "num" as const, dp: 2, best: "low" as const },
+        { k: "dividendYield", label: "Dividend Yield (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "roe", label: "ROE (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "beta", label: "Beta", type: "num" as const, dp: 2 },
+        { k: "cagr3y", label: "3Y CAGR (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "cagr5y", label: "5Y CAGR (%)", type: "pct" as const, dp: 2, best: "high" as const },
+        { k: "expectedReturn", label: "Expected Return (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "risk", label: "Risk Level", type: "text" as const },
+      ]
+    : [
+        { k: "issuer", label: "Issuer", type: "text" as const },
+        { k: "bondType", label: "Type", type: "text" as const },
+        { k: "rating", label: "Credit Rating", type: "text" as const },
+        { k: "couponRate", label: "Coupon (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "ytm", label: "YTM (%)", type: "num" as const, dp: 2, best: "high" as const },
+        { k: "residualTenorYears", label: "Tenor (Y)", type: "num" as const, dp: 0 },
+        { k: "faceValue", label: "Face Value (₹)", type: "num" as const, dp: 0 },
+        { k: "minInvestment", label: "Min Investment (₹)", type: "inr" as const, best: "low" as const },
+        { k: "payout", label: "Payout", type: "text" as const },
+        { k: "taxable", label: "Taxable", type: "bool" as const },
+        { k: "risk", label: "Risk Level", type: "text" as const },
       ];
 
   const bestIdxFor = (key: string, best: "high" | "low" | undefined): number | null => {
@@ -913,7 +1114,7 @@ function CompareModal({ cat, items, onClose, onRemove }: { cat: Category; items:
         <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Side-by-side Comparison</div>
-            <h2 className="text-lg font-semibold tracking-tight">{cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS Strategies" : "AIF Schemes"} · {products.length} selected</h2>
+            <h2 className="text-lg font-semibold tracking-tight">{cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS Strategies" : cat === "AIF" ? "AIF Schemes" : cat === "EQ" ? "Equity" : "Fixed Income"} · {products.length} selected</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-sm hover:bg-secondary"><X className="w-4 h-4" /></button>
         </div>
@@ -1053,7 +1254,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
     .filter(l => l.txn === "SIP")
     .reduce((acc, l) => acc + (l.amount || 0), 0);
 
-  const catLabel = cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS" : "AIF";
+  const catLabel = cat === "MF" ? "Mutual Funds" : cat === "FD" ? "Fixed Deposits" : cat === "INS" ? "Insurance Plans" : cat === "PMS" ? "PMS" : cat === "AIF" ? "AIF" : cat === "EQ" ? "Equity" : "Fixed Income";
 
   if (products.length === 0) {
     return (
@@ -1211,6 +1412,14 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                               <option value="REDEEM">Partial Withdrawal</option>
                             </>}
                             {cat === "AIF" && <option value="BUY">Commitment / Drawdown</option>}
+                            {cat === "EQ" && <>
+                              <option value="BUY">Buy (Delivery)</option>
+                              <option value="REDEEM">Sell (Delivery)</option>
+                            </>}
+                            {cat === "BOND" && <>
+                              <option value="BUY">Subscribe / Buy</option>
+                              <option value="REDEEM">Sell on Exchange</option>
+                            </>}
                           </select>
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -1282,7 +1491,7 @@ function OrderModal({ cat, items, onClose }: { cat: Category; items: AnyProduct[
                         )}
                         {cat !== "MF" && (
                           <td className="px-3 py-2 text-[10px] text-muted-foreground">
-                            {cat === "FD" ? "Direct issuer booking" : cat === "INS" ? "POSP / Broker portal" : cat === "PMS" ? "Drawdown notice + DDP" : "Capital call notice"}
+                            {cat === "FD" ? "Direct issuer booking" : cat === "INS" ? "POSP / Broker portal" : cat === "PMS" ? "Drawdown notice + DDP" : cat === "AIF" ? "Capital call notice" : cat === "EQ" ? "NSE / BSE · T+1 settlement" : "NSE / BSE · RBI Retail Direct"}
                           </td>
                         )}
                       </tr>

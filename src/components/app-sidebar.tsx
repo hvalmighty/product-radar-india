@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3 } from "lucide-react";
+import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import mpowerLogo from "@/assets/mpower-logo.png.asset.json";
 
@@ -25,6 +25,7 @@ const items = [
   { title: "Alerts",        url: "/alerts",      icon: Bell },
   { title: "Analytics",     url: "/analytics",   icon: BarChart3 },
   { title: "Reports",       url: "/reports",     icon: FileText },
+  { title: "mPower AI",     url: "/assistant",   icon: Sparkles },
 ] as const;
 
 export function AppSidebar() {

@@ -47,6 +47,8 @@
   --color-ins: var(--ins);
   --color-pms: var(--pms);
   --color-aif: var(--aif);
+  --color-eq: var(--eq);
+  --color-bond: var(--bond);
 }
 
 :root {
@@ -95,6 +97,8 @@
   --ins: oklch(0.55 0.16 30);
   --pms: oklch(0.5 0.16 295);
   --aif: oklch(0.55 0.14 200);
+  --eq: oklch(0.55 0.17 60);
+  --bond: oklch(0.5 0.11 180);
 
   --sidebar: oklch(0.985 0.003 95);
   --sidebar-foreground: oklch(0.18 0.012 250);

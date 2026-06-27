@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
-import mpowerLogo from "@/assets/mpower-logo.png.asset.json";
+import mpowerLogo from "@/assets/mpower-logo.png";
 
 import {
   Sidebar,
@@ -40,7 +40,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 px-2 py-1.5">
           <img src={kfintechLogo.url} alt="KFintech" className="h-7 w-auto object-contain shrink-0" />
           {!collapsed && (
-            <img src={mpowerLogo.url} alt="mPower" className="h-7 w-auto object-contain shrink-0" />
+            <img src={mpowerLogo} alt="mPower" className="h-7 w-auto object-contain shrink-0" />
           )}
         </div>
       </SidebarHeader>

@@ -19,8 +19,10 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantIndexRouteImport } from './routes/assistant.index'
+import { Route as DebugLogsRouteImport } from './routes/debug.logs'
 import { Route as AssistantThreadIdRouteImport } from './routes/assistant.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiPublicDebugLogsRouteImport } from './routes/api/public/debug-logs'
 
 const TaxRoute = TaxRouteImport.update({
   id: '/tax',
@@ -72,6 +74,11 @@ const AssistantIndexRoute = AssistantIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AssistantRoute,
 } as any)
+const DebugLogsRoute = DebugLogsRouteImport.update({
+  id: '/debug/logs',
+  path: '/debug/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssistantThreadIdRoute = AssistantThreadIdRouteImport.update({
   id: '/$threadId',
   path: '/$threadId',
@@ -80,6 +87,11 @@ const AssistantThreadIdRoute = AssistantThreadIdRouteImport.update({
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDebugLogsRoute = ApiPublicDebugLogsRouteImport.update({
+  id: '/api/public/debug-logs',
+  path: '/api/public/debug-logs',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -95,7 +107,9 @@ export interface FileRoutesByFullPath {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
+  '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -108,7 +122,9 @@ export interface FileRoutesByTo {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/debug/logs': typeof DebugLogsRoute
   '/assistant': typeof AssistantIndexRoute
+  '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,7 +139,9 @@ export interface FileRoutesById {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
+  '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -139,7 +157,9 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/debug/logs'
     | '/assistant/'
+    | '/api/public/debug-logs'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -152,7 +172,9 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/debug/logs'
     | '/assistant'
+    | '/api/public/debug-logs'
   id:
     | '__root__'
     | '/'
@@ -166,7 +188,9 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/debug/logs'
     | '/assistant/'
+    | '/api/public/debug-logs'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -180,6 +204,8 @@ export interface RootRouteChildren {
   ReportsRoute: typeof ReportsRoute
   TaxRoute: typeof TaxRoute
   ApiChatRoute: typeof ApiChatRoute
+  DebugLogsRoute: typeof DebugLogsRoute
+  ApiPublicDebugLogsRoute: typeof ApiPublicDebugLogsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -254,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssistantIndexRouteImport
       parentRoute: typeof AssistantRoute
     }
+    '/debug/logs': {
+      id: '/debug/logs'
+      path: '/debug/logs'
+      fullPath: '/debug/logs'
+      preLoaderRoute: typeof DebugLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assistant/$threadId': {
       id: '/assistant/$threadId'
       path: '/$threadId'
@@ -266,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/debug-logs': {
+      id: '/api/public/debug-logs'
+      path: '/api/public/debug-logs'
+      fullPath: '/api/public/debug-logs'
+      preLoaderRoute: typeof ApiPublicDebugLogsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -296,7 +336,19 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRoute: ReportsRoute,
   TaxRoute: TaxRoute,
   ApiChatRoute: ApiChatRoute,
+  DebugLogsRoute: DebugLogsRoute,
+  ApiPublicDebugLogsRoute: ApiPublicDebugLogsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -7,6 +7,17 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+function applyCloudflareEnvToProcessEnv(env: unknown) {
+  if (!env || typeof env !== "object") return;
+  if (!globalThis.process?.env) return;
+
+  for (const [key, value] of Object.entries(env)) {
+    if (typeof value === "string") {
+      globalThis.process.env[key] = value;
+    }
+  }
+}
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
@@ -40,6 +51,7 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      applyCloudflareEnvToProcessEnv(env);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

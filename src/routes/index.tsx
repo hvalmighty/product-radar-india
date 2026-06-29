@@ -28,9 +28,10 @@ function pctClass(v: number) {
 }
 
 function TopBarTicker() {
+  const { region } = useRegion();
   const q = useQuery({
-    queryKey: ["topbar-indices"],
-    queryFn: () => getTopBarIndices(),
+    queryKey: ["topbar-indices", region],
+    queryFn: () => getTopBarIndices({ data: { region } }),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });

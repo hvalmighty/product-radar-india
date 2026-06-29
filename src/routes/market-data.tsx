@@ -34,9 +34,11 @@ export const Route = createFileRoute("/market-data")({
   component: MarketDataPage,
 });
 
+import { useRegion } from "@/lib/region";
+
 const GROUPS: { key: Quote["group"]; label: string }[] = [
-  { key: "india", label: "India Benchmark Indices" },
-  { key: "sector", label: "India Sector Indices" },
+  { key: "india", label: "Benchmark Indices" },
+  { key: "sector", label: "Listed Heavyweights" },
   { key: "fx", label: "Currencies (USD base)" },
   { key: "crypto", label: "Crypto" },
 ];
@@ -211,18 +213,19 @@ function NewsCard({ n }: { n: NewsItem }) {
 }
 
 function MarketDataPage() {
+  const { region, meta: regionMeta } = useRegion();
   const [tab, setTab] = useState<(typeof NEWS_TABS)[number]["key"]>("markets");
 
   const quotesQ = useQuery({
-    queryKey: ["market-quotes"],
-    queryFn: () => getMarketQuotes(),
+    queryKey: ["market-quotes", region],
+    queryFn: () => getMarketQuotes({ data: { region } }),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
 
   const newsQ = useQuery({
-    queryKey: ["news", tab],
-    queryFn: () => getNews({ data: { category: tab } }),
+    queryKey: ["news", region, tab],
+    queryFn: () => getNews({ data: { category: tab, region } }),
     refetchInterval: 5 * 60_000,
     staleTime: 60_000,
   });

@@ -1065,6 +1065,57 @@ function FilterToggle({ label, value, onChange }: { label: string; value: boolea
   );
 }
 
+function SavedScreens({ cat, snapshot, apply }: { cat: string; snapshot: () => any; apply: (s: any) => void }) {
+  const storageKey = `vantage.savedScreens.${cat}`;
+  const [list, setList] = useState<Array<{ name: string; state: any }>>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(window.localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+  });
+  const persist = (next: Array<{ name: string; state: any }>) => {
+    setList(next);
+    try { window.localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+  };
+  return (
+    <div className="pt-4 border-t border-border space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>
+        <button
+          onClick={() => {
+            const name = window.prompt("Name this screen");
+            if (!name) return;
+            persist([...list.filter(s => s.name !== name), { name, state: snapshot() }]);
+          }}
+          className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider flex items-center gap-1"
+        >
+          <BookmarkPlus className="w-3 h-3" /> Save
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <div className="text-[10px] text-muted-foreground italic">No saved screens yet. Configure filters then click Save.</div>
+      ) : (
+        list.map((s) => (
+          <div key={s.name} className="flex items-center gap-1 group">
+            <button
+              onClick={() => apply(s.state)}
+              className="flex-1 text-left px-2 py-1.5 rounded-sm hover:bg-secondary text-[11px] flex items-center gap-2"
+            >
+              <BookmarkPlus className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />{s.name}
+            </button>
+            <button
+              onClick={() => persist(list.filter(x => x.name !== s.name))}
+              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1"
+              aria-label={`Delete ${s.name}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+
 function ToolbarSelect({ icon, label, value, onChange, options }: { icon: React.ReactNode; label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <div className="flex items-center gap-1.5 text-[11px]">

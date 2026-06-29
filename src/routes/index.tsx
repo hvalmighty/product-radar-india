@@ -815,32 +815,42 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
 }
 
 function MFRow({ p, idx }: { p: MutualFund; idx: number }) {
+  const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
       <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark}</div>
+        <div className="font-medium text-[12.5px] flex items-center gap-1.5">
+          {p.name}
+          {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+        </div>
+        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
       </td>
       <td className="px-3 py-2.5">
         <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
           <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
         </span>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass}</div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
       </td>
+      <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>
       <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>
       <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
       <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
     </>
   );
 }
+
 
 function FDRow({ p }: { p: FixedDeposit }) {
   return (

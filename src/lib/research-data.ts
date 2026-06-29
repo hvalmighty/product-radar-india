@@ -15,14 +15,23 @@ export interface MutualFund {
   returns1y: number;
   returns3y: number;
   returns5y: number;
+  ytdReturn: number;
   sharpe: number;
+  sortino: number;
   alpha: number;
   beta: number;
+  maxDrawdown: number; // negative %, e.g. -22.5
   risk: RiskLevel;
   rating: number; // 1-5
   minInvestment: number;
+  sipMin: number;
   exitLoad: string;
+  exitLoadDays: number;
+  lockInYears: number;
+  taxation: "Equity" | "Debt" | "Hybrid";
   benchmark: string;
+  fundManager: string;
+  inceptionYear: number;
 }
 
 export interface FixedDeposit {

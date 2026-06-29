@@ -45,9 +45,9 @@ const GROUPS: { key: Quote["group"]; label: string }[] = [
 
 const NEWS_TABS = [
   { key: "markets", label: "Market News", icon: LineChart },
-  { key: "india", label: "India", icon: Building2 },
-  { key: "macro", label: "Macro", icon: TrendingUp },
-  { key: "global", label: "Global Events", icon: Globe },
+  { key: "india",   label: "Domestic",    icon: Building2 },
+  { key: "macro",   label: "Macro",       icon: TrendingUp },
+  { key: "global",  label: "Global Events", icon: Globe },
 ] as const;
 
 function fmtNum(n: number, d = 2) {

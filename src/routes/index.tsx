@@ -86,6 +86,17 @@ function ResearchTerminal() {
   const [mfMinReturn, setMfMinReturn] = useState<number>(0);
   const [mfMaxExpense, setMfMaxExpense] = useState<number>(2.5);
   const [mfAssetClass, setMfAssetClass] = useState<string>("All");
+  const [mfAmc, setMfAmc] = useState<string>("All");
+  const [mfMinSharpe, setMfMinSharpe] = useState<number>(0);
+  const [mfMinRating, setMfMinRating] = useState<number>(1);
+  const [mfMaxDrawdown, setMfMaxDrawdown] = useState<number>(50); // allow up to -50%
+  const [mfMinAge, setMfMinAge] = useState<number>(0);
+  const [mfMinAum, setMfMinAum] = useState<number>(0); // ₹ Cr
+  const [mfBeatsBench, setMfBeatsBench] = useState<boolean>(false);
+  const [mfElssOnly, setMfElssOnly] = useState<boolean>(false);
+  const [mfPositive5y, setMfPositive5y] = useState<boolean>(false);
+  const [mfPreset, setMfPreset] = useState<string>("");
+
 
   const [fdIssuer, setFdIssuer] = useState<string>("All");
   const [fdMinRate, setFdMinRate] = useState<number>(6);

@@ -215,7 +215,7 @@ function ResearchTerminal() {
       if (query && !`${p.name} ${p.issuer} ${p.bondType} ${p.rating}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
+  }, [cat, query, currentYear, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, mfAmc, mfMinSharpe, mfMinRating, mfMinAge, mfMinAum, mfMaxDrawdown, mfBeatsBench, mfElssOnly, mfPositive5y, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
 
   const sorted = useMemo(() => {
     const arr = [...data] as any[];

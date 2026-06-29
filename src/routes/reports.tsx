@@ -192,13 +192,14 @@ function seedNum(seed: string, min: number, max: number): number {
 }
 
 function ReportsPage() {
+  const { region } = useRegion();
   const [saved, setSaved] = useState<SavedPortfolio[]>([]);
   const [mode, setMode] = useState<"customer" | "family">("customer");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [familyName, setFamilyName] = useState("Family Group");
   const [generated, setGenerated] = useState(false);
 
-  useEffect(() => { setSaved(loadSaved()); }, []);
+  useEffect(() => { setSaved(loadSavedFor(region)); setSelected(new Set()); setGenerated(false); }, [region]);
 
   function toggle(id: string) {
     const next = new Set(selected);

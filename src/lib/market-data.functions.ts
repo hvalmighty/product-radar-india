@@ -198,7 +198,7 @@ const UAE_SECTORS: { yahoo: string; label: string }[] = [
 async function fetchUaeQuotes(): Promise<Quote[]> {
   const all = [...UAE_INDICES.map(x => ({ ...x, group: "india" as Quote["group"] })),
                ...UAE_SECTORS.map(x => ({ ...x, group: "sector" as Quote["group"] }))];
-  const results = await Promise.all(all.map(async x => {
+  const results = await Promise.all(all.map(async (x): Promise<Quote | null> => {
     const q = await fetchYahooQuote(x.yahoo);
     if (!q) return null;
     const change = q.price - q.prev;
@@ -206,7 +206,7 @@ async function fetchUaeQuotes(): Promise<Quote[]> {
       symbol: x.yahoo, name: x.label, price: q.price, change,
       changePct: q.prev ? (change / q.prev) * 100 : 0,
       currency: "AED", group: x.group,
-    } satisfies Quote;
+    };
   }));
   return results.filter((r): r is Quote => r !== null);
 }

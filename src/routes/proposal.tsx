@@ -64,6 +64,7 @@ function irrBasisFor(klass: AssetClassKey, name: string): string {
 }
 
 function ProposalPage() {
+  const { region } = useRegion();
   // Prospect details
   const [prospect, setProspect] = useState({ name: "", age: "", riskProfile: "Moderate", horizonYears: "5", goal: "Wealth Creation" });
   const [totalCorpus, setTotalCorpus] = useState<number>(10000000);
@@ -72,6 +73,8 @@ function ProposalPage() {
   const [activeClass, setActiveClass] = useState<AssetClassKey>("MF");
   const [search, setSearch] = useState("");
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  // Wipe holdings on region switch so we never carry over India product IDs into AE catalog.
+  useEffect(() => { setHoldings([]); }, [region]);
 
   // Catalog by class
   const catalog = useMemo(() => {

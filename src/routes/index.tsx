@@ -131,19 +131,31 @@ function ResearchTerminal() {
   const [bondMaxTenor, setBondMaxTenor] = useState<number>(40);
   const [bondTaxFree, setBondTaxFree] = useState<boolean>(false);
 
+  const currentYear = new Date().getFullYear();
+
   const data = useMemo(() => {
     if (cat === "MF") {
       return mutualFunds.filter(p => {
         if (mfSub !== "All" && p.subCategory !== mfSub) return false;
         if (mfAssetClass !== "All" && p.assetClass !== mfAssetClass) return false;
+        if (mfAmc !== "All" && p.amc !== mfAmc) return false;
         if (p.returns3y < mfMinReturn) return false;
         if (p.expenseRatio > mfMaxExpense) return false;
+        if (p.sharpe < mfMinSharpe) return false;
+        if (p.rating < mfMinRating) return false;
+        if (p.aum < mfMinAum) return false;
+        if (Math.abs(p.maxDrawdown) > mfMaxDrawdown) return false;
+        if ((currentYear - p.inceptionYear) < mfMinAge) return false;
+        if (mfBeatsBench && p.alpha <= 0) return false;
+        if (mfElssOnly && p.lockInYears < 3) return false;
+        if (mfPositive5y && p.returns5y <= 0) return false;
         const riskOrder = ["Low", "Low-Mod", "Moderate", "Mod-High", "High", "Very High"];
         if (riskOrder.indexOf(p.risk) + 1 > mfRiskMax) return false;
-        if (query && !`${p.name} ${p.amc} ${p.subCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+        if (query && !`${p.name} ${p.amc} ${p.subCategory} ${p.fundManager}`.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
       });
     }
+
     if (cat === "FD") {
       return fixedDeposits.filter(p => {
         if (fdIssuer !== "All" && p.subCategory !== fdIssuer) return false;

@@ -181,30 +181,83 @@ async function fetchFx(): Promise<Quote[]> {
   }
 }
 
-export const getMarketQuotes = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const [india, crypto, fx] = await Promise.all([
-      fetchNseIndices(),
-      fetchCrypto(),
-      fetchFx(),
-    ]);
-    return [...india, ...crypto, ...fx];
-  },
-);
+// ============ UAE markets (Yahoo) ============
+const UAE_INDICES: { yahoo: string; label: string }[] = [
+  { yahoo: "^DFMGI", label: "DFM General" },
+  { yahoo: "^ADI",   label: "ADX General" },
+  { yahoo: "BBGI.AD", label: "FTSE ADX 15" },
+];
+const UAE_SECTORS: { yahoo: string; label: string }[] = [
+  { yahoo: "EMAAR.AE", label: "Emaar Properties" },
+  { yahoo: "ENBD.DU",  label: "Emirates NBD" },
+  { yahoo: "FAB.AE",   label: "First Abu Dhabi Bank" },
+  { yahoo: "ADCB.AE",  label: "ADCB" },
+  { yahoo: "DEWA.DU",  label: "DEWA" },
+  { yahoo: "EAND.AE",  label: "e& (Etisalat Group)" },
+];
+async function fetchUaeQuotes(): Promise<Quote[]> {
+  const all = [...UAE_INDICES.map(x => ({ ...x, group: "india" as Quote["group"] })),
+               ...UAE_SECTORS.map(x => ({ ...x, group: "sector" as Quote["group"] }))];
+  const results = await Promise.all(all.map(async x => {
+    const q = await fetchYahooQuote(x.yahoo);
+    if (!q) return null;
+    const change = q.price - q.prev;
+    return {
+      symbol: x.yahoo, name: x.label, price: q.price, change,
+      changePct: q.prev ? (change / q.prev) * 100 : 0,
+      currency: "AED", group: x.group,
+    } satisfies Quote;
+  }));
+  return results.filter((r): r is Quote => r !== null);
+}
 
-// === Yahoo Finance — top-bar benchmark indices (NIFTY 50 + SENSEX) ===
-// NSE's allIndices doesn't include BSE Sensex and is often blocked from edge IPs.
-// Yahoo is reliable from workerd and returns both.
+async function fetchFxAE(): Promise<Quote[]> {
+  try {
+    const today = new Date();
+    const start = new Date(today); start.setDate(start.getDate() - 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const url = `https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(today)}?from=USD&to=AED,EUR,GBP,INR,SAR`;
+    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!r.ok) return [];
+    const j: any = await r.json();
+    const rates: Record<string, Record<string, number>> = j.rates ?? {};
+    const dates = Object.keys(rates).sort();
+    if (!dates.length) return [];
+    const last = rates[dates[dates.length - 1]];
+    const prev = rates[dates[dates.length - 2]] ?? last;
+    const out: Quote[] = [];
+    for (const cc of ["AED", "EUR", "GBP", "INR", "SAR"] as const) {
+      const price = Number(last[cc]); const pr = Number(prev[cc]) || price;
+      if (!price) continue;
+      const change = price - pr;
+      out.push({ symbol: `USD/${cc}`, name: `USD → ${cc}`, price, change, changePct: pr ? (change / pr) * 100 : 0, currency: cc, group: "fx" });
+    }
+    return out;
+  } catch { return []; }
+}
+
+export const getMarketQuotes = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => {
+    const region = (d as any)?.region === "AE" ? "AE" : "IN";
+    return { region: region as "IN" | "AE" };
+  })
+  .handler(async ({ data }) => {
+    if (data.region === "AE") {
+      const [ae, crypto, fx] = await Promise.all([fetchUaeQuotes(), fetchCrypto(), fetchFxAE()]);
+      return [...ae, ...crypto, ...fx];
+    }
+    const [india, crypto, fx] = await Promise.all([fetchNseIndices(), fetchCrypto(), fetchFx()]);
+    return [...india, ...crypto, ...fx];
+  });
+
+// === Yahoo Finance — top-bar benchmark indices ===
 async function fetchYahooQuote(symbol: string): Promise<{ price: number; prev: number } | null> {
   try {
     const r = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
       { headers: { "User-Agent": BROWSER_HEADERS["User-Agent"], Accept: "application/json" } },
     );
-    if (!r.ok) {
-      console.error(`[yahoo ${symbol}] HTTP ${r.status}`);
-      return null;
-    }
+    if (!r.ok) return null;
     const j: any = await r.json();
     const result = j?.chart?.result?.[0];
     if (!result) return null;
@@ -212,10 +265,7 @@ async function fetchYahooQuote(symbol: string): Promise<{ price: number; prev: n
     const prev = Number(result.meta?.chartPreviousClose ?? result.meta?.previousClose);
     if (!Number.isFinite(price) || !Number.isFinite(prev)) return null;
     return { price, prev };
-  } catch (e) {
-    console.error(`[yahoo ${symbol}] threw`, e);
-    return null;
-  }
+  } catch { return null; }
 }
 
 export type TopBarIndex = {
@@ -225,26 +275,22 @@ export type TopBarIndex = {
   changePct: number;
 };
 
-export const getTopBarIndices = createServerFn({ method: "GET" }).handler(
-  async (): Promise<TopBarIndex[]> => {
-    const [nifty, sensex] = await Promise.all([
-      fetchYahooQuote("^NSEI"),
-      fetchYahooQuote("^BSESN"),
-    ]);
-    const out: TopBarIndex[] = [];
-    if (nifty) out.push({
-      symbol: "^NSEI", label: "NIFTY",
-      price: nifty.price,
-      changePct: nifty.prev ? ((nifty.price - nifty.prev) / nifty.prev) * 100 : 0,
-    });
-    if (sensex) out.push({
-      symbol: "^BSESN", label: "SENSEX",
-      price: sensex.price,
-      changePct: sensex.prev ? ((sensex.price - sensex.prev) / sensex.prev) * 100 : 0,
-    });
-    return out;
-  },
-);
+export const getTopBarIndices = createServerFn({ method: "GET" })
+  .inputValidator((d: unknown) => {
+    const region = (d as any)?.region === "AE" ? "AE" : "IN";
+    return { region: region as "IN" | "AE" };
+  })
+  .handler(async ({ data }): Promise<TopBarIndex[]> => {
+    const symbols = data.region === "AE"
+      ? [{ y: "^DFMGI", l: "DFM" }, { y: "^ADI", l: "ADX" }]
+      : [{ y: "^NSEI",  l: "NIFTY" }, { y: "^BSESN", l: "SENSEX" }];
+    const results = await Promise.all(symbols.map(async s => {
+      const q = await fetchYahooQuote(s.y);
+      if (!q) return null;
+      return { symbol: s.y, label: s.l, price: q.price, changePct: q.prev ? ((q.price - q.prev) / q.prev) * 100 : 0 } satisfies TopBarIndex;
+    }));
+    return results.filter((r): r is TopBarIndex => r !== null);
+  });
 
 // ============ NEWS ============
 

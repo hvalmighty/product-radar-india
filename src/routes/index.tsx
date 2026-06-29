@@ -86,6 +86,17 @@ function ResearchTerminal() {
   const [mfMinReturn, setMfMinReturn] = useState<number>(0);
   const [mfMaxExpense, setMfMaxExpense] = useState<number>(2.5);
   const [mfAssetClass, setMfAssetClass] = useState<string>("All");
+  const [mfAmc, setMfAmc] = useState<string>("All");
+  const [mfMinSharpe, setMfMinSharpe] = useState<number>(0);
+  const [mfMinRating, setMfMinRating] = useState<number>(1);
+  const [mfMaxDrawdown, setMfMaxDrawdown] = useState<number>(50); // allow up to -50%
+  const [mfMinAge, setMfMinAge] = useState<number>(0);
+  const [mfMinAum, setMfMinAum] = useState<number>(0); // ₹ Cr
+  const [mfBeatsBench, setMfBeatsBench] = useState<boolean>(false);
+  const [mfElssOnly, setMfElssOnly] = useState<boolean>(false);
+  const [mfPositive5y, setMfPositive5y] = useState<boolean>(false);
+  const [mfPreset, setMfPreset] = useState<string>("");
+
 
   const [fdIssuer, setFdIssuer] = useState<string>("All");
   const [fdMinRate, setFdMinRate] = useState<number>(6);
@@ -120,19 +131,31 @@ function ResearchTerminal() {
   const [bondMaxTenor, setBondMaxTenor] = useState<number>(40);
   const [bondTaxFree, setBondTaxFree] = useState<boolean>(false);
 
+  const currentYear = new Date().getFullYear();
+
   const data = useMemo(() => {
     if (cat === "MF") {
       return mutualFunds.filter(p => {
         if (mfSub !== "All" && p.subCategory !== mfSub) return false;
         if (mfAssetClass !== "All" && p.assetClass !== mfAssetClass) return false;
+        if (mfAmc !== "All" && p.amc !== mfAmc) return false;
         if (p.returns3y < mfMinReturn) return false;
         if (p.expenseRatio > mfMaxExpense) return false;
+        if (p.sharpe < mfMinSharpe) return false;
+        if (p.rating < mfMinRating) return false;
+        if (p.aum < mfMinAum) return false;
+        if (Math.abs(p.maxDrawdown) > mfMaxDrawdown) return false;
+        if ((currentYear - p.inceptionYear) < mfMinAge) return false;
+        if (mfBeatsBench && p.alpha <= 0) return false;
+        if (mfElssOnly && p.lockInYears < 3) return false;
+        if (mfPositive5y && p.returns5y <= 0) return false;
         const riskOrder = ["Low", "Low-Mod", "Moderate", "Mod-High", "High", "Very High"];
         if (riskOrder.indexOf(p.risk) + 1 > mfRiskMax) return false;
-        if (query && !`${p.name} ${p.amc} ${p.subCategory}`.toLowerCase().includes(query.toLowerCase())) return false;
+        if (query && !`${p.name} ${p.amc} ${p.subCategory} ${p.fundManager}`.toLowerCase().includes(query.toLowerCase())) return false;
         return true;
       });
     }
+
     if (cat === "FD") {
       return fixedDeposits.filter(p => {
         if (fdIssuer !== "All" && p.subCategory !== fdIssuer) return false;
@@ -192,7 +215,7 @@ function ResearchTerminal() {
       if (query && !`${p.name} ${p.issuer} ${p.bondType} ${p.rating}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [cat, query, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
+  }, [cat, query, currentYear, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, mfAmc, mfMinSharpe, mfMinRating, mfMinAge, mfMinAum, mfMaxDrawdown, mfBeatsBench, mfElssOnly, mfPositive5y, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
 
   const sorted = useMemo(() => {
     const arr = [...data] as any[];
@@ -358,20 +381,95 @@ function ResearchTerminal() {
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
             </div>
-            <button className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider">Reset</button>
+            <button
+              onClick={() => {
+                if (cat === "MF") {
+                  setMfSub("All"); setMfAssetClass("All"); setMfAmc("All");
+                  setMfRiskMax(6); setMfMinReturn(0); setMfMaxExpense(2.5);
+                  setMfMinSharpe(0); setMfMinRating(1); setMfMaxDrawdown(50);
+                  setMfMinAge(0); setMfMinAum(0);
+                  setMfBeatsBench(false); setMfElssOnly(false); setMfPositive5y(false);
+                  setMfPreset("");
+                } else if (cat === "FD") {
+                  setFdIssuer("All"); setFdTenure("All"); setFdMinRate(6); setFdSenior(false); setFdInsured(false);
+                } else if (cat === "INS") {
+                  setInsSub("All"); setInsMinClaim(94); setInsMinRating(1);
+                } else if (cat === "PMS") {
+                  setPmsStrategy("All"); setPmsStructure("All"); setPmsMinReturn(0); setPmsMaxFee(2.5);
+                } else if (cat === "AIF") {
+                  setAifCategory("All"); setAifStrategy("All"); setAifMinIRR(0); setAifVintageFrom(2018);
+                } else if (cat === "EQ") {
+                  setEqMarketCap("All"); setEqSector("All"); setEqMinCagr(0); setEqMaxPe(90);
+                } else if (cat === "BOND") {
+                  setBondType("All"); setBondRating("All"); setBondMinYtm(6); setBondMaxTenor(40); setBondTaxFree(false);
+                }
+                setQuery("");
+              }}
+              className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider"
+            >
+              Reset
+            </button>
           </div>
 
           <div className="p-4 space-y-5 text-xs">
             {cat === "MF" && (
               <>
+                {/* Quick presets */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">Quick Screens</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      ["top5",  "5★ Only"],
+                      ["lowexp","Low Cost <1%"],
+                      ["alpha", "Beats Bench"],
+                      ["elss",  "ELSS Tax Saver"],
+                      ["growth","High Growth 3Y>20%"],
+                      ["safe",  "Low DD <15%"],
+                      ["large", "Mega AUM >₹25k Cr"],
+                    ] as [string, string][]).map(([k, label]) => (
+                      <button
+                        key={k}
+                        onClick={() => {
+                          // start from a clean slate then apply preset
+                          setMfSub("All"); setMfAssetClass("All"); setMfAmc("All");
+                          setMfRiskMax(6); setMfMinReturn(0); setMfMaxExpense(2.5);
+                          setMfMinSharpe(0); setMfMinRating(1); setMfMaxDrawdown(50);
+                          setMfMinAge(0); setMfMinAum(0);
+                          setMfBeatsBench(false); setMfElssOnly(false); setMfPositive5y(false);
+                          if (k === "top5") setMfMinRating(5);
+                          if (k === "lowexp") setMfMaxExpense(1);
+                          if (k === "alpha") setMfBeatsBench(true);
+                          if (k === "elss") { setMfElssOnly(true); setMfSub("ELSS"); }
+                          if (k === "growth") { setMfMinReturn(20); setMfAssetClass("Equity"); }
+                          if (k === "safe") setMfMaxDrawdown(15);
+                          if (k === "large") setMfMinAum(25000);
+                          setMfPreset(k);
+                        }}
+                        className={`text-[10px] px-2 py-1 rounded-sm border transition-colors ${mfPreset === k ? "border-foreground bg-secondary text-foreground" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <FilterSelect label="Sub-Category" value={mfSub} onChange={setMfSub}
                   options={["All", ...Array.from(new Set(mutualFunds.map(m => m.subCategory)))]} />
                 <FilterSelect label="Asset Class" value={mfAssetClass} onChange={setMfAssetClass}
                   options={["All", "Equity", "Debt", "Hybrid"]} />
+                <FilterSelect label="AMC" value={mfAmc} onChange={setMfAmc}
+                  options={["All", ...Array.from(new Set(mutualFunds.map(m => m.amc))).sort()]} />
                 <FilterRange label="Min 3Y Return" value={mfMinReturn} onChange={setMfMinReturn} min={-5} max={25} step={0.5} suffix="%" />
                 <FilterRange label="Max Expense Ratio" value={mfMaxExpense} onChange={setMfMaxExpense} min={0.1} max={2.5} step={0.05} suffix="%" />
+                <FilterRange label="Min Sharpe" value={mfMinSharpe} onChange={setMfMinSharpe} min={0} max={2} step={0.05} format={v => v.toFixed(2)} />
+                <FilterRange label="Min Rating" value={mfMinRating} onChange={setMfMinRating} min={1} max={5} step={1} format={v => `${v}★ & above`} />
+                <FilterRange label="Max Drawdown" value={mfMaxDrawdown} onChange={setMfMaxDrawdown} min={5} max={50} step={1} format={v => `-${v}% max`} />
+                <FilterRange label="Min Fund Age" value={mfMinAge} onChange={setMfMinAge} min={0} max={20} step={1} format={v => v === 0 ? "Any" : `${v}Y+`} />
+                <FilterRange label="Min AUM (₹ Cr)" value={mfMinAum} onChange={setMfMinAum} min={0} max={50000} step={500} format={v => v === 0 ? "Any" : v.toLocaleString("en-IN")} />
                 <FilterRange label="Risk Ceiling" value={mfRiskMax} onChange={setMfRiskMax} min={1} max={6} step={1}
                   format={v => ["Low", "Low-Mod", "Moderate", "Mod-High", "High", "Very High"][v - 1]} />
+                <FilterToggle label="Beats Benchmark (α>0)" value={mfBeatsBench} onChange={setMfBeatsBench} />
+                <FilterToggle label="Positive 5Y Returns" value={mfPositive5y} onChange={setMfPositive5y} />
+                <FilterToggle label="ELSS / Tax Saver Only" value={mfElssOnly} onChange={setMfElssOnly} />
               </>
             )}
             {cat === "FD" && (
@@ -439,16 +537,24 @@ function ResearchTerminal() {
             )}
 
 
-            <div className="pt-4 border-t border-border space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>
-              {["Top 3Y Equity > 15%", "AAA NBFC FD > 8%", "5★ Term ≤ ₹15K"].map(s => (
-                <button key={s} className="w-full text-left px-2 py-1.5 rounded-sm hover:bg-secondary text-[11px] flex items-center gap-2 group">
-                  <BookmarkPlus className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />{s}
-                </button>
-              ))}
-            </div>
+            {cat === "MF" && (
+              <SavedScreens
+                cat="MF"
+                snapshot={() => ({ mfSub, mfAssetClass, mfAmc, mfRiskMax, mfMinReturn, mfMaxExpense, mfMinSharpe, mfMinRating, mfMaxDrawdown, mfMinAge, mfMinAum, mfBeatsBench, mfElssOnly, mfPositive5y })}
+                apply={(s: any) => {
+                  setMfSub(s.mfSub ?? "All"); setMfAssetClass(s.mfAssetClass ?? "All"); setMfAmc(s.mfAmc ?? "All");
+                  setMfRiskMax(s.mfRiskMax ?? 6); setMfMinReturn(s.mfMinReturn ?? 0); setMfMaxExpense(s.mfMaxExpense ?? 2.5);
+                  setMfMinSharpe(s.mfMinSharpe ?? 0); setMfMinRating(s.mfMinRating ?? 1); setMfMaxDrawdown(s.mfMaxDrawdown ?? 50);
+                  setMfMinAge(s.mfMinAge ?? 0); setMfMinAum(s.mfMinAum ?? 0);
+                  setMfBeatsBench(!!s.mfBeatsBench); setMfElssOnly(!!s.mfElssOnly); setMfPositive5y(!!s.mfPositive5y);
+                  setMfPreset("");
+                }}
+              />
+            )}
           </div>
         </aside>
+
+
 
         {/* Main */}
         <main className="flex-1 min-w-0">
@@ -521,15 +627,20 @@ function ResearchTerminal() {
                         <>
                           <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                         </>
@@ -704,32 +815,42 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
 }
 
 function MFRow({ p, idx }: { p: MutualFund; idx: number }) {
+  const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
       <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark}</div>
+        <div className="font-medium text-[12.5px] flex items-center gap-1.5">
+          {p.name}
+          {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+        </div>
+        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
       </td>
       <td className="px-3 py-2.5">
         <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
           <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
         </span>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass}</div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
       </td>
+      <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>
+      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
       <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>
       <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
       <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
+      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
+      <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>
       <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
       <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
     </>
   );
 }
+
 
 function FDRow({ p }: { p: FixedDeposit }) {
   return (
@@ -943,6 +1064,57 @@ function FilterToggle({ label, value, onChange }: { label: string; value: boolea
     </button>
   );
 }
+
+function SavedScreens({ cat, snapshot, apply }: { cat: string; snapshot: () => any; apply: (s: any) => void }) {
+  const storageKey = `vantage.savedScreens.${cat}`;
+  const [list, setList] = useState<Array<{ name: string; state: any }>>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(window.localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+  });
+  const persist = (next: Array<{ name: string; state: any }>) => {
+    setList(next);
+    try { window.localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+  };
+  return (
+    <div className="pt-4 border-t border-border space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>
+        <button
+          onClick={() => {
+            const name = window.prompt("Name this screen");
+            if (!name) return;
+            persist([...list.filter(s => s.name !== name), { name, state: snapshot() }]);
+          }}
+          className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider flex items-center gap-1"
+        >
+          <BookmarkPlus className="w-3 h-3" /> Save
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <div className="text-[10px] text-muted-foreground italic">No saved screens yet. Configure filters then click Save.</div>
+      ) : (
+        list.map((s) => (
+          <div key={s.name} className="flex items-center gap-1 group">
+            <button
+              onClick={() => apply(s.state)}
+              className="flex-1 text-left px-2 py-1.5 rounded-sm hover:bg-secondary text-[11px] flex items-center gap-2"
+            >
+              <BookmarkPlus className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />{s.name}
+            </button>
+            <button
+              onClick={() => persist(list.filter(x => x.name !== s.name))}
+              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1"
+              aria-label={`Delete ${s.name}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 
 function ToolbarSelect({ icon, label, value, onChange, options }: { icon: React.ReactNode; label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (

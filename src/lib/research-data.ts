@@ -15,14 +15,23 @@ export interface MutualFund {
   returns1y: number;
   returns3y: number;
   returns5y: number;
+  ytdReturn: number;
   sharpe: number;
+  sortino: number;
   alpha: number;
   beta: number;
+  maxDrawdown: number; // negative %, e.g. -22.5
   risk: RiskLevel;
   rating: number; // 1-5
   minInvestment: number;
+  sipMin: number;
   exitLoad: string;
+  exitLoadDays: number;
+  lockInYears: number;
+  taxation: "Equity" | "Debt" | "Hybrid";
   benchmark: string;
+  fundManager: string;
+  inceptionYear: number;
 }
 
 export interface FixedDeposit {
@@ -140,8 +149,11 @@ export const mutualFunds: MutualFund[] = Array.from({ length: 38 }, (_, i) => {
   const sub = pick(MF_SUB);
   const isDebt = ["Liquid", "Corporate Bond", "Gilt"].includes(sub);
   const isHybrid = sub.startsWith("Hybrid");
+  const isElss = sub === "ELSS";
   const assetClass: MutualFund["assetClass"] = isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity";
   const amc = pick(AMCS);
+  const r3 = r(isDebt ? 5 : 6, isDebt ? 8.5 : 28);
+  const sharpe = r(0.2, 1.9);
   return {
     category: "MF",
     id: `MF-${1000 + i}`,
@@ -153,16 +165,25 @@ export const mutualFunds: MutualFund[] = Array.from({ length: 38 }, (_, i) => {
     aum: Math.round(r(200, 65000, 0)),
     expenseRatio: r(0.15, 2.25),
     returns1y: r(isDebt ? 5 : -8, isDebt ? 9 : 42),
-    returns3y: r(isDebt ? 5 : 6, isDebt ? 8.5 : 28),
+    returns3y: r3,
     returns5y: r(isDebt ? 5.5 : 8, isDebt ? 8 : 22),
-    sharpe: r(0.2, 1.9),
+    ytdReturn: r(isDebt ? 2 : -6, isDebt ? 6 : 22),
+    sharpe,
+    sortino: +(sharpe * r(1.1, 1.6)).toFixed(2),
     alpha: r(-3, 7),
     beta: isDebt ? r(0.05, 0.4) : r(0.7, 1.25),
+    maxDrawdown: isDebt ? r(-4, -0.5) : isHybrid ? r(-18, -6) : r(-45, -12),
     risk: isDebt ? "Low-Mod" : isHybrid ? "Moderate" : pick(["Mod-High", "High", "Very High"] as RiskLevel[]),
     rating: Math.round(r(2, 5, 0)),
     minInvestment: pick([100, 500, 1000, 5000]),
-    exitLoad: isDebt ? "Nil" : "1% if <1Y",
+    sipMin: pick([100, 250, 500, 1000]),
+    exitLoad: isElss ? "Nil (3Y lock-in)" : isDebt ? "Nil" : "1% if <1Y",
+    exitLoadDays: isElss ? 0 : isDebt ? 0 : 365,
+    lockInYears: isElss ? 3 : 0,
+    taxation: isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity",
     benchmark: isDebt ? "CRISIL Composite Bond" : pick(BENCH),
+    fundManager: pick(["R. Naren", "P. Khemka", "S. Trivedi", "N. Subramaniam", "A. Mukherjea", "H. Bhatt", "C. Bhansali", "V. Kuppa", "M. Modi", "K. Mohanty", "S. Sapre", "S. Banerjee"]),
+    inceptionYear: Math.round(r(1998, 2022, 0)),
   };
 });
 

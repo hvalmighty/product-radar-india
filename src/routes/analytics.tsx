@@ -12,7 +12,7 @@ import {
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   Treemap,
 } from "recharts";
-import { REGION_META, getCurrentRegion } from "@/lib/region";
+import { REGION_META, getCurrentRegion, useRegion as useRegionReactive } from "@/lib/region";
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
@@ -287,6 +287,8 @@ const clientPortfolios: ClientPortfolio[] = [
 // Page
 // ============================================================
 function AnalyticsPage() {
+  // Subscribe to region changes so the formatter helpers re-render with the right currency/unit.
+  useRegionReactive();
   const [tab, setTab] = useState<"business" | "portfolio">("business");
 
   return (

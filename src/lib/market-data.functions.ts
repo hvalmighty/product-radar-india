@@ -350,41 +350,31 @@ function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
   return items;
 }
 
-const FEEDS: Record<string, { url: string; source: string }[]> = {
-  markets: [
-    {
-      url: "https://news.google.com/rss/search?q=indian+stock+market+nifty+sensex+when:1d&hl=en-IN&gl=IN&ceid=IN:en",
-      source: "Google News",
-    },
-  ],
-  india: [
-    {
-      url: "https://news.google.com/rss/search?q=india+economy+business+rbi+when:1d&hl=en-IN&gl=IN&ceid=IN:en",
-      source: "Google News",
-    },
-  ],
-  macro: [
-    {
-      url: "https://news.google.com/rss/search?q=federal+reserve+inflation+interest+rates+bond+yields+when:1d&hl=en-US&gl=US&ceid=US:en",
-      source: "Google News",
-    },
-  ],
-  global: [
-    {
-      url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en",
-      source: "Google News",
-    },
-  ],
+type FeedCat = "markets" | "india" | "macro" | "global";
+const FEEDS_BY_REGION: Record<"IN" | "AE", Record<FeedCat, { url: string; source: string }[]>> = {
+  IN: {
+    markets: [{ url: "https://news.google.com/rss/search?q=indian+stock+market+nifty+sensex+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
+    india:   [{ url: "https://news.google.com/rss/search?q=india+economy+business+rbi+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
+    macro:   [{ url: "https://news.google.com/rss/search?q=federal+reserve+inflation+interest+rates+bond+yields+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+    global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+  },
+  AE: {
+    markets: [{ url: "https://news.google.com/rss/search?q=DFM+ADX+UAE+stock+market+when:1d&hl=en-AE&gl=AE&ceid=AE:en", source: "Google News" }],
+    india:   [{ url: "https://news.google.com/rss/search?q=UAE+economy+business+central+bank+when:1d&hl=en-AE&gl=AE&ceid=AE:en", source: "Google News" }],
+    macro:   [{ url: "https://news.google.com/rss/search?q=oil+prices+OPEC+GCC+sukuk+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+    global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+  },
 };
 
 export const getNews = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
     const cat = (d as any)?.category as string;
-    if (!(cat in FEEDS)) throw new Error("invalid category");
-    return { category: cat as keyof typeof FEEDS };
+    const region = (d as any)?.region === "AE" ? "AE" : "IN";
+    if (!["markets", "india", "macro", "global"].includes(cat)) throw new Error("invalid category");
+    return { category: cat as FeedCat, region: region as "IN" | "AE" };
   })
   .handler(async ({ data }) => {
-    const feeds = FEEDS[data.category];
+    const feeds = FEEDS_BY_REGION[data.region][data.category];
     const all: NewsItem[] = [];
     await Promise.all(
       feeds.map(async (f) => {
@@ -393,9 +383,7 @@ export const getNews = createServerFn({ method: "GET" })
           if (!r.ok) return;
           const xml = await r.text();
           all.push(...parseRss(xml, f.source));
-        } catch {
-          /* ignore */
-        }
+        } catch { /* ignore */ }
       }),
     );
     const seen = new Set<string>();
@@ -406,9 +394,6 @@ export const getNews = createServerFn({ method: "GET" })
       seen.add(k);
       out.push(it);
     }
-    out.sort(
-      (a, b) =>
-        new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime(),
-    );
+    out.sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());
     return out.slice(0, 30);
   });

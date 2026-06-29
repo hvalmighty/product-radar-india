@@ -11,8 +11,9 @@ import {
   Tooltip, CartesianGrid, Legend, LineChart, Line, AreaChart, Area,
 } from "recharts";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
-import { SAMPLE_FAMILIES, SAMPLE_PORTFOLIOS, seedSamplePortfolios, removeSamplePortfolios, STORAGE_KEY, type SavedPortfolio } from "@/lib/sample-portfolios";
+import { SAMPLE_FAMILIES, SAMPLE_PORTFOLIOS, seedSamplePortfolios, removeSamplePortfolios, storageKeyForRegion, type SavedPortfolio } from "@/lib/sample-portfolios";
 import { Sparkles, Trash } from "lucide-react";
+import { useRegion, fmtMoney } from "@/lib/region";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -24,18 +25,12 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-function loadSaved(): SavedPortfolio[] {
+function loadSavedFor(region: "IN" | "AE"): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]"); } catch { return []; }
 }
 
-function fmtINR(n: number) {
-  if (!n) return "₹0";
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n.toFixed(0)}`;
-}
+const fmtINR = fmtMoney;
 function pct(n: number, digits = 1) { return `${n.toFixed(digits)}%`; }
 function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; }
 

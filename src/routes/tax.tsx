@@ -6,9 +6,10 @@ import {
   SAMPLE_FAMILIES,
   SAMPLE_PORTFOLIOS,
   seedSamplePortfolios,
-  STORAGE_KEY,
+  storageKeyForRegion,
   type SavedPortfolio,
 } from "@/lib/sample-portfolios";
+import { useRegion, fmtMoney, fmtMoneyFull } from "@/lib/region";
 
 export const Route = createFileRoute("/tax")({
   head: () => ({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/tax")({
       {
         name: "description",
         content:
-          "View per-transaction short-term and long-term capital gains tax liability for client and family portfolios under Indian Income Tax rules (FY 2025-26).",
+          "Per-transaction capital-gains tax for client and family portfolios — India FY 2025-26 engine; UAE region shows 0% personal-tax notice.",
       },
     ],
   }),
@@ -25,27 +26,17 @@ export const Route = createFileRoute("/tax")({
 });
 
 // ---------------- Helpers ----------------
-function loadSaved(): SavedPortfolio[] {
+function loadSaved(region: "IN" | "AE"): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]");
   } catch {
     return [];
   }
 }
 
-function fmtINR(n: number) {
-  if (!isFinite(n)) return "₹0";
-  const a = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
-  if (a >= 1e7) return `${sign}₹${(a / 1e7).toFixed(2)} Cr`;
-  if (a >= 1e5) return `${sign}₹${(a / 1e5).toFixed(2)} L`;
-  if (a >= 1000) return `${sign}₹${(a / 1000).toFixed(1)}K`;
-  return `${sign}₹${a.toFixed(0)}`;
-}
-function fmtINRFull(n: number) {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
-}
+const fmtINR = fmtMoney;
+const fmtINRFull = fmtMoneyFull;
 
 function seedNum(seed: string, min: number, max: number): number {
   let h = 2166136261;
@@ -619,6 +610,7 @@ function optimise(originalTxns: Txn[], regime: TaxRegime): { steps: OptStep[]; o
 
 // ---------------- Component ----------------
 function TaxPage() {
+  const { region } = useRegion();
   const [saved, setSaved] = useState<SavedPortfolio[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [slabRate, setSlabRate] = useState<number>(30);
@@ -630,11 +622,47 @@ function TaxPage() {
   useEffect(() => { setShowOpt(false); }, [activeId, slabRate, surcharge]);
 
   useEffect(() => {
-    let s = loadSaved();
+    let s = loadSaved(region);
     if (!s.length) s = seedSamplePortfolios();
     setSaved(s);
-    if (!activeId && s.length) setActiveId(s[0].id);
-  }, []);
+    setActiveId(s.length ? s[0].id : null);
+  }, [region]);
+
+  // UAE: personal income tax does not apply (CT only kicks in for businesses).
+  if (region === "AE") {
+    return (
+      <div className="min-h-screen text-foreground">
+        <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
+          <div className="pl-12 pr-6 py-3 flex items-center gap-4">
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">Tax Liability</h1>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">UAE Residency</p>
+            </div>
+          </div>
+        </header>
+        <main className="px-6 py-12 max-w-3xl mx-auto">
+          <div className="border border-border rounded-lg bg-surface/60 p-8">
+            <div className="flex items-center gap-2 text-positive font-semibold mb-3">
+              <CheckCircle2 className="w-5 h-5" /> No personal income tax in the UAE
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              UAE residents are not subject to personal income tax on salary, dividends, capital gains or interest income.
+              Corporate Tax of 9% applies only to businesses with annual taxable profit above AED 375,000 (Federal Decree-Law No. 47 of 2022),
+              and a separate 15% Domestic Minimum Top-up Tax applies to qualifying multinationals from 1-Jan-2025.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              For an Indian-resident client's capital-gains liability, switch the region toggle (top-right) back to
+              <strong className="text-foreground"> India</strong>.
+            </p>
+            <div className="mt-6 text-[11px] text-muted-foreground border-t border-border pt-4">
+              Sources: UAE Federal Tax Authority (FTA), Federal Decree-Law No. 47/2022 on the Taxation of Corporations and Businesses.
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
 
   const regime: TaxRegime = { slabRate, surcharge, cessRate: 4 };
   const active = useMemo(() => saved.find((s) => s.id === activeId) || null, [saved, activeId]);

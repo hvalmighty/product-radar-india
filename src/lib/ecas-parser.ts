@@ -22,13 +22,13 @@ export interface Holding {
   quantity: number;
   price: number;
   value: number;
-  source: "NSDL" | "CDSL";
+  source: "NSDL" | "CDSL" | "DFM" | "ADX" | "DFM/ADX Custodian";
   /** Optional fine-grained product category (PMS / AIF / REIT / InvIT / Private Equity / Real Estate / Mutual Fund - Equity etc.). When present, reports use this for asset-class bucketing instead of `type`. */
   productCategory?: string;
 }
 
 export interface PortfolioParseResult {
-  source: "NSDL" | "CDSL" | "Unknown";
+  source: "NSDL" | "CDSL" | "DFM" | "ADX" | "DFM/ADX Custodian" | "Unknown";
   asOf?: string;
   investor?: string;
   pan?: string;

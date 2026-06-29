@@ -145,7 +145,7 @@ const rand = seeded(42);
 const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)];
 const r = (min: number, max: number, dp = 2) => +(min + rand() * (max - min)).toFixed(dp);
 
-export const mutualFunds: MutualFund[] = Array.from({ length: 38 }, (_, i) => {
+const mutualFundsIN: MutualFund[] = Array.from({ length: 38 }, (_, i) => {
   const sub = pick(MF_SUB);
   const isDebt = ["Liquid", "Corporate Bond", "Gilt"].includes(sub);
   const isHybrid = sub.startsWith("Hybrid");
@@ -196,7 +196,7 @@ const FD_ENTRIES: { issuer: string; sub: FixedDeposit["subCategory"]; rating: st
 
 const TENURES = [3, 6, 12, 18, 24, 36, 60, 84, 120];
 
-export const fixedDeposits: FixedDeposit[] = FD_ENTRIES.flatMap((e, i) =>
+const fixedDepositsIN: FixedDeposit[] = FD_ENTRIES.flatMap((e, i) =>
   TENURES.slice(0, 4 + (i % 3)).map((t, j) => {
     const base = e.sub === "Small Finance" ? 7.5 : e.sub === "NBFC" ? 7.8 : e.sub === "Private Bank" ? 7 : 6.5;
     const rate = +(base + (t > 12 ? 0.3 : 0) + rand() * 0.9).toFixed(2);
@@ -220,7 +220,7 @@ export const fixedDeposits: FixedDeposit[] = FD_ENTRIES.flatMap((e, i) =>
   })
 );
 
-export const insurance: Insurance[] = Array.from({ length: 32 }, (_, i) => {
+const insuranceIN: Insurance[] = Array.from({ length: 32 }, (_, i) => {
   const sub = INS_SUB[i % INS_SUB.length];
   const insurer = pick(INSURERS);
   const isTerm = sub === "Term";
@@ -260,7 +260,7 @@ const PMS_STRATEGIES: PMS["strategy"][] = [
 const PMS_STRUCT: PMS["structure"][] = ["Discretionary", "Discretionary", "Discretionary", "Non-Discretionary", "Advisory"];
 const PMS_BENCH = ["NIFTY 50 TRI", "NIFTY 500 TRI", "BSE 500 TRI", "NIFTY Midcap 150 TRI", "NIFTY Smallcap 250 TRI", "NIFTY Bank TRI"];
 
-export const pmsSchemes: PMS[] = Array.from({ length: 28 }, (_, i) => {
+const pmsSchemesIN: PMS[] = Array.from({ length: 28 }, (_, i) => {
   const manager = pick(PMS_HOUSES);
   const strategy = PMS_STRATEGIES[i % PMS_STRATEGIES.length];
   const isDebt = strategy === "Debt";
@@ -301,7 +301,7 @@ const AIF_CAT1: AIF["subStrategy"][] = ["Venture Capital", "SME Fund", "Social V
 const AIF_CAT2: AIF["subStrategy"][] = ["Private Equity", "Real Estate", "Private Credit / Debt", "Distressed / Special Sit."];
 const AIF_CAT3: AIF["subStrategy"][] = ["Long-Short Hedge", "Long-Only Equity"];
 
-export const aifSchemes: AIF[] = Array.from({ length: 30 }, (_, i) => {
+const aifSchemesIN: AIF[] = Array.from({ length: 30 }, (_, i) => {
   const manager = pick(AIF_HOUSES);
   const catRoll = i % 3;
   const sebiCategory: AIF["sebiCategory"] = catRoll === 0 ? "Category I" : catRoll === 1 ? "Category II" : "Category III";
@@ -336,7 +336,7 @@ export const aifSchemes: AIF[] = Array.from({ length: 30 }, (_, i) => {
   };
 });
 
-export const allProducts: Product[] = [...mutualFunds, ...fixedDeposits, ...insurance, ...pmsSchemes, ...aifSchemes];
+// allProducts exported below as a region-aware proxy.
 
 // ====================== EQUITY STOCKS ======================
 
@@ -498,7 +498,7 @@ const STOCKS_SEED: { ticker: string; name: string; sector: string; cap: EquitySt
 ];
 
 
-export const equityStocks: EquityStock[] = STOCKS_SEED.map((s, i) => {
+const equityStocksIN: EquityStock[] = STOCKS_SEED.map((s, i) => {
   const isLarge = s.cap === "Large Cap";
   const cagr3 = r(isLarge ? 8 : 5, isLarge ? 26 : 42);
   const dy = r(0.1, isLarge ? 2.4 : 1.2);
@@ -607,7 +607,7 @@ const BOND_SEED: { issuer: string; type: Bond["bondType"]; rating: string; coupo
   { issuer: "NABARD", type: "Zero Coupon", rating: "AAA", coupon: 0, tenor: 7, taxable: true },
 ];
 
-export const bonds: Bond[] = BOND_SEED.map((b, i) => ({
+const bondsIN: Bond[] = BOND_SEED.map((b, i) => ({
   category: "BOND",
   id: `BD-${7000 + i}`,
   name: `${b.issuer} ${b.coupon}% ${b.tenor}Y`,
@@ -623,3 +623,439 @@ export const bonds: Bond[] = BOND_SEED.map((b, i) => ({
   taxable: b.taxable,
   risk: b.rating === "Sovereign" ? "Low" : b.type === "Perpetual / AT1" ? "Mod-High" : b.rating === "AAA" ? "Low-Mod" : b.rating === "AA+" || b.rating === "AA" ? "Moderate" : "Mod-High",
 }));
+
+// =====================================================================
+// ======================== UAE DATASET ================================
+// =====================================================================
+// UAE/GCC-flavored mock data. Same shapes as India; AED-denominated where
+// monetary; subCategory/risk/rating semantics preserved so screener UI works.
+
+import { getCurrentRegion, type Region } from "./region";
+
+const randAE = seeded(8137);
+const pickAE = <T,>(arr: T[]) => arr[Math.floor(randAE() * arr.length)];
+const rAE = (min: number, max: number, dp = 2) => +(min + randAE() * (max - min)).toFixed(dp);
+
+const AMCS_AE = [
+  "Emirates NBD AM", "ADCB Asset Mgmt", "Mashreq Capital", "FAB Asset Mgmt", "ADIB Capital",
+  "Daman Investments", "Lunate", "Chimera Capital", "Shuaa Capital", "Rasmala Invest Bank",
+  "NBK Capital", "EFG Hermes", "ADQ Asset Mgmt",
+];
+const MF_SUB_AE = [
+  "GCC Equity", "UAE Equity", "MENA Equity", "Global Equity", "Sharia Equity",
+  "Sukuk", "MENA Bond", "Money Market", "Real Estate", "Multi-Asset", "Global Index",
+];
+const BENCH_AE = [
+  "DFM General Index", "ADX General Index", "FTSE ADX 15", "S&P UAE BMI",
+  "MSCI GCC", "MSCI Emerging Markets", "Bloomberg GCC Sukuk", "Bloomberg EM Aggregate",
+];
+const FUND_MGRS_AE = [
+  "K. Al Mansoori", "H. Al Suwaidi", "F. Khan", "R. Al Marri", "A. Al Awadhi",
+  "S. Sharma", "N. Al Hashemi", "Y. Khoury", "T. Al Mazrouei", "M. Al Falasi",
+];
+
+const mutualFundsAE: MutualFund[] = Array.from({ length: 34 }, (_, i) => {
+  const sub = pickAE(MF_SUB_AE);
+  const isDebt = ["Sukuk", "MENA Bond", "Money Market"].includes(sub);
+  const isHybrid = sub === "Multi-Asset";
+  const assetClass: MutualFund["assetClass"] = isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity";
+  const amc = pickAE(AMCS_AE);
+  const r3 = rAE(isDebt ? 3.5 : 4, isDebt ? 6.5 : 22);
+  const sharpe = rAE(0.2, 1.7);
+  return {
+    category: "MF",
+    id: `MF-AE-${1000 + i}`,
+    name: `${amc} ${sub} Fund`,
+    amc,
+    subCategory: sub,
+    assetClass,
+    nav: rAE(8, 220),
+    aum: Math.round(rAE(20, 3500, 0)),       // AED Million
+    expenseRatio: rAE(0.35, 2.1),
+    returns1y: rAE(isDebt ? 3 : -6, isDebt ? 7 : 32),
+    returns3y: r3,
+    returns5y: rAE(isDebt ? 3.5 : 5, isDebt ? 6 : 18),
+    ytdReturn: rAE(isDebt ? 1.5 : -4, isDebt ? 5 : 18),
+    sharpe,
+    sortino: +(sharpe * rAE(1.1, 1.6)).toFixed(2),
+    alpha: rAE(-2, 6),
+    beta: isDebt ? rAE(0.05, 0.4) : rAE(0.6, 1.2),
+    maxDrawdown: isDebt ? rAE(-4, -0.5) : isHybrid ? rAE(-16, -5) : rAE(-38, -10),
+    risk: isDebt ? "Low-Mod" : isHybrid ? "Moderate" : pickAE(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rAE(2, 5, 0)),
+    minInvestment: pickAE([1000, 5000, 10000, 25000]),
+    sipMin: pickAE([500, 1000, 2500, 5000]),
+    exitLoad: isDebt ? "Nil" : "1% if <1Y",
+    exitLoadDays: isDebt ? 0 : 365,
+    lockInYears: 0,
+    taxation: isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity",
+    benchmark: isDebt ? "Bloomberg GCC Sukuk" : pickAE(BENCH_AE),
+    fundManager: pickAE(FUND_MGRS_AE),
+    inceptionYear: Math.round(rAE(2005, 2022, 0)),
+  };
+});
+
+const BANKS_AE_PUB = ["Emirates NBD", "First Abu Dhabi Bank (FAB)", "ADCB", "Dubai Islamic Bank"];
+const BANKS_AE_PVT = ["Mashreq Bank", "ADIB", "Commercial Bank of Dubai", "RAKBANK", "Sharjah Islamic Bank", "HSBC UAE", "Standard Chartered UAE"];
+const NBFC_AE      = ["Amlak Finance", "Tamweel", "Aafaq Islamic Finance", "Dunia Finance"];
+
+const FD_ENTRIES_AE: { issuer: string; sub: FixedDeposit["subCategory"]; rating: string }[] = [
+  ...BANKS_AE_PUB.map(b => ({ issuer: b, sub: "Public Bank" as const, rating: "AA-" })),
+  ...BANKS_AE_PVT.map(b => ({ issuer: b, sub: "Private Bank" as const, rating: pickAE(["A+", "AA-", "A"]) })),
+  ...NBFC_AE.map(b => ({ issuer: b, sub: "NBFC" as const, rating: pickAE(["BBB+", "BBB"]) })),
+];
+
+const fixedDepositsAE: FixedDeposit[] = FD_ENTRIES_AE.flatMap((e, i) =>
+  TENURES.slice(0, 4 + (i % 3)).map((t, j) => {
+    const base = e.sub === "NBFC" ? 5.0 : e.sub === "Private Bank" ? 4.4 : 4.1;
+    const rate = +(base + (t > 12 ? 0.25 : 0) + randAE() * 0.8).toFixed(2);
+    return {
+      category: "FD",
+      id: `FD-AE-${2000 + i * 10 + j}`,
+      name: `${e.issuer} ${t}M AED Wakala`,
+      issuer: e.issuer,
+      subCategory: e.sub,
+      tenureMonths: t,
+      interestRate: rate,
+      seniorRate: +(rate + 0.25).toFixed(2),
+      compounding: pickAE(["Quarterly", "Monthly", "At Maturity"] as FixedDeposit["compounding"][]),
+      minInvestment: pickAE([10000, 25000, 50000, 100000]),
+      maxInvestment: null,
+      premature: randAE() > 0.2,
+      rating: e.rating,
+      insuredDICGC: false, // No DICGC equivalent — UAE has DGS but caps differ
+      payout: pickAE(["Cumulative", "Non-Cumulative"] as const),
+    };
+  })
+);
+
+const INSURERS_AE = [
+  "Sukoon Insurance", "Orient Insurance", "Salama Islamic Arab", "Daman Health",
+  "Oman Insurance Co", "Watania Takaful", "Dubai Insurance", "AXA Gulf",
+  "MetLife Gulf", "Abu Dhabi National Takaful", "Emirates Insurance", "Noor Takaful",
+];
+
+const insuranceAE: Insurance[] = Array.from({ length: 28 }, (_, i) => {
+  const sub = INS_SUB[i % INS_SUB.length];
+  const insurer = pickAE(INSURERS_AE);
+  const isTerm = sub === "Term";
+  const isHealth = sub === "Health";
+  // AED face values
+  const sa = isTerm ? pickAE([500000, 1000000, 2500000, 5000000]) : isHealth ? pickAE([100000, 250000, 500000, 1000000]) : pickAE([250000, 500000, 1000000]);
+  const premium = isTerm ? Math.round(sa * rAE(0.0010, 0.0022)) : isHealth ? Math.round(sa * rAE(0.025, 0.06)) : Math.round(sa * rAE(0.05, 0.12));
+  return {
+    category: "INS",
+    id: `IN-AE-${3000 + i}`,
+    name: `${insurer} ${sub} ${isTerm ? "Shield" : isHealth ? "Care" : "Plan"}`,
+    insurer,
+    subCategory: sub,
+    sumAssured: sa,
+    premiumAnnual: premium,
+    policyTermYears: isTerm ? pickAE([20, 25, 30]) : sub === "Annuity" ? pickAE([10, 15, 20]) : pickAE([10, 15, 20]),
+    ppt: isTerm ? pickAE([10, 15, 20]) : pickAE([5, 7, 10]),
+    claimSettlement: rAE(92, 99),
+    solvencyRatio: rAE(1.5, 2.6),
+    irr: ["Endowment", "ULIP", "Annuity", "Child"].includes(sub) ? rAE(3.5, 7.0) : undefined,
+    taxBenefit: "Tax-free (UAE 0% personal income tax)",
+    riders: pickAE([["Critical Illness"], ["Accidental Death"], ["Critical Illness", "Waiver of Premium"], ["Accidental Death", "Critical Illness"]]),
+    rating: Math.round(rAE(3, 5, 0)),
+  };
+});
+
+const PMS_HOUSES_AE = [
+  "Lunate", "Chimera Investments", "ADQ Asset Mgmt", "Mubadala Capital",
+  "Shuaa Capital", "Daman Investments", "Rasmala IB", "Mashreq Capital",
+  "FAB Capital Markets", "Emirates NBD AM", "NBK Capital", "EFG Hermes",
+];
+const PMS_STRATEGIES_AE: PMS["strategy"][] = [
+  "Multi Cap", "Large Cap", "Mid & Small Cap", "Thematic",
+  "Sector - Banking & Financials", "Contra / Value", "Debt", "Hybrid",
+];
+const PMS_BENCH_AE = ["DFM General Index", "ADX General Index", "FTSE ADX 15", "S&P UAE BMI", "MSCI GCC"];
+
+const pmsSchemesAE: PMS[] = Array.from({ length: 22 }, (_, i) => {
+  const manager = pickAE(PMS_HOUSES_AE);
+  const strategy = PMS_STRATEGIES_AE[i % PMS_STRATEGIES_AE.length];
+  const isDebt = strategy === "Debt";
+  return {
+    category: "PMS",
+    id: `PMS-AE-${4000 + i}`,
+    name: `${manager} ${strategy} Mandate`,
+    manager,
+    structure: pickAE(["Discretionary", "Discretionary", "Non-Discretionary", "Advisory"] as PMS["structure"][]),
+    strategy,
+    benchmark: isDebt ? "Bloomberg GCC Sukuk" : pickAE(PMS_BENCH_AE),
+    aum: Math.round(rAE(50, 4500, 0)),          // AED Million
+    minInvestment: 500000,                      // AED 500K typical DIFC minimum
+    returns1y: rAE(isDebt ? 4 : -4, isDebt ? 8 : 36),
+    returns3y: rAE(isDebt ? 4 : 6, isDebt ? 7 : 24),
+    returns5y: rAE(isDebt ? 4.5 : 8, isDebt ? 7 : 20),
+    alpha: rAE(-2, 7),
+    sharpe: rAE(0.4, 1.9),
+    beta: isDebt ? rAE(0.1, 0.5) : rAE(0.7, 1.3),
+    maxDrawdown: rAE(isDebt ? -6 : -30, isDebt ? -2 : -10),
+    fixedFee: rAE(0.5, 2.0),
+    performanceFee: pickAE(["20% over 8% hurdle", "15% over 6% hurdle", "20% over 10% hurdle", "Nil", "15% over benchmark"]),
+    exitLoad: pickAE(["1% if <1Y", "2% Y1, 1% Y2", "Nil after 1Y"]),
+    inception: `${2012 + Math.floor(randAE() * 12)}-0${1 + Math.floor(randAE() * 9)}`,
+    risk: isDebt ? "Moderate" : pickAE(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rAE(3, 5, 0)),
+  };
+});
+
+const AIF_HOUSES_AE = [
+  "Mubadala Capital", "ADQ Investments", "Investcorp", "Lunate", "Chimera Investments",
+  "Gulf Capital", "Abraaj-Successor Fund Mgmt", "Multiply Group", "Waha Capital", "NBK Capital Partners",
+  "BECO Capital", "Wamda Capital", "Shorooq Partners", "Arzan VC",
+];
+
+const aifSchemesAE: AIF[] = Array.from({ length: 26 }, (_, i) => {
+  const manager = pickAE(AIF_HOUSES_AE);
+  const catRoll = i % 3;
+  const sebiCategory: AIF["sebiCategory"] = catRoll === 0 ? "Category I" : catRoll === 1 ? "Category II" : "Category III";
+  const pool: AIF["subStrategy"][] = sebiCategory === "Category I"
+    ? ["Venture Capital", "SME Fund", "Social Venture", "Infrastructure"]
+    : sebiCategory === "Category II"
+      ? ["Private Equity", "Real Estate", "Private Credit / Debt", "Distressed / Special Sit."]
+      : ["Long-Short Hedge", "Long-Only Equity"];
+  const subStrategy = pickAE(pool);
+  const isDebt = subStrategy === "Private Credit / Debt";
+  const isHedge = subStrategy === "Long-Short Hedge";
+  const corpus = Math.round(rAE(50, 2500, 0)); // AED Million
+  return {
+    category: "AIF",
+    id: `AIF-AE-${5000 + i}`,
+    name: `${manager} ${subStrategy} Fund ${["I", "II", "III", "IV"][i % 4]}`,
+    manager,
+    sebiCategory,
+    subStrategy,
+    structure: sebiCategory === "Category III" && isHedge ? pickAE(["Open-Ended", "Close-Ended"] as const) : "Close-Ended",
+    vintage: 2018 + Math.floor(randAE() * 8),
+    corpusTarget: corpus,
+    commitments: Math.round(corpus * rAE(0.4, 1.0)),
+    minInvestment: 1000000,                     // AED 1M typical DIFC/ADGM QI ticket
+    tenureYears: sebiCategory === "Category III" ? pickAE([3, 5, 7]) : pickAE([7, 8, 10]),
+    drawdownStatus: Math.round(rAE(15, 100, 0)),
+    targetIRR: rAE(isDebt ? 9 : 14, isDebt ? 13 : 26),
+    netIRR: rAE(isDebt ? 6 : -2, isDebt ? 12 : 30),
+    moic: rAE(0.9, 3.0),
+    hurdleRate: rAE(6, 10),
+    carry: pickAE([10, 15, 20, 20]),
+    managementFee: rAE(1.0, 2.5),
+    domicile: pickAE(["India - GIFT IFSC", "India - Onshore"] as AIF["domicile"][]), // type only allows India; treat as alt-jurisdiction label
+    risk: isDebt ? "Mod-High" : isHedge ? "High" : "Very High",
+    rating: Math.round(rAE(3, 5, 0)),
+  };
+});
+
+// --- UAE Equities (DFM + ADX) -------------------------------------------
+const STOCKS_SEED_AE: { ticker: string; name: string; sector: string; cap: EquityStock["marketCap"]; price: number }[] = [
+  // ADX heavyweights
+  { ticker: "IHC.AD",    name: "International Holding Co",    sector: "Conglomerate",       cap: "Large Cap", price: 414 },
+  { ticker: "FAB.AD",    name: "First Abu Dhabi Bank",        sector: "Banking",            cap: "Large Cap", price: 14.8 },
+  { ticker: "ADCB.AD",   name: "Abu Dhabi Commercial Bank",   sector: "Banking",            cap: "Large Cap", price: 11.4 },
+  { ticker: "ADIB.AD",   name: "Abu Dhabi Islamic Bank",      sector: "Banking",            cap: "Large Cap", price: 16.2 },
+  { ticker: "EAND.AD",   name: "e& (Emirates Telecom Group)", sector: "Telecom",            cap: "Large Cap", price: 18.6 },
+  { ticker: "ALDAR.AD",  name: "Aldar Properties",            sector: "Realty",             cap: "Large Cap", price: 8.2 },
+  { ticker: "ADNOCDIST.AD", name: "ADNOC Distribution",       sector: "Oil & Gas Distribution", cap: "Large Cap", price: 3.85 },
+  { ticker: "ADNOCGAS.AD",  name: "ADNOC Gas",                sector: "Oil & Gas",          cap: "Large Cap", price: 3.42 },
+  { ticker: "ADNOCDRILL.AD", name: "ADNOC Drilling",          sector: "Oilfield Services",  cap: "Large Cap", price: 5.78 },
+  { ticker: "BOROUGE.AD", name: "Borouge",                    sector: "Petrochemicals",     cap: "Large Cap", price: 2.46 },
+  { ticker: "TAQA.AD",   name: "Abu Dhabi National Energy",   sector: "Power Utility",      cap: "Large Cap", price: 3.18 },
+  { ticker: "AGTHIA.AD", name: "Agthia Group",                sector: "FMCG",               cap: "Mid Cap",   price: 6.4 },
+  { ticker: "MULTIPLY.AD", name: "Multiply Group",            sector: "Investment Holding", cap: "Mid Cap",   price: 1.92 },
+  { ticker: "Q.AD",      name: "Q Holding",                   sector: "Investment Holding", cap: "Mid Cap",   price: 2.86 },
+  { ticker: "PUREHEALTH.AD", name: "Pure Health Holding",     sector: "Healthcare",         cap: "Large Cap", price: 4.12 },
+  { ticker: "ADPORTS.AD", name: "AD Ports Group",             sector: "Logistics",          cap: "Large Cap", price: 5.48 },
+  { ticker: "ALPHADHA.AD", name: "Alpha Dhabi Holding",       sector: "Conglomerate",       cap: "Large Cap", price: 12.3 },
+  { ticker: "EMSTEEL.AD", name: "Emirates Steel Arkan",       sector: "Metals",             cap: "Mid Cap",   price: 1.62 },
+  { ticker: "RAKCEC.AD", name: "RAK Ceramics",                sector: "Building Products",  cap: "Mid Cap",   price: 3.85 },
+  { ticker: "NMDC.AD",   name: "NMDC Energy",                 sector: "Oilfield Services",  cap: "Mid Cap",   price: 4.62 },
+  // DFM heavyweights
+  { ticker: "EMAAR.DU",  name: "Emaar Properties",            sector: "Realty",             cap: "Large Cap", price: 13.85 },
+  { ticker: "EMAARDEV.DU", name: "Emaar Development",         sector: "Realty",             cap: "Large Cap", price: 14.2 },
+  { ticker: "DEWA.DU",   name: "Dubai Electricity & Water",   sector: "Power Utility",      cap: "Large Cap", price: 2.68 },
+  { ticker: "ENBD.DU",   name: "Emirates NBD Bank",           sector: "Banking",            cap: "Large Cap", price: 22.5 },
+  { ticker: "DIB.DU",    name: "Dubai Islamic Bank",          sector: "Banking",            cap: "Large Cap", price: 7.84 },
+  { ticker: "MASB.DU",   name: "Mashreq Bank",                sector: "Banking",            cap: "Mid Cap",   price: 232.0 },
+  { ticker: "CBD.DU",    name: "Commercial Bank of Dubai",    sector: "Banking",            cap: "Mid Cap",   price: 9.85 },
+  { ticker: "DU.DU",     name: "du (EITC)",                   sector: "Telecom",            cap: "Large Cap", price: 7.92 },
+  { ticker: "EMIRATES.DU", name: "Emirates (DAE)",            sector: "Aviation",           cap: "Large Cap", price: 35.0 },
+  { ticker: "AIRARABIA.DU", name: "Air Arabia",               sector: "Aviation",           cap: "Mid Cap",   price: 3.18 },
+  { ticker: "AMR.DU",    name: "Amanat Holdings",             sector: "Education / Health", cap: "Small Cap", price: 1.42 },
+  { ticker: "DXBE.DU",   name: "DXB Entertainments",          sector: "Leisure",            cap: "Small Cap", price: 0.42 },
+  { ticker: "TECOM.DU",  name: "TECOM Group",                 sector: "Realty",             cap: "Mid Cap",   price: 3.24 },
+  { ticker: "SALIK.DU",  name: "Salik Company",               sector: "Toll / Infra",       cap: "Large Cap", price: 5.96 },
+  { ticker: "PARKIN.DU", name: "Parkin Company",              sector: "Parking / Infra",    cap: "Mid Cap",   price: 6.34 },
+  { ticker: "EMPOWER.DU", name: "Empower (Emirates District Cooling)", sector: "Utility", cap: "Mid Cap",   price: 1.78 },
+  { ticker: "TALABAT.DU", name: "Talabat Holding",            sector: "Internet / Food Tech", cap: "Large Cap", price: 1.62 },
+  { ticker: "DTC.DU",    name: "Dubai Taxi Company",          sector: "Transport",          cap: "Mid Cap",   price: 2.86 },
+  { ticker: "GFH.DU",    name: "GFH Financial Group",         sector: "Financial Services", cap: "Mid Cap",   price: 1.95 },
+  { ticker: "DIC.DU",    name: "Dubai Investments",           sector: "Conglomerate",       cap: "Mid Cap",   price: 2.42 },
+  { ticker: "UNB.DU",    name: "Union National Bank",         sector: "Banking",            cap: "Mid Cap",   price: 4.18 },
+  { ticker: "ARMX.DU",   name: "Aramex",                      sector: "Logistics",          cap: "Mid Cap",   price: 3.14 },
+  { ticker: "ALANSARI.DU", name: "Al Ansari Financial Svc",   sector: "Financial Services", cap: "Mid Cap",   price: 1.12 },
+  { ticker: "SHUAA.DU",  name: "Shuaa Capital",               sector: "Financial Services", cap: "Small Cap", price: 0.36 },
+  { ticker: "DAMAC.DU",  name: "DAMAC Properties",            sector: "Realty",             cap: "Mid Cap",   price: 1.85 },
+  { ticker: "DEYAAR.DU", name: "Deyaar Development",          sector: "Realty",             cap: "Small Cap", price: 0.68 },
+];
+
+const equityStocksAE: EquityStock[] = STOCKS_SEED_AE.map((s, i) => {
+  const isLarge = s.cap === "Large Cap";
+  const cagr3 = rAE(isLarge ? 6 : 4, isLarge ? 24 : 38);
+  const dy = rAE(0.2, isLarge ? 5.0 : 2.0);
+  const eps = rAE(isLarge ? 6 : 10, isLarge ? 16 : 26);
+  return {
+    category: "EQ",
+    id: `EQ-AE-${6000 + i}`,
+    ticker: s.ticker,
+    name: s.name,
+    sector: s.sector,
+    marketCap: s.cap,
+    price: s.price,
+    pe: rAE(8, 60),
+    pb: rAE(0.8, 8),
+    dividendYield: dy,
+    roe: rAE(8, 32),
+    beta: rAE(0.6, 1.4),
+    cagr3y: cagr3,
+    cagr5y: rAE(isLarge ? 7 : 6, isLarge ? 22 : 30),
+    expectedReturn: +(eps + dy).toFixed(2),
+    risk: isLarge ? "Mod-High" : s.cap === "Mid Cap" ? "High" : "Very High",
+  };
+});
+
+// --- UAE Bonds / Sukuk --------------------------------------------------
+const BOND_SEED_AE: { issuer: string; type: Bond["bondType"]; rating: string; coupon: number; tenor: number; taxable: boolean }[] = [
+  // UAE Federal & Emirate-level Sovereign
+  { issuer: "UAE Federal Govt", type: "G-Sec", rating: "Sovereign", coupon: 4.85, tenor: 10, taxable: false },
+  { issuer: "UAE Federal Govt", type: "G-Sec", rating: "Sovereign", coupon: 5.15, tenor: 30, taxable: false },
+  { issuer: "UAE Federal Govt", type: "G-Sec", rating: "Sovereign", coupon: 4.55, tenor: 5, taxable: false },
+  { issuer: "Abu Dhabi Govt",   type: "G-Sec", rating: "Sovereign", coupon: 4.65, tenor: 10, taxable: false },
+  { issuer: "Abu Dhabi Govt",   type: "G-Sec", rating: "Sovereign", coupon: 5.05, tenor: 30, taxable: false },
+  { issuer: "Dubai Govt Sukuk", type: "G-Sec", rating: "Sovereign", coupon: 4.95, tenor: 10, taxable: false },
+  { issuer: "Sharjah Govt",     type: "State Dev Loan", rating: "BBB+", coupon: 5.85, tenor: 10, taxable: false },
+  // PSU / GRE
+  { issuer: "Mubadala", type: "PSU Bond", rating: "AA", coupon: 4.95, tenor: 10, taxable: false },
+  { issuer: "ADNOC Murban",    type: "PSU Bond", rating: "AA", coupon: 4.85, tenor: 10, taxable: false },
+  { issuer: "TAQA", type: "PSU Bond", rating: "AA-", coupon: 5.15, tenor: 7, taxable: false },
+  { issuer: "DP World", type: "PSU Bond", rating: "BBB+", coupon: 5.65, tenor: 10, taxable: false },
+  { issuer: "Etisalat (e&) Sukuk", type: "PSU Bond", rating: "AA-", coupon: 4.75, tenor: 5, taxable: false },
+  { issuer: "Emaar Sukuk", type: "Corporate Bond", rating: "BBB+", coupon: 5.95, tenor: 7, taxable: false },
+  { issuer: "DEWA Sukuk", type: "PSU Bond", rating: "AA-", coupon: 4.85, tenor: 10, taxable: false },
+  { issuer: "Aldar Sukuk", type: "Corporate Bond", rating: "BBB", coupon: 5.85, tenor: 7, taxable: false },
+  // Banks AT1 / Senior
+  { issuer: "Emirates NBD AT1", type: "Perpetual / AT1", rating: "BBB-", coupon: 7.85, tenor: 5, taxable: false },
+  { issuer: "FAB AT1", type: "Perpetual / AT1", rating: "BBB", coupon: 7.45, tenor: 5, taxable: false },
+  { issuer: "ADCB AT1", type: "Perpetual / AT1", rating: "BB+", coupon: 8.15, tenor: 5, taxable: false },
+  { issuer: "ADIB Sukuk AT1", type: "Perpetual / AT1", rating: "BB+", coupon: 7.95, tenor: 5, taxable: false },
+  { issuer: "FAB Senior", type: "Corporate Bond", rating: "AA-", coupon: 4.85, tenor: 5, taxable: false },
+  { issuer: "Emirates NBD Senior", type: "Corporate Bond", rating: "A+", coupon: 4.95, tenor: 5, taxable: false },
+  // Corporate Sukuk
+  { issuer: "Majid Al Futtaim Sukuk", type: "Corporate Bond", rating: "BBB", coupon: 5.55, tenor: 5, taxable: false },
+  { issuer: "Damac Real Estate Sukuk", type: "NCD", rating: "BB-", coupon: 7.65, tenor: 3, taxable: false },
+  { issuer: "Aldar Investment Sukuk", type: "Corporate Bond", rating: "BBB", coupon: 5.95, tenor: 7, taxable: false },
+  { issuer: "Dubai Aerospace Enterprise", type: "Corporate Bond", rating: "BBB+", coupon: 5.75, tenor: 5, taxable: false },
+  { issuer: "Investment Corp of Dubai", type: "PSU Bond", rating: "A", coupon: 5.05, tenor: 10, taxable: false },
+  // Tax-free retail Sukuk
+  { issuer: "Sharjah Islamic Sukuk", type: "Tax-Free Bond", rating: "A", coupon: 5.15, tenor: 5, taxable: false },
+  { issuer: "DIB Tier 1 Sukuk", type: "Perpetual / AT1", rating: "BB+", coupon: 7.65, tenor: 5, taxable: false },
+];
+
+const bondsAE: Bond[] = BOND_SEED_AE.map((b, i) => ({
+  category: "BOND",
+  id: `BD-AE-${7000 + i}`,
+  name: `${b.issuer} ${b.coupon}% ${b.tenor}Y`,
+  issuer: b.issuer,
+  bondType: b.type,
+  rating: b.rating,
+  couponRate: b.coupon,
+  ytm: +(b.coupon + rAE(-0.3, 0.6)).toFixed(2),
+  residualTenorYears: b.tenor,
+  faceValue: 1000,
+  minInvestment: b.type === "G-Sec" ? 10000 : 200000,  // AED — most UAE corporate sukuk have ~$50K min
+  payout: b.type === "Zero Coupon" ? "Cumulative" : "Semi-Annual",
+  taxable: b.taxable,
+  risk: b.rating === "Sovereign" ? "Low" : b.type === "Perpetual / AT1" ? "Mod-High" : b.rating.startsWith("AA") ? "Low-Mod" : b.rating.startsWith("A") ? "Moderate" : "Mod-High",
+}));
+
+// =====================================================================
+// ================ REGION-AWARE PROXY EXPORTS =========================
+// =====================================================================
+
+const DATA_SETS: Record<Region, {
+  mutualFunds: MutualFund[];
+  fixedDeposits: FixedDeposit[];
+  insurance: Insurance[];
+  pmsSchemes: PMS[];
+  aifSchemes: AIF[];
+  equityStocks: EquityStock[];
+  bonds: Bond[];
+}> = {
+  IN: {
+    mutualFunds: mutualFundsIN,
+    fixedDeposits: fixedDepositsIN,
+    insurance: insuranceIN,
+    pmsSchemes: pmsSchemesIN,
+    aifSchemes: aifSchemesIN,
+    equityStocks: equityStocksIN,
+    bonds: bondsIN,
+  },
+  AE: {
+    mutualFunds: mutualFundsAE,
+    fixedDeposits: fixedDepositsAE,
+    insurance: insuranceAE,
+    pmsSchemes: pmsSchemesAE,
+    aifSchemes: aifSchemesAE,
+    equityStocks: equityStocksAE,
+    bonds: bondsAE,
+  },
+};
+
+function regionArrayProxy<T>(key: keyof typeof DATA_SETS[Region]): T[] {
+  // Proxy forwards array reads to the current region's array.
+  const handler: ProxyHandler<any[]> = {
+    get(_t, prop, _r) {
+      const arr = DATA_SETS[getCurrentRegion()][key] as unknown as any[];
+      const v: any = (arr as any)[prop as any];
+      return typeof v === "function" ? v.bind(arr) : v;
+    },
+    has(_t, prop) {
+      return prop in (DATA_SETS[getCurrentRegion()][key] as unknown as any[]);
+    },
+    ownKeys() {
+      return Reflect.ownKeys(DATA_SETS[getCurrentRegion()][key] as unknown as any[]);
+    },
+    getOwnPropertyDescriptor(_t, p) {
+      return Object.getOwnPropertyDescriptor(DATA_SETS[getCurrentRegion()][key] as unknown as any[], p);
+    },
+    set() { return true; }, // arrays are read-only from consumers
+  };
+  return new Proxy([] as any[], handler) as T[];
+}
+
+export const mutualFunds   = regionArrayProxy<MutualFund>("mutualFunds");
+export const fixedDeposits = regionArrayProxy<FixedDeposit>("fixedDeposits");
+export const insurance     = regionArrayProxy<Insurance>("insurance");
+export const pmsSchemes    = regionArrayProxy<PMS>("pmsSchemes");
+export const aifSchemes    = regionArrayProxy<AIF>("aifSchemes");
+export const equityStocks  = regionArrayProxy<EquityStock>("equityStocks");
+export const bonds         = regionArrayProxy<Bond>("bonds");
+
+// Recomputed each access via proxy semantics:
+export const allProducts: Product[] = new Proxy([] as Product[], {
+  get(_t, prop) {
+    const r = getCurrentRegion();
+    const d = DATA_SETS[r];
+    const merged: Product[] = [
+      ...d.mutualFunds, ...d.fixedDeposits, ...d.insurance, ...d.pmsSchemes, ...d.aifSchemes,
+    ];
+    const v: any = (merged as any)[prop as any];
+    return typeof v === "function" ? v.bind(merged) : v;
+  },
+  ownKeys() {
+    const d = DATA_SETS[getCurrentRegion()];
+    const merged = [...d.mutualFunds, ...d.fixedDeposits, ...d.insurance, ...d.pmsSchemes, ...d.aifSchemes];
+    return Reflect.ownKeys(merged);
+  },
+});

@@ -6,6 +6,7 @@ import mpowerLogo from "@/assets/mpower-logo.png";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -15,6 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { RegionSwitcher } from "@/components/region-switcher";
 
 const items = [
   { title: "Screener",    url: "/",            icon: LayoutGrid },
@@ -64,6 +66,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-border p-2">
+        <RegionSwitcher />
+      </SidebarFooter>
     </Sidebar>
   );
 }

@@ -381,20 +381,95 @@ function ResearchTerminal() {
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
             </div>
-            <button className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider">Reset</button>
+            <button
+              onClick={() => {
+                if (cat === "MF") {
+                  setMfSub("All"); setMfAssetClass("All"); setMfAmc("All");
+                  setMfRiskMax(6); setMfMinReturn(0); setMfMaxExpense(2.5);
+                  setMfMinSharpe(0); setMfMinRating(1); setMfMaxDrawdown(50);
+                  setMfMinAge(0); setMfMinAum(0);
+                  setMfBeatsBench(false); setMfElssOnly(false); setMfPositive5y(false);
+                  setMfPreset("");
+                } else if (cat === "FD") {
+                  setFdIssuer("All"); setFdTenure("All"); setFdMinRate(6); setFdSenior(false); setFdInsured(false);
+                } else if (cat === "INS") {
+                  setInsSub("All"); setInsMinClaim(94); setInsMinRating(1);
+                } else if (cat === "PMS") {
+                  setPmsStrategy("All"); setPmsStructure("All"); setPmsMinReturn(0); setPmsMaxFee(2.5);
+                } else if (cat === "AIF") {
+                  setAifCategory("All"); setAifStrategy("All"); setAifMinIRR(0); setAifVintageFrom(2018);
+                } else if (cat === "EQ") {
+                  setEqMarketCap("All"); setEqSector("All"); setEqMinCagr(0); setEqMaxPe(90);
+                } else if (cat === "BOND") {
+                  setBondType("All"); setBondRating("All"); setBondMinYtm(6); setBondMaxTenor(40); setBondTaxFree(false);
+                }
+                setQuery("");
+              }}
+              className="text-[10px] uppercase text-muted-foreground hover:text-foreground tracking-wider"
+            >
+              Reset
+            </button>
           </div>
 
           <div className="p-4 space-y-5 text-xs">
             {cat === "MF" && (
               <>
+                {/* Quick presets */}
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-1.5">Quick Screens</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      ["top5",  "5★ Only"],
+                      ["lowexp","Low Cost <1%"],
+                      ["alpha", "Beats Bench"],
+                      ["elss",  "ELSS Tax Saver"],
+                      ["growth","High Growth 3Y>20%"],
+                      ["safe",  "Low DD <15%"],
+                      ["large", "Mega AUM >₹25k Cr"],
+                    ] as [string, string][]).map(([k, label]) => (
+                      <button
+                        key={k}
+                        onClick={() => {
+                          // start from a clean slate then apply preset
+                          setMfSub("All"); setMfAssetClass("All"); setMfAmc("All");
+                          setMfRiskMax(6); setMfMinReturn(0); setMfMaxExpense(2.5);
+                          setMfMinSharpe(0); setMfMinRating(1); setMfMaxDrawdown(50);
+                          setMfMinAge(0); setMfMinAum(0);
+                          setMfBeatsBench(false); setMfElssOnly(false); setMfPositive5y(false);
+                          if (k === "top5") setMfMinRating(5);
+                          if (k === "lowexp") setMfMaxExpense(1);
+                          if (k === "alpha") setMfBeatsBench(true);
+                          if (k === "elss") { setMfElssOnly(true); setMfSub("ELSS"); }
+                          if (k === "growth") { setMfMinReturn(20); setMfAssetClass("Equity"); }
+                          if (k === "safe") setMfMaxDrawdown(15);
+                          if (k === "large") setMfMinAum(25000);
+                          setMfPreset(k);
+                        }}
+                        className={`text-[10px] px-2 py-1 rounded-sm border transition-colors ${mfPreset === k ? "border-foreground bg-secondary text-foreground" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary/60"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <FilterSelect label="Sub-Category" value={mfSub} onChange={setMfSub}
                   options={["All", ...Array.from(new Set(mutualFunds.map(m => m.subCategory)))]} />
                 <FilterSelect label="Asset Class" value={mfAssetClass} onChange={setMfAssetClass}
                   options={["All", "Equity", "Debt", "Hybrid"]} />
+                <FilterSelect label="AMC" value={mfAmc} onChange={setMfAmc}
+                  options={["All", ...Array.from(new Set(mutualFunds.map(m => m.amc))).sort()]} />
                 <FilterRange label="Min 3Y Return" value={mfMinReturn} onChange={setMfMinReturn} min={-5} max={25} step={0.5} suffix="%" />
                 <FilterRange label="Max Expense Ratio" value={mfMaxExpense} onChange={setMfMaxExpense} min={0.1} max={2.5} step={0.05} suffix="%" />
+                <FilterRange label="Min Sharpe" value={mfMinSharpe} onChange={setMfMinSharpe} min={0} max={2} step={0.05} format={v => v.toFixed(2)} />
+                <FilterRange label="Min Rating" value={mfMinRating} onChange={setMfMinRating} min={1} max={5} step={1} format={v => `${v}★ & above`} />
+                <FilterRange label="Max Drawdown" value={mfMaxDrawdown} onChange={setMfMaxDrawdown} min={5} max={50} step={1} format={v => `-${v}% max`} />
+                <FilterRange label="Min Fund Age" value={mfMinAge} onChange={setMfMinAge} min={0} max={20} step={1} format={v => v === 0 ? "Any" : `${v}Y+`} />
+                <FilterRange label="Min AUM (₹ Cr)" value={mfMinAum} onChange={setMfMinAum} min={0} max={50000} step={500} format={v => v === 0 ? "Any" : v.toLocaleString("en-IN")} />
                 <FilterRange label="Risk Ceiling" value={mfRiskMax} onChange={setMfRiskMax} min={1} max={6} step={1}
                   format={v => ["Low", "Low-Mod", "Moderate", "Mod-High", "High", "Very High"][v - 1]} />
+                <FilterToggle label="Beats Benchmark (α>0)" value={mfBeatsBench} onChange={setMfBeatsBench} />
+                <FilterToggle label="Positive 5Y Returns" value={mfPositive5y} onChange={setMfPositive5y} />
+                <FilterToggle label="ELSS / Tax Saver Only" value={mfElssOnly} onChange={setMfElssOnly} />
               </>
             )}
             {cat === "FD" && (
@@ -462,16 +537,24 @@ function ResearchTerminal() {
             )}
 
 
-            <div className="pt-4 border-t border-border space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Saved Screens</div>
-              {["Top 3Y Equity > 15%", "AAA NBFC FD > 8%", "5★ Term ≤ ₹15K"].map(s => (
-                <button key={s} className="w-full text-left px-2 py-1.5 rounded-sm hover:bg-secondary text-[11px] flex items-center gap-2 group">
-                  <BookmarkPlus className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />{s}
-                </button>
-              ))}
-            </div>
+            {cat === "MF" && (
+              <SavedScreens
+                cat="MF"
+                snapshot={() => ({ mfSub, mfAssetClass, mfAmc, mfRiskMax, mfMinReturn, mfMaxExpense, mfMinSharpe, mfMinRating, mfMaxDrawdown, mfMinAge, mfMinAum, mfBeatsBench, mfElssOnly, mfPositive5y })}
+                apply={(s: any) => {
+                  setMfSub(s.mfSub ?? "All"); setMfAssetClass(s.mfAssetClass ?? "All"); setMfAmc(s.mfAmc ?? "All");
+                  setMfRiskMax(s.mfRiskMax ?? 6); setMfMinReturn(s.mfMinReturn ?? 0); setMfMaxExpense(s.mfMaxExpense ?? 2.5);
+                  setMfMinSharpe(s.mfMinSharpe ?? 0); setMfMinRating(s.mfMinRating ?? 1); setMfMaxDrawdown(s.mfMaxDrawdown ?? 50);
+                  setMfMinAge(s.mfMinAge ?? 0); setMfMinAum(s.mfMinAum ?? 0);
+                  setMfBeatsBench(!!s.mfBeatsBench); setMfElssOnly(!!s.mfElssOnly); setMfPositive5y(!!s.mfPositive5y);
+                  setMfPreset("");
+                }}
+              />
+            )}
           </div>
         </aside>
+
+
 
         {/* Main */}
         <main className="flex-1 min-w-0">

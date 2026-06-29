@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, equityStocks, bonds, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type EquityStock, type Bond, type Category } from "@/lib/research-data";
 import { getTopBarIndices } from "@/lib/market-data.functions";
+import { useRegion, fmtMoney, aumScale } from "@/lib/region";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
@@ -18,36 +19,24 @@ export const Route = createFileRoute("/")({
 
 type SortDir = "asc" | "desc";
 
-const CATEGORIES: { key: Category; label: string; count: number; tone: string }[] = [
-  { key: "MF", label: "Mutual Funds", count: mutualFunds.length, tone: "text-mf" },
-  { key: "EQ", label: "Equity", count: equityStocks.length, tone: "text-eq" },
-  { key: "BOND", label: "Fixed Income", count: bonds.length, tone: "text-bond" },
-  { key: "PMS", label: "PMS", count: pmsSchemes.length, tone: "text-pms" },
-  { key: "AIF", label: "AIF", count: aifSchemes.length, tone: "text-aif" },
-  { key: "FD", label: "Fixed Deposits", count: fixedDeposits.length, tone: "text-fd" },
-  { key: "INS", label: "Insurance", count: insurance.length, tone: "text-ins" },
-];
+type SortDir2 = SortDir;
 
-function fmtINR(n: number) {
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n}`;
-}
+function fmtINR(n: number) { return fmtMoney(n); }
 
 function pctClass(v: number) {
   return v >= 0 ? "text-positive" : "text-negative";
 }
 
 function TopBarTicker() {
+  const { region } = useRegion();
   const q = useQuery({
-    queryKey: ["topbar-indices"],
-    queryFn: () => getTopBarIndices(),
+    queryKey: ["topbar-indices", region],
+    queryFn: () => getTopBarIndices({ data: { region } }),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
   const data = q.data ?? [];
-  const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="hidden lg:flex items-center gap-2 text-[11px] text-muted-foreground mono-num">
       {q.isLoading && !data.length ? (
@@ -71,6 +60,8 @@ function TopBarTicker() {
 }
 
 function ResearchTerminal() {
+  const { region, meta: regionMeta } = useRegion();
+  // Reset selection across region switches so UI doesn't carry stale ids
   const [cat, setCat] = useState<Category>("MF");
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<string>("returns3y");
@@ -79,6 +70,16 @@ function ResearchTerminal() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
+
+  const CATEGORIES = useMemo(() => [
+    { key: "MF"   as Category, label: "Mutual Funds",  count: mutualFunds.length,   tone: "text-mf" },
+    { key: "EQ"   as Category, label: "Equity",        count: equityStocks.length,  tone: "text-eq" },
+    { key: "BOND" as Category, label: "Fixed Income",  count: bonds.length,         tone: "text-bond" },
+    { key: "PMS"  as Category, label: "PMS",           count: pmsSchemes.length,    tone: "text-pms" },
+    { key: "AIF"  as Category, label: "AIF",           count: aifSchemes.length,    tone: "text-aif" },
+    { key: "FD"   as Category, label: "Fixed Deposits",count: fixedDeposits.length, tone: "text-fd" },
+    { key: "INS"  as Category, label: "Insurance",     count: insurance.length,     tone: "text-ins" },
+  ], [region]);
 
   // category-specific filters
   const [mfSub, setMfSub] = useState<string>("All");
@@ -215,7 +216,7 @@ function ResearchTerminal() {
       if (query && !`${p.name} ${p.issuer} ${p.bondType} ${p.rating}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [cat, query, currentYear, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, mfAmc, mfMinSharpe, mfMinRating, mfMinAge, mfMinAum, mfMaxDrawdown, mfBeatsBench, mfElssOnly, mfPositive5y, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
+  }, [region, cat, query, currentYear, mfSub, mfRiskMax, mfMinReturn, mfMaxExpense, mfAssetClass, mfAmc, mfMinSharpe, mfMinRating, mfMinAge, mfMinAum, mfMaxDrawdown, mfBeatsBench, mfElssOnly, mfPositive5y, fdIssuer, fdMinRate, fdTenure, fdSenior, fdInsured, insSub, insMinClaim, insMinRating, pmsStrategy, pmsStructure, pmsMinReturn, pmsMaxFee, aifCategory, aifStrategy, aifMinIRR, aifVintageFrom, eqMarketCap, eqSector, eqMinCagr, eqMaxPe, bondType, bondRating, bondMinYtm, bondMaxTenor, bondTaxFree]);
 
   const sorted = useMemo(() => {
     const arr = [...data] as any[];
@@ -275,7 +276,7 @@ function ResearchTerminal() {
         { l: "Funds", v: a.length },
         { l: "Avg 3Y", v: a.length ? `${(a.reduce((s, x) => s + x.returns3y, 0) / a.length).toFixed(2)}%` : "—" },
         { l: "Avg Expense", v: a.length ? `${(a.reduce((s, x) => s + x.expenseRatio, 0) / a.length).toFixed(2)}%` : "—" },
-        { l: "Top AUM", v: a.length ? fmtINR(Math.max(...a.map(x => x.aum)) * 1e7) : "—" },
+        { l: "Top AUM", v: a.length ? fmtMoney(Math.max(...a.map(x => x.aum)) * aumScale()) : "—" },
       ];
     }
     if (cat === "FD") {
@@ -302,7 +303,7 @@ function ResearchTerminal() {
         { l: "Strategies", v: a.length },
         { l: "Avg 3Y", v: a.length ? `${(a.reduce((s, x) => s + x.returns3y, 0) / a.length).toFixed(2)}%` : "—" },
         { l: "Avg Fixed Fee", v: a.length ? `${(a.reduce((s, x) => s + x.fixedFee, 0) / a.length).toFixed(2)}%` : "—" },
-        { l: "Top AUM", v: a.length ? fmtINR(Math.max(...a.map(x => x.aum)) * 1e7) : "—" },
+        { l: "Top AUM", v: a.length ? fmtMoney(Math.max(...a.map(x => x.aum)) * aumScale()) : "—" },
       ];
     }
     if (cat === "AIF") {
@@ -310,7 +311,7 @@ function ResearchTerminal() {
       return [
         { l: "Funds", v: a.length },
         { l: "Avg Net IRR", v: a.length ? `${(a.reduce((s, x) => s + x.netIRR, 0) / a.length).toFixed(2)}%` : "—" },
-        { l: "Total Corpus", v: a.length ? fmtINR(a.reduce((s, x) => s + x.corpusTarget, 0) * 1e7) : "—" },
+        { l: "Total Corpus", v: a.length ? fmtMoney(a.reduce((s, x) => s + x.corpusTarget, 0) * aumScale()) : "—" },
         { l: "Cat-III Funds", v: a.filter(x => x.sebiCategory === "Category III").length },
       ];
     }

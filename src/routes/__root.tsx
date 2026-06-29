@@ -13,6 +13,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { RegionSwitcher } from "@/components/region-switcher";
 
 function NotFoundComponent() {
   return (
@@ -128,6 +129,9 @@ function RootComponent() {
           <AppSidebar />
           <div className="flex-1 min-w-0 relative">
             <SidebarTrigger className="fixed top-2 left-2 z-50 h-7 w-7 bg-surface/80 backdrop-blur border border-border rounded-sm" />
+            <div className="fixed top-2 right-3 z-50">
+              <RegionSwitcher />
+            </div>
             <Outlet />
           </div>
         </div>

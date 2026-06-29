@@ -2,13 +2,8 @@ import { useMemo } from "react";
 import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
 import { Activity, Layers, Building2, Shuffle, AlertTriangle, Sparkles } from "lucide-react";
 
-function fmtINR(n: number) {
-  if (!n) return "₹0";
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n.toFixed(0)}`;
-}
+import { fmtMoney } from "@/lib/region";
+function fmtINR(n: number) { return fmtMoney(n); }
 
 // Deterministic pseudo-random from string (for synthetic but stable analytics)
 function hash(s: string): number {

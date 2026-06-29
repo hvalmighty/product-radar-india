@@ -4,36 +4,30 @@ import { parseECasPdf, type Holding, type PortfolioParseResult } from "@/lib/eca
 import { PortfolioCommentary } from "@/components/PortfolioCommentary";
 import { Upload, FileText, Lock, X, ArrowLeft, PieChart, TrendingUp, AlertCircle, Loader2, Download, Search, Save, FolderOpen, Trash2, Sparkles } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
-import { seedSamplePortfolios, removeSamplePortfolios, SAMPLE_PORTFOLIOS } from "@/lib/sample-portfolios";
+import { seedSamplePortfolios, removeSamplePortfolios, SAMPLE_PORTFOLIOS, storageKeyForRegion } from "@/lib/sample-portfolios";
+import { useRegion, fmtMoney } from "@/lib/region";
 
-const STORAGE_KEY = "mpower.savedPortfolios.v1";
 type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult; family?: string; isSample?: boolean };
 
-function loadSaved(): SavedPortfolio[] {
+function loadSavedFor(region: "IN" | "AE"): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]"); } catch { return []; }
 }
-function writeSaved(list: SavedPortfolio[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+function writeSavedFor(region: "IN" | "AE", list: SavedPortfolio[]) {
+  localStorage.setItem(storageKeyForRegion(region), JSON.stringify(list));
 }
 
 export const Route = createFileRoute("/portfolio")({
   head: () => ({
     meta: [
-      { title: "Portfolio Importer — eCAS (NSDL/CDSL) · mPower Wealth" },
-      { name: "description", content: "Upload NSDL or CDSL consolidated account statements (eCAS) and review client portfolios with allocation analytics." },
+      { title: "Portfolio Importer — eCAS (NSDL/CDSL/DFM) · mPower Wealth" },
+      { name: "description", content: "Upload custodian consolidated account statements (NSDL/CDSL eCAS or DFM/ADX) and review client portfolios with allocation analytics." },
     ],
   }),
   component: PortfolioImporter,
 });
 
-function fmtINR(n: number) {
-  if (!n) return "₹0";
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n.toFixed(0)}`;
-}
+const fmtINR = fmtMoney;
 
 const TYPE_COLORS: Record<string, string> = {
   Equity: "bg-mf",
@@ -44,6 +38,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function PortfolioImporter() {
+  const { region } = useRegion();
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [needsPwd, setNeedsPwd] = useState(false);
@@ -59,14 +54,18 @@ function PortfolioImporter() {
   const [saveName, setSaveName] = useState("");
   const [savedToast, setSavedToast] = useState<string | null>(null);
 
-  useEffect(() => { setSaved(loadSaved()); }, []);
+  // Reload saved list (and clear the current preview) whenever region changes.
+  useEffect(() => {
+    setSaved(loadSavedFor(region));
+    setResult(null); setFile(null); setErr(null); setNeedsPwd(false);
+  }, [region]);
 
   function saveCurrent() {
     if (!result) return;
     const name = (saveName.trim() || result.investor || file?.name?.replace(/\.pdf$/i, "") || "Portfolio").slice(0, 80);
     const entry: SavedPortfolio = { id: `${Date.now()}`, name, savedAt: Date.now(), data: result };
     const next = [entry, ...saved].slice(0, 50);
-    setSaved(next); writeSaved(next); setSaveName("");
+    setSaved(next); writeSavedFor(region, next); setSaveName("");
     setSavedToast(`Saved "${name}"`);
     setTimeout(() => setSavedToast(null), 2200);
   }
@@ -75,7 +74,7 @@ function PortfolioImporter() {
   }
   function deleteSavedItem(id: string) {
     const next = saved.filter(s => s.id !== id);
-    setSaved(next); writeSaved(next);
+    setSaved(next); writeSavedFor(region, next);
   }
 
   async function handleParse(f: File, pwd?: string) {

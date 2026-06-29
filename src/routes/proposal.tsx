@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import {
   mutualFunds, equityStocks, aifSchemes, bonds, pmsSchemes, fixedDeposits,
   type MutualFund, type EquityStock, type AIF, type Bond, type PMS, type FixedDeposit,
 } from "@/lib/research-data";
+import { useRegion, fmtMoney } from "@/lib/region";
 
 export const Route = createFileRoute("/proposal")({
   component: ProposalPage,
@@ -27,7 +28,7 @@ const ASSET_CLASSES: AssetClassDef[] = [
   { key: "EQ", label: "Equity", product: "Direct Equity", security: "Listed Stocks", tone: "text-foreground" },
   { key: "PMS", label: "PMS", product: "Portfolio Mgmt Svc", security: "PMS Strategies", tone: "text-pms" },
   { key: "AIF", label: "AIF", product: "Alternative Inv Funds", security: "AIF Schemes", tone: "text-aif" },
-  { key: "DEBT", label: "Debt", product: "Debt / Fixed Income", security: "Bonds & G-Secs", tone: "text-fd" },
+  { key: "DEBT", label: "Debt", product: "Debt / Fixed Income", security: "Bonds & Sukuk", tone: "text-fd" },
   { key: "FD", label: "Fixed Deposits", product: "Bank / NBFC FD", security: "FD Schemes", tone: "text-fd" },
   { key: "CASH", label: "Cash", product: "Liquid / Savings", security: "Idle Cash", tone: "text-muted-foreground" },
 ];
@@ -44,13 +45,7 @@ type Holding = {
   risk: string;
 };
 
-const fmtINR = (n: number) => {
-  if (!n) return "₹0";
-  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
-  if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n.toFixed(0)}`;
-};
+const fmtINR = fmtMoney;
 
 const RISK_SCORE: Record<string, number> = {
   "Low": 1, "Low-Mod": 2, "Moderate": 3, "Mod-High": 4, "High": 5, "Very High": 6,
@@ -69,6 +64,7 @@ function irrBasisFor(klass: AssetClassKey, name: string): string {
 }
 
 function ProposalPage() {
+  const { region } = useRegion();
   // Prospect details
   const [prospect, setProspect] = useState({ name: "", age: "", riskProfile: "Moderate", horizonYears: "5", goal: "Wealth Creation" });
   const [totalCorpus, setTotalCorpus] = useState<number>(10000000);
@@ -77,6 +73,8 @@ function ProposalPage() {
   const [activeClass, setActiveClass] = useState<AssetClassKey>("MF");
   const [search, setSearch] = useState("");
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  // Wipe holdings on region switch so we never carry over India product IDs into AE catalog.
+  useEffect(() => { setHoldings([]); }, [region]);
 
   // Catalog by class
   const catalog = useMemo(() => {

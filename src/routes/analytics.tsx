@@ -12,7 +12,7 @@ import {
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   Treemap,
 } from "recharts";
-
+import { REGION_META, getCurrentRegion, useRegion as useRegionReactive } from "@/lib/region";
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [
@@ -26,8 +26,17 @@ export const Route = createFileRoute("/analytics")({
 // ============================================================
 // helpers
 // ============================================================
-function fmtCr(n: number) { return `₹${n.toFixed(n >= 100 ? 0 : 1)} Cr`; }
-function fmtCrShort(n: number) { return n >= 1000 ? `₹${(n/1000).toFixed(2)} K Cr` : `₹${n.toFixed(0)} Cr`; }
+function fmtCr(n: number) {
+  const m = REGION_META[getCurrentRegion()];
+  const u = m.code === "IN" ? "Cr" : "M";
+  return `${m.symbol}${n.toFixed(n >= 100 ? 0 : 1)} ${u}`;
+}
+function fmtCrShort(n: number) {
+  const m = REGION_META[getCurrentRegion()];
+  const u = m.code === "IN" ? "Cr" : "M";
+  const big = m.code === "IN" ? "K Cr" : "B";
+  return n >= 1000 ? `${m.symbol}${(n / 1000).toFixed(2)} ${big}` : `${m.symbol}${n.toFixed(0)} ${u}`;
+}
 function pct(n: number, d = 1) { return `${n >= 0 ? "+" : ""}${n.toFixed(d)}%`; }
 function clsPct(n: number) { return n >= 0 ? "text-positive" : "text-negative"; }
 function classNames(...a: (string | false | undefined)[]) { return a.filter(Boolean).join(" "); }
@@ -278,6 +287,8 @@ const clientPortfolios: ClientPortfolio[] = [
 // Page
 // ============================================================
 function AnalyticsPage() {
+  // Subscribe to region changes so the formatter helpers re-render with the right currency/unit.
+  useRegionReactive();
   const [tab, setTab] = useState<"business" | "portfolio">("business");
 
   return (

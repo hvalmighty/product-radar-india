@@ -627,15 +627,20 @@ function ResearchTerminal() {
                         <>
                           <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                          <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                           <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                           <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
                         </>

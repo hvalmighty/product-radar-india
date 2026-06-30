@@ -413,7 +413,7 @@ function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
 }
 
 type FeedCat = "markets" | "india" | "macro" | "global";
-const FEEDS_BY_REGION: Record<"IN" | "AE", Record<FeedCat, { url: string; source: string }[]>> = {
+const FEEDS_BY_REGION: Record<"IN" | "AE" | "PH", Record<FeedCat, { url: string; source: string }[]>> = {
   IN: {
     markets: [{ url: "https://news.google.com/rss/search?q=indian+stock+market+nifty+sensex+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
     india:   [{ url: "https://news.google.com/rss/search?q=india+economy+business+rbi+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
@@ -426,14 +426,21 @@ const FEEDS_BY_REGION: Record<"IN" | "AE", Record<FeedCat, { url: string; source
     macro:   [{ url: "https://news.google.com/rss/search?q=oil+prices+OPEC+GCC+sukuk+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
     global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
   },
+  PH: {
+    markets: [{ url: "https://news.google.com/rss/search?q=PSE+Philippine+stock+market+PSEi+when:1d&hl=en-PH&gl=PH&ceid=PH:en", source: "Google News" }],
+    india:   [{ url: "https://news.google.com/rss/search?q=Philippines+economy+business+BSP+when:1d&hl=en-PH&gl=PH&ceid=PH:en", source: "Google News" }],
+    macro:   [{ url: "https://news.google.com/rss/search?q=ASEAN+inflation+US+Fed+rates+Asia+markets+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+    global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+  },
 };
 
 export const getNews = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
     const cat = (d as any)?.category as string;
-    const region = (d as any)?.region === "AE" ? "AE" : "IN";
+    const raw = (d as any)?.region;
+    const region: "IN" | "AE" | "PH" = raw === "AE" ? "AE" : raw === "PH" ? "PH" : "IN";
     if (!["markets", "india", "macro", "global"].includes(cat)) throw new Error("invalid category");
-    return { category: cat as FeedCat, region: region as "IN" | "AE" };
+    return { category: cat as FeedCat, region };
   })
   .handler(async ({ data }) => {
     const feeds = FEEDS_BY_REGION[data.region][data.category];

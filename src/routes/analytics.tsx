@@ -13,6 +13,14 @@ import {
   Treemap,
 } from "recharts";
 import { REGION_META, getCurrentRegion, useRegion as useRegionReactive } from "@/lib/region";
+import {
+  MONTHS, SEGMENTS, CHANNELS,
+  RM_INFO, REGIONS, PRODUCTS,
+  businessFacts, clientPortfolios, flatHoldings, lookthroughHoldings,
+  getQuickFilters,
+  type BProduct, type BRegion, type BSegment, type BChannel, type BRm,
+  type BFact, type Holding, type ClientPortfolio, type FlatHolding,
+} from "@/lib/analytics-data";
 export const Route = createFileRoute("/analytics")({
   head: () => ({
     meta: [

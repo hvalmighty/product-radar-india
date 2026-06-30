@@ -336,12 +336,15 @@ export type TopBarIndex = {
 
 export const getTopBarIndices = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
-    const region = (d as any)?.region === "AE" ? "AE" : "IN";
-    return { region: region as "IN" | "AE" };
+    const raw = (d as any)?.region;
+    const region: "IN" | "AE" | "PH" = raw === "AE" ? "AE" : raw === "PH" ? "PH" : "IN";
+    return { region };
   })
   .handler(async ({ data }): Promise<TopBarIndex[]> => {
     const symbols = data.region === "AE"
       ? [{ y: "^DFMGI", l: "DFM" }, { y: "^ADI", l: "ADX" }]
+      : data.region === "PH"
+      ? [{ y: "PSEI.PS", l: "PSEi" }, { y: "^PSI", l: "PSE ALL" }]
       : [{ y: "^NSEI",  l: "NIFTY" }, { y: "^BSESN", l: "SENSEX" }];
     const results = await Promise.all(symbols.map(async s => {
       const q = await fetchYahooQuote(s.y);

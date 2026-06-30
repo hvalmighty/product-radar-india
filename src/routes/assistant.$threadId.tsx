@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getOrCreateThread, updateThread } from "@/lib/assistant-store";
+import { useRegion } from "@/lib/region";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/assistant/$threadId")({
@@ -24,9 +25,13 @@ const SUGGESTIONS = [
 
 function ChatPage() {
   const { threadId } = Route.useParams();
+  const { region } = useRegion();
   const thread = useMemo(() => getOrCreateThread(threadId), [threadId]);
   const [input, setInput] = useState("");
-  const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/chat", body: () => ({ region }) }),
+    [region],
+  );
   const taRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 

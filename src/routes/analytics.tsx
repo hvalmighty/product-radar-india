@@ -1051,7 +1051,7 @@ function LookupView() {
               Include MF look-through
             </label>
             <span className="text-[10px] text-muted-foreground">·</span>
-            {["HDFC Bank","Reliance Inds.","ICICI Bank","Infosys","Axis AMC","Financials"].map(s => (
+            {getQuickFilters().map(s => (
               <button key={s} onClick={() => setQuery(s)} className="text-[10px] px-2 py-0.5 rounded border border-border bg-card hover:bg-muted">{s}</button>
             ))}
           </div>

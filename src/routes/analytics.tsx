@@ -485,54 +485,7 @@ const P_DIM_LABEL: Record<PDim, string> = {
   assetClass: "Asset Class", sector: "Sector", issuer: "Issuer", amc: "AMC", liquidity: "Liquidity",
 };
 
-type FlatHolding = {
-  clientId: string; client: string; segment: BSegment; rm: BRm;
-  product: Holding["product"]; assetClass: Holding["assetClass"];
-  issuer: string; amc: string; sector: string; liquidity: Holding["liquidity"];
-  value: number; fee: number; isUnderlying: boolean; parentSecurity?: string;
-};
-
-const flatHoldings: FlatHolding[] = (() => {
-  const out: FlatHolding[] = [];
-  clientPortfolios.forEach(p => {
-    p.holdings.forEach(h => {
-      out.push({
-        clientId: p.id, client: p.client, segment: p.segment, rm: p.rm,
-        product: h.product, assetClass: h.assetClass,
-        issuer: h.issuer, amc: h.amc ?? h.issuer, sector: h.sector, liquidity: h.liquidity,
-        value: h.value, fee: h.fee, isUnderlying: false,
-      });
-    });
-  });
-  return out;
-})();
-
-// Look-through holdings (MF underlyings resolved to issuer level)
-const lookthroughHoldings: FlatHolding[] = (() => {
-  const out: FlatHolding[] = [];
-  clientPortfolios.forEach(p => {
-    p.holdings.forEach(h => {
-      if (h.product === "MF" && h.underlyings && h.underlyings.length) {
-        h.underlyings.forEach(u => {
-          out.push({
-            clientId: p.id, client: p.client, segment: p.segment, rm: p.rm,
-            product: h.product, assetClass: h.assetClass,
-            issuer: u.issuer, amc: h.amc ?? h.issuer, sector: u.sector, liquidity: h.liquidity,
-            value: +(h.value * u.weight / 100).toFixed(3), fee: h.fee, isUnderlying: true, parentSecurity: h.security,
-          });
-        });
-      } else {
-        out.push({
-          clientId: p.id, client: p.client, segment: p.segment, rm: p.rm,
-          product: h.product, assetClass: h.assetClass,
-          issuer: h.issuer, amc: h.amc ?? h.issuer, sector: h.sector, liquidity: h.liquidity,
-          value: h.value, fee: h.fee, isUnderlying: false,
-        });
-      }
-    });
-  });
-  return out;
-})();
+// FlatHolding type + flatHoldings/lookthroughHoldings now come from @/lib/analytics-data.
 
 function PortfolioAnalytics() {
   const [view, setView] = useState<"healthcheck" | "pivot" | "drift" | "concentration" | "underperform" | "lookup">("healthcheck");

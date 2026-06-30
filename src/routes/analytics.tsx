@@ -97,7 +97,7 @@ function AnalyticsPage() {
         </div>
       </header>
 
-      {tab === "business" ? <BusinessAnalytics /> : <PortfolioAnalytics />}
+      {tab === "business" ? <BusinessAnalytics key={region} /> : <PortfolioAnalytics key={region} />}
     </div>
   );
 }

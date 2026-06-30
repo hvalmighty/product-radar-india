@@ -9,11 +9,13 @@ import { useRegion, fmtMoney } from "@/lib/region";
 
 type SavedPortfolio = { id: string; name: string; savedAt: number; data: PortfolioParseResult; family?: string; isSample?: boolean };
 
-function loadSavedFor(region: "IN" | "AE"): SavedPortfolio[] {
+import type { Region } from "@/lib/region";
+
+function loadSavedFor(region: Region): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
   try { return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]"); } catch { return []; }
 }
-function writeSavedFor(region: "IN" | "AE", list: SavedPortfolio[]) {
+function writeSavedFor(region: Region, list: SavedPortfolio[]) {
   localStorage.setItem(storageKeyForRegion(region), JSON.stringify(list));
 }
 

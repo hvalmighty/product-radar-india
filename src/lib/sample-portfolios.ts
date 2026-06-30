@@ -377,11 +377,128 @@ function buildPortfoliosAE(): SavedPortfolio[] {
 }
 
 // ============================================================================
+// PHILIPPINES portfolios (PHP, PSE securities, BSP/BTr bonds)
+// ============================================================================
+const mkPhEquity: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name, type: "Equity",
+  quantity: Math.round(value / 100), price: 100, value,
+  source: "PSE", productCategory: "Direct Equity", ...opts,
+});
+const mkPhBond: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name, type: "Bond",
+  quantity: Math.round(value / 1000), price: 1000, value,
+  source: "PSE", productCategory: "Direct Debt", ...opts,
+});
+const mkPhMfEquity: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name, type: "Mutual Fund",
+  quantity: Math.round(value / 10), price: 10, value,
+  source: "PSE", productCategory: "Mutual Fund - Equity", ...opts,
+});
+const mkPhMfDebt: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name, type: "Mutual Fund",
+  quantity: Math.round(value / 1000), price: 1000, value,
+  source: "PSE", productCategory: "Mutual Fund - Debt", ...opts,
+});
+const mkPhReit: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name: `${name}`, type: "Equity",
+  quantity: Math.round(value / 38), price: 38, value,
+  source: "PSE", productCategory: "REIT", ...opts,
+});
+const mkPhRe: Mk = (name, value, opts) => ({
+  isin: isin("PHP"), name: `${name} Real Estate`, type: "Other",
+  quantity: 1, price: value, value,
+  source: "PSE", productCategory: "Real Estate", ...opts,
+});
+
+function buildPortfoliosPH(): SavedPortfolio[] {
+  const now = Date.now();
+  const ph = (investor: string, pan: string, holdings: Holding[]) =>
+    pkg(investor, pan, holdings, { source: "PSE Custodian", asOf: "31-May-2026" });
+  const list: Array<Omit<SavedPortfolio, "savedAt" | "isSample">> = [
+    {
+      id: "sample-ph-santos-miguel", name: "Miguel Santos — Patriarch", family: "Santos Family",
+      data: ph("Miguel Santos", "TIN-123-456-789-000", [
+        mkPhEquity("SM Investments", 4_200_000),
+        mkPhEquity("BDO Unibank", 3_100_000),
+        mkPhEquity("Ayala Land", 2_400_000),
+        mkPhEquity("PLDT", 1_800_000),
+        mkPhMfEquity("BPI Philippine Equity Fund", 2_800_000),
+        mkPhMfEquity("ALFM Growth Fund", 2_100_000),
+        mkPhMfDebt("ATRAM Total Return Peso Bond Fund", 3_500_000),
+        mkPhBond("BTr 6.25% RTB 2034", 5_000_000),
+        mkPhBond("Ayala Corp 6.85% 2031 AAA", 2_500_000),
+        mkPhBond("BDO Tier 2 8.25% 2029", 2_000_000),
+        mkPhReit("AREIT", 900_000),
+        mkPhRe("BGC Bonifacio Global City Office", 18_000_000),
+        mkPhRe("Tagaytay Residential Villa", 12_000_000),
+      ]),
+    },
+    {
+      id: "sample-ph-santos-isabella", name: "Isabella Santos", family: "Santos Family",
+      data: ph("Isabella Santos", "TIN-234-567-890-000", [
+        mkPhEquity("Ayala Corporation", 1_500_000),
+        mkPhEquity("Jollibee Foods Corp", 1_200_000),
+        mkPhMfEquity("Sun Life Philippine Equity Fund", 1_800_000),
+        mkPhMfEquity("Philequity Fund", 1_400_000),
+        mkPhMfDebt("BPI Premium Bond Fund", 1_200_000),
+        mkPhBond("BTr 5.95% FXTN 2030", 1_500_000),
+        mkPhReit("RL Commercial REIT", 450_000),
+      ]),
+    },
+    {
+      id: "sample-ph-reyes-antonio", name: "Antonio Reyes — Family Office", family: "Reyes Family Office",
+      data: ph("Antonio Reyes", "TIN-345-678-901-000", [
+        mkPhEquity("SM Prime Holdings", 6_500_000),
+        mkPhEquity("BPI", 4_200_000),
+        mkPhEquity("Metrobank", 3_800_000),
+        mkPhEquity("Globe Telecom", 2_400_000),
+        mkPhEquity("Manila Electric Co", 1_800_000),
+        mkPhEquity("Aboitiz Power", 1_500_000),
+        mkPhMfEquity("Manulife Equity Wealth Fund", 4_500_000),
+        mkPhMfDebt("First Metro Save and Learn Fixed Income", 3_500_000),
+        mkPhBond("BTr 6.85% 25Y FXTN", 6_000_000),
+        mkPhBond("PLDT 6.85% 2034 AAA", 4_500_000),
+        mkPhBond("Meralco 6.85% 2034 AAA", 5_500_000),
+        mkPhBond("Metrobank Tier 2 8.35% 2029", 3_500_000),
+        mkPhRe("Makati CBD Office Floor", 28_000_000),
+        mkPhRe("Boracay Resort Asset", 15_000_000),
+      ]),
+    },
+    {
+      id: "sample-ph-reyes-sofia", name: "Sofia Reyes", family: "Reyes Family Office",
+      data: ph("Sofia Reyes", "TIN-456-789-012-000", [
+        mkPhEquity("Converge ICT", 800_000),
+        mkPhEquity("Monde Nissin", 700_000),
+        mkPhMfEquity("BDO Equity Fund", 1_200_000),
+        mkPhMfDebt("BPI Short Term Fund", 900_000),
+        mkPhBond("BTr RTB 6.45% 2030", 1_000_000),
+      ]),
+    },
+    {
+      id: "sample-ph-cruz-rafael", name: "Rafael Cruz — Returning OFW HNI",
+      data: ph("Rafael Cruz (Returning OFW)", "TIN-567-890-123-000", [
+        mkPhEquity("Ayala Land", 1_500_000),
+        mkPhEquity("ACEN Corporation", 600_000),
+        mkPhEquity("Cebu Air", 800_000),
+        mkPhMfEquity("BPI Global Equity Feeder Fund", 1_800_000),
+        mkPhMfDebt("Sun Life Prosperity Bond Fund", 1_200_000),
+        mkPhBond("BTr 6.25% 10Y FXTN", 1_500_000),
+        mkPhBond("Ayala Land 6.75% 2030 AAA", 1_000_000),
+        mkPhReit("Megaworld REIT", 400_000),
+        mkPhRe("Quezon City Condominium", 4_500_000),
+      ]),
+    },
+  ];
+  return list.map(p => ({ ...p, savedAt: now, isSample: true }));
+}
+
+// ============================================================================
 // Region-keyed registries
 // ============================================================================
 export const SAMPLE_PORTFOLIOS_BY_REGION: Record<Region, SavedPortfolio[]> = {
   IN: buildPortfoliosIN(),
   AE: buildPortfoliosAE(),
+  PH: buildPortfoliosPH(),
 };
 
 export const SAMPLE_FAMILIES_BY_REGION: Record<Region, { name: string; portfolioIds: string[] }[]> = {
@@ -394,6 +511,10 @@ export const SAMPLE_FAMILIES_BY_REGION: Record<Region, { name: string; portfolio
   AE: [
     { name: "Al Maktoum Family Office", portfolioIds: ["sample-ae-almaktoum-rashid", "sample-ae-almaktoum-maryam"] },
     { name: "Al Nahyan Family Office",  portfolioIds: ["sample-ae-alnahyan-hamdan", "sample-ae-alnahyan-sara"] },
+  ],
+  PH: [
+    { name: "Santos Family",       portfolioIds: ["sample-ph-santos-miguel", "sample-ph-santos-isabella"] },
+    { name: "Reyes Family Office", portfolioIds: ["sample-ph-reyes-antonio", "sample-ph-reyes-sofia"] },
   ],
 };
 

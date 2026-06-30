@@ -471,7 +471,7 @@ function BusinessAnalytics() {
       </section>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Configurable analytics for an illustrative Indian wealth-management firm. All figures synthetic.
+        Configurable analytics for an illustrative {REGION_META[getCurrentRegion()].label} wealth-management firm. All figures synthetic.
       </p>
     </main>
   );

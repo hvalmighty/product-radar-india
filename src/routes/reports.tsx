@@ -25,7 +25,7 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-function loadSavedFor(region: "IN" | "AE"): SavedPortfolio[] {
+function loadSavedFor(region: import("@/lib/region").Region): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
   try { return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]"); } catch { return []; }
 }

@@ -26,7 +26,7 @@ export const Route = createFileRoute("/tax")({
 });
 
 // ---------------- Helpers ----------------
-function loadSaved(region: "IN" | "AE"): SavedPortfolio[] {
+function loadSaved(region: import("@/lib/region").Region): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
   try {
     return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]");
@@ -662,6 +662,47 @@ function TaxPage() {
       </div>
     );
   }
+
+  // Philippines: BIR taxes capital gains differently — show informational notice
+  // rather than reusing the India FY 2025-26 LTCG/STCG engine.
+  if (region === "PH") {
+    return (
+      <div className="min-h-screen text-foreground">
+        <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
+          <div className="pl-12 pr-6 py-3 flex items-center gap-4">
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">Tax Liability</h1>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Philippines Residency</p>
+            </div>
+          </div>
+        </header>
+        <main className="px-6 py-12 max-w-3xl mx-auto">
+          <div className="border border-border rounded-lg bg-surface/60 p-8">
+            <div className="flex items-center gap-2 text-foreground font-semibold mb-3">
+              <CheckCircle2 className="w-5 h-5" /> Philippines Capital-Gains Regime (BIR / NIRC)
+            </div>
+            <ul className="text-sm text-muted-foreground leading-relaxed list-disc pl-5 space-y-1.5">
+              <li><strong className="text-foreground">PSE-listed equities</strong> — exempt from CGT; subject to <strong className="text-foreground">0.6% Stock Transaction Tax</strong> on gross selling price (NIRC §127).</li>
+              <li><strong className="text-foreground">Unlisted shares</strong> — flat <strong className="text-foreground">15% CGT</strong> on net gain (NIRC §24(C), as amended by TRAIN Law).</li>
+              <li><strong className="text-foreground">Mutual fund / UITF redemption</strong> — gains from BIR-registered MFs are tax-exempt for the investor; fund pays final tax at issuer level.</li>
+              <li><strong className="text-foreground">Govt securities & corporate bonds</strong> — interest taxed at 20% final withholding tax; gains on sale of long-tenor (≥5Y) govt bonds tax-exempt.</li>
+              <li><strong className="text-foreground">Dividends (resident individuals)</strong> — 10% final withholding tax.</li>
+              <li><strong className="text-foreground">Real property</strong> — 6% CGT on gross selling price or zonal value (whichever higher) plus 1.5% DST.</li>
+            </ul>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-4">
+              For an Indian-resident client's capital-gains liability, switch the region toggle back to
+              <strong className="text-foreground"> India</strong> to use the FY 2025-26 LTCG/STCG engine.
+            </p>
+            <div className="mt-6 text-[11px] text-muted-foreground border-t border-border pt-4">
+              Sources: Bureau of Internal Revenue (BIR), National Internal Revenue Code (NIRC) as amended by TRAIN (RA 10963) and CREATE (RA 11534).
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+
 
 
   const regime: TaxRegime = { slabRate, surcharge, cessRate: 4 };

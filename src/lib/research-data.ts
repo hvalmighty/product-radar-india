@@ -983,6 +983,367 @@ const bondsAE: Bond[] = BOND_SEED_AE.map((b, i) => ({
 // ================ REGION-AWARE PROXY EXPORTS =========================
 // =====================================================================
 
+// =====================================================================
+// ================ PHILIPPINES DATASET =================================
+// =====================================================================
+// PH-flavored mock data. PHP-denominated; PSE-listed equities, BSP/Bureau of Treasury
+// govt bonds, BDO/BPI/Metrobank UITFs/Mutual funds, SEC-registered investment houses.
+
+const randPH = seeded(5621);
+const pickPH = <T,>(arr: T[]) => arr[Math.floor(randPH() * arr.length)];
+const rPH = (min: number, max: number, dp = 2) => +(min + randPH() * (max - min)).toFixed(dp);
+
+const AMCS_PH = [
+  "BDO Trust", "BPI Investment Mgmt", "Metrobank Trust", "ATR Asset Mgmt",
+  "Sun Life Asset Mgmt", "ALFM Mutual Funds", "First Metro Asset Mgmt",
+  "Philequity Mgmt", "Manulife Investment", "ATRAM Trust", "PNB Trust",
+  "Security Bank Trust", "Rizal Commercial Banking Trust",
+];
+const MF_SUB_PH = [
+  "Philippine Equity", "Philippine Stock Index", "Balanced", "Bond", "Money Market",
+  "Global Equity Feeder", "US Equity Feeder", "ASEAN Equity", "Dollar Bond", "Peso Bond",
+];
+const BENCH_PH = [
+  "PSEi", "PSE All Shares", "HSBC Phil Bond Index", "MSCI Philippines",
+  "Markit iBoxx ALBI Philippines", "MSCI Emerging Markets",
+];
+const FUND_MGRS_PH = [
+  "M. Dela Cruz", "R. Santos", "J. Reyes", "A. Gonzales", "C. Bautista",
+  "L. Aquino", "F. Tan", "K. Lim", "P. Cruz", "E. Mendoza",
+];
+
+const mutualFundsPH: MutualFund[] = Array.from({ length: 30 }, (_, i) => {
+  const sub = pickPH(MF_SUB_PH);
+  const isDebt = ["Bond", "Money Market", "Dollar Bond", "Peso Bond"].includes(sub);
+  const isHybrid = sub === "Balanced";
+  const assetClass: MutualFund["assetClass"] = isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity";
+  const amc = pickPH(AMCS_PH);
+  const r3 = rPH(isDebt ? 3 : 5, isDebt ? 6 : 20);
+  const sharpe = rPH(0.2, 1.7);
+  return {
+    category: "MF",
+    id: `MF-PH-${1000 + i}`,
+    name: `${amc} ${sub} Fund`,
+    amc,
+    subCategory: sub,
+    assetClass,
+    nav: rPH(1.2, 8.5),
+    aum: Math.round(rPH(50, 8500, 0)),         // PHP Million
+    expenseRatio: rPH(0.5, 2.25),
+    returns1y: rPH(isDebt ? 2.5 : -6, isDebt ? 6 : 28),
+    returns3y: r3,
+    returns5y: rPH(isDebt ? 3 : 5, isDebt ? 5.5 : 16),
+    ytdReturn: rPH(isDebt ? 1 : -4, isDebt ? 4.5 : 16),
+    sharpe,
+    sortino: +(sharpe * rPH(1.1, 1.6)).toFixed(2),
+    alpha: rPH(-2, 5),
+    beta: isDebt ? rPH(0.05, 0.4) : rPH(0.6, 1.2),
+    maxDrawdown: isDebt ? rPH(-4, -0.5) : isHybrid ? rPH(-16, -5) : rPH(-38, -10),
+    risk: isDebt ? "Low-Mod" : isHybrid ? "Moderate" : pickPH(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rPH(2, 5, 0)),
+    minInvestment: pickPH([1000, 5000, 10000, 50000]),
+    sipMin: pickPH([500, 1000, 2500, 5000]),
+    exitLoad: isDebt ? "Nil" : "1% if <1Y",
+    exitLoadDays: isDebt ? 0 : 365,
+    lockInYears: 0,
+    taxation: isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity",
+    benchmark: isDebt ? "Markit iBoxx ALBI Philippines" : pickPH(BENCH_PH),
+    fundManager: pickPH(FUND_MGRS_PH),
+    inceptionYear: Math.round(rPH(2003, 2022, 0)),
+  };
+});
+
+const BANKS_PH_PUB = ["Land Bank of the Philippines", "Development Bank of the Phil"];
+const BANKS_PH_PVT = ["BDO Unibank", "BPI", "Metrobank", "PNB", "Security Bank", "China Bank", "Union Bank", "RCBC", "EastWest Bank"];
+const NBFC_PH = ["Asialink Finance", "Maybank Phil", "Citystate Savings Bank", "Sun Life Grepa Financial"];
+
+const FD_ENTRIES_PH: { issuer: string; sub: FixedDeposit["subCategory"]; rating: string }[] = [
+  ...BANKS_PH_PUB.map(b => ({ issuer: b, sub: "Public Bank" as const, rating: "BBB+" })),
+  ...BANKS_PH_PVT.map(b => ({ issuer: b, sub: "Private Bank" as const, rating: pickPH(["BBB+", "BBB", "A-"]) })),
+  ...NBFC_PH.map(b => ({ issuer: b, sub: "NBFC" as const, rating: pickPH(["BB+", "BB"]) })),
+];
+
+const fixedDepositsPH: FixedDeposit[] = FD_ENTRIES_PH.flatMap((e, i) =>
+  TENURES.slice(0, 4 + (i % 3)).map((t, j) => {
+    const base = e.sub === "NBFC" ? 5.5 : e.sub === "Private Bank" ? 4.8 : 4.4;
+    const rate = +(base + (t > 12 ? 0.3 : 0) + randPH() * 0.9).toFixed(2);
+    return {
+      category: "FD",
+      id: `FD-PH-${2000 + i * 10 + j}`,
+      name: `${e.issuer} ${t}M Time Deposit`,
+      issuer: e.issuer,
+      subCategory: e.sub,
+      tenureMonths: t,
+      interestRate: rate,
+      seniorRate: +(rate + 0.25).toFixed(2),
+      compounding: pickPH(["Quarterly", "Monthly", "At Maturity"] as FixedDeposit["compounding"][]),
+      minInvestment: pickPH([10000, 50000, 100000, 500000]),
+      maxInvestment: null,
+      premature: randPH() > 0.2,
+      rating: e.rating,
+      insuredDICGC: true,         // PDIC covers up to ₱500K per depositor
+      payout: pickPH(["Cumulative", "Non-Cumulative"] as const),
+    };
+  })
+);
+
+const INSURERS_PH = [
+  "Sun Life of Canada (Phils)", "Philam Life (AIA)", "Manulife Phil", "BPI AIA Life",
+  "Insular Life", "Pru Life UK", "FWD Life Insurance", "AXA Philippines",
+  "Generali Phil", "BDO Life Assurance", "Allianz PNB Life", "Sun Life Grepa",
+];
+
+const insurancePH: Insurance[] = Array.from({ length: 26 }, (_, i) => {
+  const sub = INS_SUB[i % INS_SUB.length];
+  const insurer = pickPH(INSURERS_PH);
+  const isTerm = sub === "Term";
+  const isHealth = sub === "Health";
+  const sa = isTerm ? pickPH([1000000, 3000000, 5000000, 10000000]) : isHealth ? pickPH([250000, 500000, 1000000, 2500000]) : pickPH([500000, 1000000, 2500000]);
+  const premium = isTerm ? Math.round(sa * rPH(0.0010, 0.0025)) : isHealth ? Math.round(sa * rPH(0.025, 0.06)) : Math.round(sa * rPH(0.05, 0.13));
+  return {
+    category: "INS",
+    id: `IN-PH-${3000 + i}`,
+    name: `${insurer} ${sub} ${isTerm ? "Protect" : isHealth ? "Care" : "Plus"}`,
+    insurer,
+    subCategory: sub,
+    sumAssured: sa,
+    premiumAnnual: premium,
+    policyTermYears: isTerm ? pickPH([20, 25, 30]) : sub === "Annuity" ? pickPH([10, 15, 20]) : pickPH([10, 15, 20]),
+    ppt: isTerm ? pickPH([10, 15, 20]) : pickPH([5, 7, 10]),
+    claimSettlement: rPH(91, 99),
+    solvencyRatio: rPH(1.4, 2.6),
+    irr: ["Endowment", "ULIP", "Annuity", "Child"].includes(sub) ? rPH(3.5, 7.0) : undefined,
+    taxBenefit: "Premiums deductible under NIRC §34",
+    riders: pickPH([["Critical Illness"], ["Accidental Death"], ["Critical Illness", "Waiver of Premium"], ["Accidental Death", "Critical Illness"]]),
+    rating: Math.round(rPH(3, 5, 0)),
+  };
+});
+
+const PMS_HOUSES_PH = [
+  "BDO Trust", "BPI Wealth", "Metrobank Trust", "ATRAM Trust",
+  "Security Bank Trust", "Manulife Investment Mgmt", "Sun Life Investment Mgmt",
+  "Philequity Mgmt", "First Metro Sec", "China Bank Capital", "RCBC Trust",
+];
+const PMS_BENCH_PH = ["PSEi", "PSE All Shares", "MSCI Philippines", "Markit iBoxx ALBI Philippines"];
+
+const pmsSchemesPH: PMS[] = Array.from({ length: 20 }, (_, i) => {
+  const manager = pickPH(PMS_HOUSES_PH);
+  const strategy = PMS_STRATEGIES[i % PMS_STRATEGIES.length];
+  const isDebt = strategy === "Debt";
+  return {
+    category: "PMS",
+    id: `PMS-PH-${4000 + i}`,
+    name: `${manager} ${strategy} Mandate`,
+    manager,
+    structure: pickPH(["Discretionary", "Discretionary", "Non-Discretionary", "Advisory"] as PMS["structure"][]),
+    strategy,
+    benchmark: isDebt ? "Markit iBoxx ALBI Philippines" : pickPH(PMS_BENCH_PH),
+    aum: Math.round(rPH(30, 3500, 0)),         // PHP Million
+    minInvestment: 1000000,                    // ₱1M typical UITF-discretionary minimum
+    returns1y: rPH(isDebt ? 3 : -4, isDebt ? 7 : 32),
+    returns3y: rPH(isDebt ? 3.5 : 5, isDebt ? 6 : 22),
+    returns5y: rPH(isDebt ? 4 : 7, isDebt ? 5.5 : 18),
+    alpha: rPH(-2, 6),
+    sharpe: rPH(0.4, 1.8),
+    beta: isDebt ? rPH(0.1, 0.5) : rPH(0.7, 1.3),
+    maxDrawdown: rPH(isDebt ? -6 : -32, isDebt ? -2 : -10),
+    fixedFee: rPH(0.5, 2.0),
+    performanceFee: pickPH(["20% over 8% hurdle", "15% over 6% hurdle", "Nil", "15% over benchmark"]),
+    exitLoad: pickPH(["1% if <1Y", "Nil after 1Y", "2% Y1, 1% Y2"]),
+    inception: `${2012 + Math.floor(randPH() * 12)}-0${1 + Math.floor(randPH() * 9)}`,
+    risk: isDebt ? "Moderate" : pickPH(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rPH(3, 5, 0)),
+  };
+});
+
+const AIF_HOUSES_PH = [
+  "Navegar PE", "Kickstart Ventures", "Foxmont Capital Partners", "Core Capital",
+  "Ayala Corp Ventures", "Gobi-Core Phil Fund", "ICCP SBI Venture Partners",
+  "JG Summit Capital", "SM Investments Capital", "Ascend Capital", "Cathay Land VC",
+  "ATR KimEng Capital", "First Metro Sec Capital",
+];
+
+const aifSchemesPH: AIF[] = Array.from({ length: 22 }, (_, i) => {
+  const manager = pickPH(AIF_HOUSES_PH);
+  const catRoll = i % 3;
+  const sebiCategory: AIF["sebiCategory"] = catRoll === 0 ? "Category I" : catRoll === 1 ? "Category II" : "Category III";
+  const pool: AIF["subStrategy"][] = sebiCategory === "Category I"
+    ? ["Venture Capital", "SME Fund", "Social Venture", "Infrastructure"]
+    : sebiCategory === "Category II"
+      ? ["Private Equity", "Real Estate", "Private Credit / Debt", "Distressed / Special Sit."]
+      : ["Long-Short Hedge", "Long-Only Equity"];
+  const subStrategy = pickPH(pool);
+  const isDebt = subStrategy === "Private Credit / Debt";
+  const isHedge = subStrategy === "Long-Short Hedge";
+  const corpus = Math.round(rPH(30, 2000, 0)); // PHP Million
+  return {
+    category: "AIF",
+    id: `AIF-PH-${5000 + i}`,
+    name: `${manager} ${subStrategy} Fund ${["I", "II", "III", "IV"][i % 4]}`,
+    manager,
+    sebiCategory,
+    subStrategy,
+    structure: sebiCategory === "Category III" && isHedge ? pickPH(["Open-Ended", "Close-Ended"] as const) : "Close-Ended",
+    vintage: 2018 + Math.floor(randPH() * 8),
+    corpusTarget: corpus,
+    commitments: Math.round(corpus * rPH(0.4, 1.0)),
+    minInvestment: 5000000,                    // ₱5M typical SEC QI ticket
+    tenureYears: sebiCategory === "Category III" ? pickPH([3, 5, 7]) : pickPH([7, 8, 10]),
+    drawdownStatus: Math.round(rPH(15, 100, 0)),
+    targetIRR: rPH(isDebt ? 10 : 15, isDebt ? 14 : 28),
+    netIRR: rPH(isDebt ? 7 : -2, isDebt ? 13 : 30),
+    moic: rPH(0.9, 3.0),
+    hurdleRate: rPH(7, 11),
+    carry: pickPH([10, 15, 20, 20]),
+    managementFee: rPH(1.0, 2.5),
+    domicile: pickPH(["India - GIFT IFSC", "India - Onshore"] as AIF["domicile"][]),
+    risk: isDebt ? "Mod-High" : isHedge ? "High" : "Very High",
+    rating: Math.round(rPH(3, 5, 0)),
+  };
+});
+
+// --- PH Equities (PSE) -------------------------------------------------
+const STOCKS_SEED_PH: { ticker: string; name: string; sector: string; cap: EquityStock["marketCap"]; price: number }[] = [
+  // PSEi 30
+  { ticker: "SM",    name: "SM Investments",            sector: "Conglomerate",     cap: "Large Cap", price: 880 },
+  { ticker: "BDO",   name: "BDO Unibank",               sector: "Banking",          cap: "Large Cap", price: 158 },
+  { ticker: "BPI",   name: "Bank of the Philippine Islands", sector: "Banking",     cap: "Large Cap", price: 142 },
+  { ticker: "MBT",   name: "Metropolitan Bank & Trust", sector: "Banking",          cap: "Large Cap", price: 78 },
+  { ticker: "ALI",   name: "Ayala Land",                sector: "Realty",           cap: "Large Cap", price: 28 },
+  { ticker: "SMPH",  name: "SM Prime Holdings",         sector: "Realty",           cap: "Large Cap", price: 28.5 },
+  { ticker: "AC",    name: "Ayala Corporation",         sector: "Conglomerate",     cap: "Large Cap", price: 615 },
+  { ticker: "JFC",   name: "Jollibee Foods Corp",       sector: "Restaurants",      cap: "Large Cap", price: 245 },
+  { ticker: "ICT",   name: "Intl Container Terminal",   sector: "Logistics",        cap: "Large Cap", price: 410 },
+  { ticker: "TEL",   name: "PLDT",                      sector: "Telecom",          cap: "Large Cap", price: 1320 },
+  { ticker: "GLO",   name: "Globe Telecom",             sector: "Telecom",          cap: "Large Cap", price: 1985 },
+  { ticker: "MER",   name: "Manila Electric Co",        sector: "Power Utility",    cap: "Large Cap", price: 480 },
+  { ticker: "ACEN",  name: "ACEN Corporation",          sector: "Power / Renewables", cap: "Large Cap", price: 4.85 },
+  { ticker: "AEV",   name: "Aboitiz Equity Ventures",   sector: "Conglomerate",     cap: "Large Cap", price: 38 },
+  { ticker: "AP",    name: "Aboitiz Power",             sector: "Power Utility",    cap: "Large Cap", price: 36 },
+  { ticker: "URC",   name: "Universal Robina",          sector: "FMCG",             cap: "Large Cap", price: 84 },
+  { ticker: "CNVRG", name: "Converge ICT Solutions",    sector: "Telecom / Fiber",  cap: "Large Cap", price: 16.5 },
+  { ticker: "GTCAP", name: "GT Capital Holdings",       sector: "Conglomerate",     cap: "Large Cap", price: 685 },
+  { ticker: "JGS",   name: "JG Summit Holdings",        sector: "Conglomerate",     cap: "Large Cap", price: 22 },
+  { ticker: "DMC",   name: "DMCI Holdings",             sector: "Mining / Construction", cap: "Large Cap", price: 11.2 },
+  { ticker: "SCC",   name: "Semirara Mining & Power",   sector: "Mining / Power",   cap: "Large Cap", price: 32 },
+  { ticker: "PGOLD", name: "Puregold Price Club",       sector: "Retail",           cap: "Large Cap", price: 28.5 },
+  { ticker: "EMP",   name: "Emperador",                 sector: "Beverages",        cap: "Large Cap", price: 18.5 },
+  { ticker: "BLOOM", name: "Bloomberry Resorts",        sector: "Gaming / Leisure", cap: "Large Cap", price: 6.85 },
+  { ticker: "MONDE", name: "Monde Nissin",              sector: "FMCG",             cap: "Large Cap", price: 8.45 },
+  { ticker: "NIKL",  name: "Nickel Asia",               sector: "Mining",           cap: "Mid Cap",   price: 4.62 },
+  { ticker: "FGEN",  name: "First Gen Corporation",     sector: "Power Utility",    cap: "Mid Cap",   price: 16.8 },
+  { ticker: "PCOR",  name: "Petron Corporation",        sector: "Oil & Gas",        cap: "Mid Cap",   price: 3.18 },
+  { ticker: "WLCON", name: "Wilcon Depot",              sector: "Retail",           cap: "Mid Cap",   price: 19.5 },
+  { ticker: "AGI",   name: "Alliance Global Group",     sector: "Conglomerate",     cap: "Mid Cap",   price: 10.4 },
+  // Mid / Small caps
+  { ticker: "RLC",   name: "Robinsons Land",            sector: "Realty",           cap: "Mid Cap",   price: 14.2 },
+  { ticker: "MEG",   name: "Megaworld",                 sector: "Realty",           cap: "Mid Cap",   price: 1.85 },
+  { ticker: "VLL",   name: "Vista Land & Lifescapes",   sector: "Realty",           cap: "Mid Cap",   price: 1.62 },
+  { ticker: "PIZZA", name: "Shakey's Pizza Asia",       sector: "Restaurants",      cap: "Mid Cap",   price: 8.95 },
+  { ticker: "MAXS",  name: "Max's Group",               sector: "Restaurants",      cap: "Small Cap", price: 4.42 },
+  { ticker: "CEB",   name: "Cebu Air (Cebu Pacific)",   sector: "Aviation",         cap: "Mid Cap",   price: 32 },
+  { ticker: "PAL",   name: "PAL Holdings",              sector: "Aviation",         cap: "Mid Cap",   price: 7.15 },
+  { ticker: "DDPC",  name: "DoubleDragon Properties",   sector: "Realty",           cap: "Small Cap", price: 8.4 },
+  { ticker: "FB",    name: "San Miguel Food & Beverage", sector: "FMCG",            cap: "Mid Cap",   price: 4.65 },
+  { ticker: "SMC",   name: "San Miguel Corporation",    sector: "Conglomerate",     cap: "Large Cap", price: 108 },
+  { ticker: "EW",    name: "EastWest Banking",          sector: "Banking",          cap: "Mid Cap",   price: 12.4 },
+  { ticker: "CHIB",  name: "China Banking Corp",        sector: "Banking",          cap: "Mid Cap",   price: 48 },
+  { ticker: "SECB",  name: "Security Bank",             sector: "Banking",          cap: "Mid Cap",   price: 86 },
+  { ticker: "PNB",   name: "Philippine National Bank",  sector: "Banking",          cap: "Mid Cap",   price: 28.5 },
+  { ticker: "RCB",   name: "RCBC",                      sector: "Banking",          cap: "Mid Cap",   price: 24.8 },
+  { ticker: "UBP",   name: "Union Bank of the Phil",    sector: "Banking",          cap: "Mid Cap",   price: 32 },
+  { ticker: "MWIDE", name: "Megawide Construction",     sector: "Construction",     cap: "Small Cap", price: 3.15 },
+  { ticker: "FNI",   name: "Global Ferronickel",        sector: "Mining",           cap: "Small Cap", price: 1.82 },
+  { ticker: "AREIT", name: "AREIT Inc",                 sector: "REIT",             cap: "Mid Cap",   price: 38 },
+  { ticker: "RCR",   name: "RL Commercial REIT",        sector: "REIT",             cap: "Mid Cap",   price: 5.85 },
+  { ticker: "MREIT", name: "Megaworld REIT",            sector: "REIT",             cap: "Mid Cap",   price: 14.2 },
+];
+
+const equityStocksPH: EquityStock[] = STOCKS_SEED_PH.map((s, i) => {
+  const isLarge = s.cap === "Large Cap";
+  const cagr3 = rPH(isLarge ? 5 : 3, isLarge ? 22 : 36);
+  const dy = rPH(0.3, isLarge ? 4.5 : 2.2);
+  const eps = rPH(isLarge ? 6 : 10, isLarge ? 16 : 24);
+  return {
+    category: "EQ",
+    id: `EQ-PH-${6000 + i}`,
+    ticker: s.ticker,
+    name: s.name,
+    sector: s.sector,
+    marketCap: s.cap,
+    price: s.price,
+    pe: rPH(8, 55),
+    pb: rPH(0.7, 6),
+    dividendYield: dy,
+    roe: rPH(7, 28),
+    beta: rPH(0.6, 1.4),
+    cagr3y: cagr3,
+    cagr5y: rPH(isLarge ? 6 : 5, isLarge ? 20 : 28),
+    expectedReturn: +(eps + dy).toFixed(2),
+    risk: isLarge ? "Mod-High" : s.cap === "Mid Cap" ? "High" : "Very High",
+  };
+});
+
+// --- PH Bonds (Bureau of Treasury, corporate) --------------------------
+const BOND_SEED_PH: { issuer: string; type: Bond["bondType"]; rating: string; coupon: number; tenor: number; taxable: boolean }[] = [
+  // Govt — RTBs / FXTNs
+  { issuer: "Bureau of Treasury PH", type: "G-Sec", rating: "Sovereign", coupon: 6.25, tenor: 10, taxable: true },
+  { issuer: "Bureau of Treasury PH", type: "G-Sec", rating: "Sovereign", coupon: 6.85, tenor: 25, taxable: true },
+  { issuer: "Bureau of Treasury PH", type: "G-Sec", rating: "Sovereign", coupon: 5.95, tenor: 5, taxable: true },
+  { issuer: "Bureau of Treasury PH", type: "G-Sec", rating: "Sovereign", coupon: 6.15, tenor: 7, taxable: true },
+  { issuer: "BTr Retail Treasury Bond", type: "G-Sec", rating: "Sovereign", coupon: 6.45, tenor: 5, taxable: true },
+  { issuer: "BTr Premyo Bond", type: "G-Sec", rating: "Sovereign", coupon: 5.25, tenor: 1, taxable: true },
+  { issuer: "BTr Dollar Sovereign", type: "G-Sec", rating: "Sovereign", coupon: 5.65, tenor: 10, taxable: false },
+  // LGU / SDL-equivalent
+  { issuer: "City of Manila LGU", type: "State Dev Loan", rating: "BBB-", coupon: 6.95, tenor: 10, taxable: true },
+  { issuer: "Cebu City LGU", type: "State Dev Loan", rating: "BBB-", coupon: 7.05, tenor: 10, taxable: true },
+  // PSU / GRE
+  { issuer: "Power Sector Assets & Liabilities (PSALM)", type: "PSU Bond", rating: "BBB+", coupon: 6.55, tenor: 10, taxable: true },
+  { issuer: "National Power Corp (NPC)", type: "PSU Bond", rating: "BBB+", coupon: 6.65, tenor: 7, taxable: true },
+  { issuer: "Land Bank of the Philippines", type: "PSU Bond", rating: "BBB", coupon: 6.45, tenor: 5, taxable: true },
+  { issuer: "Development Bank of the Phil", type: "PSU Bond", rating: "BBB", coupon: 6.55, tenor: 5, taxable: true },
+  // Corporate
+  { issuer: "Ayala Corporation", type: "Corporate Bond", rating: "AAA", coupon: 6.85, tenor: 7, taxable: true },
+  { issuer: "Ayala Land", type: "Corporate Bond", rating: "AAA", coupon: 6.75, tenor: 5, taxable: true },
+  { issuer: "SM Investments", type: "Corporate Bond", rating: "AAA", coupon: 6.65, tenor: 5, taxable: true },
+  { issuer: "SM Prime Holdings", type: "Corporate Bond", rating: "AAA", coupon: 6.55, tenor: 7, taxable: true },
+  { issuer: "BDO Unibank", type: "Corporate Bond", rating: "AAA", coupon: 6.45, tenor: 5, taxable: true },
+  { issuer: "Metrobank", type: "Corporate Bond", rating: "AAA", coupon: 6.55, tenor: 5, taxable: true },
+  { issuer: "PLDT", type: "Corporate Bond", rating: "AAA", coupon: 6.85, tenor: 10, taxable: true },
+  { issuer: "Globe Telecom", type: "Corporate Bond", rating: "AAA", coupon: 6.75, tenor: 7, taxable: true },
+  { issuer: "Meralco", type: "Corporate Bond", rating: "AAA", coupon: 6.85, tenor: 10, taxable: true },
+  { issuer: "Aboitiz Equity Ventures", type: "Corporate Bond", rating: "AA+", coupon: 7.05, tenor: 5, taxable: true },
+  { issuer: "JG Summit Holdings", type: "Corporate Bond", rating: "AA+", coupon: 7.15, tenor: 7, taxable: true },
+  { issuer: "Jollibee Foods Corp", type: "Corporate Bond", rating: "AA", coupon: 7.25, tenor: 5, taxable: true },
+  { issuer: "Petron Corporation", type: "Corporate Bond", rating: "A+", coupon: 7.85, tenor: 5, taxable: true },
+  { issuer: "San Miguel Corporation", type: "Corporate Bond", rating: "AA", coupon: 7.45, tenor: 7, taxable: true },
+  // AT1
+  { issuer: "BDO Tier 2 Notes", type: "Perpetual / AT1", rating: "AA-", coupon: 8.25, tenor: 5, taxable: true },
+  { issuer: "BPI Tier 2 Notes", type: "Perpetual / AT1", rating: "AA-", coupon: 8.15, tenor: 5, taxable: true },
+  { issuer: "Metrobank Tier 2", type: "Perpetual / AT1", rating: "A+", coupon: 8.35, tenor: 5, taxable: true },
+];
+
+const bondsPH: Bond[] = BOND_SEED_PH.map((b, i) => ({
+  category: "BOND",
+  id: `BD-PH-${7000 + i}`,
+  name: `${b.issuer} ${b.coupon}% ${b.tenor}Y`,
+  issuer: b.issuer,
+  bondType: b.type,
+  rating: b.rating,
+  couponRate: b.coupon,
+  ytm: +(b.coupon + rPH(-0.3, 0.6)).toFixed(2),
+  residualTenorYears: b.tenor,
+  faceValue: 1000,
+  minInvestment: b.type === "G-Sec" ? 5000 : 100000,
+  payout: b.type === "Zero Coupon" ? "Cumulative" : "Semi-Annual",
+  taxable: b.taxable,
+  risk: b.rating === "Sovereign" ? "Low" : b.type === "Perpetual / AT1" ? "Mod-High" : b.rating.startsWith("AA") ? "Low-Mod" : b.rating.startsWith("A") ? "Moderate" : "Mod-High",
+}));
+
+// =====================================================================
+// ================ REGION-AWARE PROXY EXPORTS =========================
+// =====================================================================
+
 const DATA_SETS: Record<Region, {
   mutualFunds: MutualFund[];
   fixedDeposits: FixedDeposit[];
@@ -1009,6 +1370,15 @@ const DATA_SETS: Record<Region, {
     aifSchemes: aifSchemesAE,
     equityStocks: equityStocksAE,
     bonds: bondsAE,
+  },
+  PH: {
+    mutualFunds: mutualFundsPH,
+    fixedDeposits: fixedDepositsPH,
+    insurance: insurancePH,
+    pmsSchemes: pmsSchemesPH,
+    aifSchemes: aifSchemesPH,
+    equityStocks: equityStocksPH,
+    bonds: bondsPH,
   },
 };
 

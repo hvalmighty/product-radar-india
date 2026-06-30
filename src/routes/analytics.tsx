@@ -58,8 +58,9 @@ const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec
 // Page
 // ============================================================
 function AnalyticsPage() {
-  // Subscribe to region changes so the formatter helpers re-render with the right currency/unit.
-  useRegionReactive();
+  // Subscribe to region changes so the formatter helpers re-render with the right currency/unit,
+  // and so child components remount with the new region's dataset.
+  const { region, meta } = useRegionReactive();
   const [tab, setTab] = useState<"business" | "portfolio">("business");
 
   return (

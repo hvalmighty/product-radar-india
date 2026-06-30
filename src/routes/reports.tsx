@@ -527,6 +527,117 @@ function ReportView({ portfolios, title, mode, onBack }: {
     { id: "annex", label: "8. Annexures" },
   ];
 
+  // --- Build PPT export payload (mirrors commentary + drilldown calcs) ---
+  function buildPptPayload() {
+    const equityShare = byAssetClass.filter(a => /Equity|Hybrid|ETF/.test(a.name)).reduce((s, a) => s + a.pct, 0) / 100;
+    const debtShare = byAssetClass.filter(a => /Debt|Cash/.test(a.name)).reduce((s, a) => s + a.pct, 0) / 100;
+    const blendedReturn = byAssetClass.reduce((s, a) => s + a.ret * (a.pct / 100), 0);
+    const blendedBench = byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0);
+    const alpha = blendedReturn - blendedBench;
+    const top5 = byIssuer.slice(0, 5).reduce((s, i) => s + i.pct, 0);
+    const top10 = byIssuer.slice(0, 10).reduce((s, i) => s + i.pct, 0);
+    const top1 = byIssuer[0];
+    const topSector = bySector[0];
+    const top3Sector = bySector.slice(0, 3).reduce((s, i) => s + i.pct, 0);
+    const liquidPct = liquidity.filter(l => /T\+1|T\+3|Short/.test(l.name)).reduce((s, l) => s + l.pct, 0);
+    const illiquidPct = liquidity.filter(l => /Long/.test(l.name)).reduce((s, l) => s + l.pct, 0);
+    const sovereignAAA = byRating.filter(r => /Sovereign|AAA/.test(r.name)).reduce((s, r) => s + r.pct, 0);
+    const subAA = byRating.filter(r => /^A$|AA(?!A|\+)/.test(r.name)).reduce((s, r) => s + r.pct, 0);
+    const largeCap = byMarketCap.find(m => m.name === "Large Cap")?.pct ?? 0;
+    const smallMid = (byMarketCap.find(m => m.name === "Small Cap")?.pct ?? 0) + (byMarketCap.find(m => m.name === "Mid Cap")?.pct ?? 0);
+    const bestAsset = [...byAssetClass].sort((a, b) => (b.ret - b.bench.ret) - (a.ret - a.bench.ret))[0];
+    const worstAsset = [...byAssetClass].sort((a, b) => (a.ret - a.bench.ret) - (b.ret - b.bench.ret))[0];
+
+    let riskScore = 3;
+    if (equityShare > 0.6) riskScore += 2; else if (equityShare > 0.4) riskScore += 1;
+    if (smallMid > 30) riskScore += 1;
+    if (top5 > 40) riskScore += 1;
+    if (top3Sector > 60) riskScore += 1;
+    if (subAA > 10) riskScore += 1;
+    if (illiquidPct > 30) riskScore += 1;
+    riskScore = Math.min(10, riskScore);
+    const riskBand = riskScore <= 3 ? "Low" : riskScore <= 6 ? "Moderate" : riskScore <= 8 ? "Moderately High" : "High";
+
+    const profileEquityTarget: Record<string, number> = { Conservative: 25, Moderate: 50, Aggressive: 75 };
+    const targetEq = profileEquityTarget[riskProfile] ?? 50;
+    const equityGap = equityShare * 100 - targetEq;
+
+    const performance = [
+      { kind: (alpha >= 0 ? "good" : "warn") as "good" | "warn", text: `Blended return ${pct(blendedReturn)} vs blended benchmark ${pct(blendedBench)} (${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}% alpha).` },
+      bestAsset && { kind: "good" as const, text: `Best sleeve: ${bestAsset.name} ${pct(bestAsset.ret)} vs ${pct(bestAsset.bench.ret)}.` },
+      worstAsset && worstAsset.name !== bestAsset?.name && { kind: ((worstAsset.ret - worstAsset.bench.ret) < -2 ? "warn" : "info") as "warn" | "info", text: `Weakest sleeve: ${worstAsset.name} ${pct(worstAsset.ret)} vs ${pct(worstAsset.bench.ret)}.` },
+    ].filter(Boolean) as { kind: "good" | "warn" | "info"; text: string }[];
+
+    const concentration = [
+      top1 && { kind: (top1.pct > 15 ? "warn" : top1.pct > 10 ? "info" : "good") as "good" | "warn" | "info", text: `Largest holding "${top1.name}" is ${pct(top1.pct)} of portfolio.` },
+      { kind: (top5 > 50 ? "warn" : top5 > 35 ? "info" : "good") as "good" | "warn" | "info", text: `Top 5 issuers ${pct(top5)} · Top 10 ${pct(top10)}.` },
+      topSector && { kind: (topSector.pct > 35 ? "warn" : topSector.pct > 25 ? "info" : "good") as "good" | "warn" | "info", text: `Top sector ${topSector.name} ${pct(topSector.pct)} · Top-3 sectors ${pct(top3Sector)}.` },
+    ].filter(Boolean) as { kind: "good" | "warn" | "info"; text: string }[];
+
+    const risk = [
+      { kind: "info" as const, text: `Composite risk band ${riskBand} (${riskScore}/10). Equity ${pct(equityShare * 100)} · Debt/Cash ${pct(debtShare * 100)}.` },
+      { kind: (smallMid > 35 ? "warn" : "info") as "warn" | "info", text: `Cap mix: Large ${pct(largeCap)}, Mid+Small ${pct(smallMid)}.` },
+      { kind: (subAA > 10 ? "warn" : "good") as "warn" | "good", text: `Credit: Sovereign/AAA ${pct(sovereignAAA)}, sub-AA ${pct(subAA)}.` },
+      { kind: (illiquidPct > 30 ? "warn" : "info") as "warn" | "info", text: `Liquidity: ${pct(liquidPct)} accessible <1Y, ${pct(illiquidPct)} locked >3Y.` },
+    ];
+
+    const comparative = [
+      { kind: (Math.abs(equityGap) > 15 ? "warn" : Math.abs(equityGap) > 7 ? "info" : "good") as "good" | "warn" | "info", text: `Vs ${riskProfile} target (eq ${targetEq}%), portfolio is ${equityGap > 0 ? "over" : "under"}-weight equity by ${Math.abs(equityGap).toFixed(1)} pp.` },
+      { kind: "info" as const, text: `Asset-weighted alpha ${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}%.` },
+      { kind: "info" as const, text: portfolios.length > 1 ? `Family aggregation across ${portfolios.length} portfolios, ${allHoldings.length} holdings, ${fmtINR(totalValue)}.` : `Single-customer view across ${allHoldings.length} holdings, ${fmtINR(totalValue)}.` },
+    ];
+
+    const advisorSummary = `The ${portfolios.length > 1 ? "consolidated family" : "customer"} portfolio of ${fmtINR(totalValue)} is positioned with ${pct(equityShare * 100, 0)} equity and ${pct(debtShare * 100, 0)} debt/cash, ${Math.abs(equityGap) <= 7 ? "broadly aligned" : equityGap > 0 ? "overweight equity" : "underweight equity"} vs a ${riskProfile} mandate. Blended return ${pct(blendedReturn)} delivers ${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}% alpha over benchmark. Issuer concentration is ${top5 > 50 ? "high" : top5 > 35 ? "moderate" : "well diversified"} (top-5 ${pct(top5)}). Credit profile is ${subAA > 10 ? "carrying sub-AA risk" : "conservative"}; ${pct(liquidPct)} liquid within a year. Composite risk band: ${riskBand}.`;
+
+    // Equity MF overlap matrix
+    const equityMF = allHoldings.filter(h => h.type === "Mutual Fund" && /Equity|Cap|Bluechip|Multi|Flexi|ELSS|Focused|Value/i.test(h.name)).slice(0, 8);
+    const mfOverlap = {
+      names: equityMF.map(h => h.name),
+      matrix: equityMF.map((a, i) => equityMF.map((b, j) => i === j ? 100 : Math.round(seedNum(a.isin + b.isin, 15, 65)))),
+    };
+
+    // Fixed income MF
+    const debtMF = allHoldings.filter(h => h.type === "Mutual Fund" && /Debt|Bond|Gilt|Income|Credit|Corporate|Liquid|Overnight|Money Market/i.test(h.name));
+    const fixedIncomeMF = debtMF.map(h => {
+      const dur = seedNum(h.isin + "d", 0.3, 6.5);
+      return {
+        name: h.name, value: h.value,
+        ytm: seedNum(h.isin + "y", 6.4, 8.2),
+        duration: dur,
+        maturity: dur * seedNum(h.isin + "m", 1.05, 1.4),
+        credit: /Gilt|Government|G-Sec/i.test(h.name) ? "Sovereign" : /Credit Risk/i.test(h.name) ? "AA & Below" : "AAA / AA+",
+      };
+    });
+
+    return {
+      title, mode,
+      portfolioCount: portfolios.length,
+      holdingsCount: allHoldings.length,
+      totalValue, contribution, distribution, realizedGL, unrealizedGL,
+      portfolioPE, portfolioPB, portfolioYTM, portfolioDuration,
+      byAssetClass: byAssetClass.map(a => ({ name: a.name, value: a.value, pct: a.pct, ret: a.ret, count: a.count, bench: a.bench })),
+      topIssuers: byIssuer,
+      bySector, byMarketCap, byRating, liquidity, upcomingCF, mfAMC,
+      riskProfile, targetVsCurrent,
+      productHoldings: byAssetClass.map(ac => ({
+        assetClass: ac.name, total: ac.value, pct: ac.pct,
+        rows: ac.holdings.sort((a, b) => b.value - a.value).map(h => ({
+          name: h.name, isin: h.isin, value: h.value,
+          pct: (h.value / ac.value) * 100, ret: seedNum(h.isin, -8, 28),
+        })),
+      })),
+      mfOverlap,
+      fixedIncomeMF,
+      bondHoldings: bondHoldings.map(h => ({ isin: h.isin, name: h.name, rating: ratingOf(h.name), quantity: h.quantity, value: h.value })),
+      benchmarks: Object.entries(ASSET_BENCHMARKS).map(([k, v]) => ({ assetClass: k, benchmark: v.name, ret: v.ret })),
+      commentary: {
+        blendedReturn, blendedBench, alpha, riskBand, riskScore,
+        top5Concentration: top5, advisorSummary,
+        performance, concentration, risk, comparative,
+      },
+    };
+  }
+
   return (
     <div>
       {/* Page-level SVG gradient defs — must live OUTSIDE Recharts (Recharts
@@ -541,16 +652,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </button>
         <div className="ml-auto flex gap-2">
           <button
-            onClick={() => exportReportToPptx({
-              title, mode,
-              portfolioCount: portfolios.length,
-              holdingsCount: allHoldings.length,
-              totalValue, contribution, distribution, realizedGL, unrealizedGL,
-              byAssetClass: byAssetClass.map(a => ({ name: a.name, value: a.value, pct: a.pct, ret: a.ret, bench: a.bench })),
-              topIssuers: byIssuer,
-              bySector, byMarketCap, byRating, liquidity, mfAMC,
-              riskProfile, targetVsCurrent,
-            })}
+            onClick={() => exportReportToPptx(buildPptPayload())}
             className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
             <Presentation className="w-3.5 h-3.5" /> Export to PPT
           </button>
@@ -559,6 +661,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
           </button>
         </div>
       </div>
+
 
       {/* Report header */}
       <div className="mb-6">

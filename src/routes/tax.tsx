@@ -26,7 +26,7 @@ export const Route = createFileRoute("/tax")({
 });
 
 // ---------------- Helpers ----------------
-function loadSaved(region: "IN" | "AE"): SavedPortfolio[] {
+function loadSaved(region: import("@/lib/region").Region): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
   try {
     return JSON.parse(localStorage.getItem(storageKeyForRegion(region)) || "[]");

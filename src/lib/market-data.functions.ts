@@ -211,6 +211,35 @@ async function fetchUaeQuotes(): Promise<Quote[]> {
   return results.filter((r): r is Quote => r !== null);
 }
 
+// ============ Philippines markets (Yahoo) ============
+const PH_INDICES: { yahoo: string; label: string }[] = [
+  { yahoo: "PSEI.PS", label: "PSEi Composite" },
+  { yahoo: "^PSI",    label: "PSE All Shares" },
+];
+const PH_SECTORS: { yahoo: string; label: string }[] = [
+  { yahoo: "SM.PS",  label: "SM Investments" },
+  { yahoo: "BDO.PS", label: "BDO Unibank" },
+  { yahoo: "ALI.PS", label: "Ayala Land" },
+  { yahoo: "TEL.PS", label: "PLDT" },
+  { yahoo: "JFC.PS", label: "Jollibee Foods Corp" },
+  { yahoo: "MER.PS", label: "Manila Electric" },
+];
+async function fetchPhQuotes(): Promise<Quote[]> {
+  const all = [...PH_INDICES.map(x => ({ ...x, group: "india" as Quote["group"] })),
+               ...PH_SECTORS.map(x => ({ ...x, group: "sector" as Quote["group"] }))];
+  const results = await Promise.all(all.map(async (x): Promise<Quote | null> => {
+    const q = await fetchYahooQuote(x.yahoo);
+    if (!q) return null;
+    const change = q.price - q.prev;
+    return {
+      symbol: x.yahoo, name: x.label, price: q.price, change,
+      changePct: q.prev ? (change / q.prev) * 100 : 0,
+      currency: "PHP", group: x.group,
+    };
+  }));
+  return results.filter((r): r is Quote => r !== null);
+}
+
 async function fetchFxAE(): Promise<Quote[]> {
   try {
     const today = new Date();
@@ -236,15 +265,45 @@ async function fetchFxAE(): Promise<Quote[]> {
   } catch { return []; }
 }
 
+async function fetchFxPH(): Promise<Quote[]> {
+  try {
+    const today = new Date();
+    const start = new Date(today); start.setDate(start.getDate() - 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const url = `https://api.frankfurter.dev/v1/${fmt(start)}..${fmt(today)}?from=USD&to=PHP,EUR,GBP,JPY,SGD`;
+    const r = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!r.ok) return [];
+    const j: any = await r.json();
+    const rates: Record<string, Record<string, number>> = j.rates ?? {};
+    const dates = Object.keys(rates).sort();
+    if (!dates.length) return [];
+    const last = rates[dates[dates.length - 1]];
+    const prev = rates[dates[dates.length - 2]] ?? last;
+    const out: Quote[] = [];
+    for (const cc of ["PHP", "EUR", "GBP", "JPY", "SGD"] as const) {
+      const price = Number(last[cc]); const pr = Number(prev[cc]) || price;
+      if (!price) continue;
+      const change = price - pr;
+      out.push({ symbol: `USD/${cc}`, name: `USD → ${cc}`, price, change, changePct: pr ? (change / pr) * 100 : 0, currency: cc, group: "fx" });
+    }
+    return out;
+  } catch { return []; }
+}
+
 export const getMarketQuotes = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
-    const region = (d as any)?.region === "AE" ? "AE" : "IN";
-    return { region: region as "IN" | "AE" };
+    const raw = (d as any)?.region;
+    const region: "IN" | "AE" | "PH" = raw === "AE" ? "AE" : raw === "PH" ? "PH" : "IN";
+    return { region };
   })
   .handler(async ({ data }) => {
     if (data.region === "AE") {
       const [ae, crypto, fx] = await Promise.all([fetchUaeQuotes(), fetchCrypto(), fetchFxAE()]);
       return [...ae, ...crypto, ...fx];
+    }
+    if (data.region === "PH") {
+      const [ph, crypto, fx] = await Promise.all([fetchPhQuotes(), fetchCrypto(), fetchFxPH()]);
+      return [...ph, ...crypto, ...fx];
     }
     const [india, crypto, fx] = await Promise.all([fetchNseIndices(), fetchCrypto(), fetchFx()]);
     return [...india, ...crypto, ...fx];

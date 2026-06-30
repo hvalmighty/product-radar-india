@@ -12,8 +12,9 @@ import {
 } from "recharts";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { SAMPLE_FAMILIES, SAMPLE_PORTFOLIOS, seedSamplePortfolios, removeSamplePortfolios, storageKeyForRegion, type SavedPortfolio } from "@/lib/sample-portfolios";
-import { Sparkles, Trash } from "lucide-react";
+import { Sparkles, Trash, Presentation } from "lucide-react";
 import { useRegion, fmtMoney } from "@/lib/region";
+import { exportReportToPptx } from "@/lib/report-pptx";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({

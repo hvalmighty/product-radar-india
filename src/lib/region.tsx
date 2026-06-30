@@ -1,6 +1,6 @@
 import { useSyncExternalStore, useCallback, type ReactNode } from "react";
 
-export type Region = "IN" | "AE";
+export type Region = "IN" | "AE" | "PH";
 
 export const REGION_META: Record<Region, {
   code: Region;
@@ -22,10 +22,15 @@ export const REGION_META: Record<Region, {
     currency: "AED", symbol: "AED ", locale: "en-AE",
     bigUnits: [{ name: "B", value: 1e9 }, { name: "M", value: 1e6 }, { name: "K", value: 1e3 }],
   },
+  PH: {
+    code: "PH", label: "Philippines", flag: "🇵🇭",
+    currency: "PHP", symbol: "₱", locale: "en-PH",
+    bigUnits: [{ name: "B", value: 1e9 }, { name: "M", value: 1e6 }, { name: "K", value: 1e3 }],
+  },
 };
 
 /** Scale factor that converts mock-data AUM/corpus units to base currency.
- * India arrays store crore (1e7), UAE arrays store million (1e6). */
+ * India arrays store crore (1e7); UAE and Philippines arrays store millions (1e6). */
 export function aumScale(): number {
   return _region === "IN" ? 1e7 : 1e6;
 }

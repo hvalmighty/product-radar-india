@@ -4,15 +4,19 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { buildSystemPrompt } from "@/lib/assistant-context";
 import { pushDebugLog, serializeError } from "@/lib/debug-log";
 
+type Region = "IN" | "AE" | "PH";
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const startedAt = Date.now();
         let messages: UIMessage[] | undefined;
+        let region: Region = "IN";
         try {
-          const body = (await request.json()) as { messages?: UIMessage[] };
+          const body = (await request.json()) as { messages?: UIMessage[]; region?: Region };
           messages = body.messages;
+          if (body.region === "IN" || body.region === "AE" || body.region === "PH") region = body.region;
         } catch (err) {
           pushDebugLog({ level: "error", source: "chat", message: "invalid json body", data: serializeError(err) });
           return new Response("invalid json", { status: 400 });
@@ -47,7 +51,7 @@ export const Route = createFileRoute("/api/chat")({
           const google = createGoogleGenerativeAI({ apiKey });
           const result = streamText({
             model: google("gemini-2.5-flash"),
-            system: buildSystemPrompt(),
+            system: buildSystemPrompt(region),
             messages: await convertToModelMessages(messages),
             onError: ({ error }) => {
               pushDebugLog({

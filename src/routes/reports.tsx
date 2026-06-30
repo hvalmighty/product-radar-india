@@ -540,6 +540,20 @@ function ReportView({ portfolios, title, mode, onBack }: {
           <ArrowLeft className="w-3.5 h-3.5" /> Back to selection
         </button>
         <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => exportReportToPptx({
+              title, mode,
+              portfolioCount: portfolios.length,
+              holdingsCount: allHoldings.length,
+              totalValue, contribution, distribution, realizedGL, unrealizedGL,
+              byAssetClass: byAssetClass.map(a => ({ name: a.name, value: a.value, pct: a.pct, ret: a.ret, bench: a.bench })),
+              topIssuers: byIssuer,
+              bySector, byMarketCap, byRating, liquidity, mfAMC,
+              riskProfile, targetVsCurrent,
+            })}
+            className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+            <Presentation className="w-3.5 h-3.5" /> Export to PPT
+          </button>
           <button onClick={() => window.print()} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
             <Printer className="w-3.5 h-3.5" /> Print / PDF
           </button>

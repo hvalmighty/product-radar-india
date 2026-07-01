@@ -151,24 +151,24 @@ function DashboardPage() {
           sub={`${new Set(holdings.map(assetClassOf)).size} product types`} />
       </div>
 
-      {/* Performance vs benchmark */}
-      <Panel title="Performance vs Benchmark" subtitle="Portfolio blended returns vs regional benchmark index.">
-        <div className="h-[280px]">
+      {/* Performance vs benchmark — time series */}
+      <Panel title="Performance vs Benchmark" subtitle="Rebased to 100 · monthly · trailing 36 months.">
+        <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={perf}>
+            <LineChart data={perfSeries} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="period" fontSize={12} />
-              <YAxis fontSize={12} unit="%" />
-              <Tooltip formatter={(v: number) => `${v}%`} />
+              <XAxis dataKey="date" fontSize={11} minTickGap={20} />
+              <YAxis fontSize={11} domain={["auto", "auto"]} />
+              <Tooltip formatter={(v: number) => v.toFixed(2)} />
               <Legend />
-              <Bar dataKey="portfolio" name="Your Portfolio" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="benchmark" name="Benchmark" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Line type="monotone" dataKey="portfolio" name="Your Portfolio" stroke="#4f46e5" strokeWidth={2.2} dot={false} />
+              <Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </Panel>
 
-      {/* Two-col: Risk radar + Broad asset class */}
+      {/* Risk radar + Unified exposure switcher */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel title="Risk Profile" subtitle={`Target allocation for "${session.riskProfile}" vs your current mix.`}>
           <div className="flex items-center gap-3 mb-2 text-xs">
@@ -189,20 +189,14 @@ function DashboardPage() {
           </div>
         </Panel>
 
-        <Panel title="Asset Class Exposure" subtitle="Split across equity, fixed income, hybrids and alternatives.">
-          <ExposureChart data={byClass} totalValue={totalValue} />
-        </Panel>
+        <ExposureSwitcher
+          byClass={byClass}
+          byProduct={byProduct}
+          bySector={bySector}
+          totalValue={totalValue}
+        />
       </div>
 
-      {/* Product & Sector & Issuer */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title="Product Exposure" subtitle="By product category.">
-          <ExposureBar data={byProduct} totalValue={totalValue} />
-        </Panel>
-        <Panel title="Sector Exposure" subtitle="Underlying sector concentration.">
-          <ExposureChart data={bySector} totalValue={totalValue} />
-        </Panel>
-      </div>
 
       <Panel title="Top Issuers" subtitle="Top 10 issuer / instrument level exposure.">
         <div className="overflow-auto">

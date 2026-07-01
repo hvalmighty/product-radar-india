@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles } from "lucide-react";
+import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles, UserCircle2 } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import mpowerLogo from "@/assets/mpower-logo.png";
 
@@ -66,8 +66,18 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-border p-2">
+      <SidebarFooter className="border-t border-border p-2 space-y-2">
         <RegionSwitcher />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Customer Portal">
+              <Link to="/customer/login" className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20">
+                <UserCircle2 className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="font-medium">Customer Portal</span>}
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );

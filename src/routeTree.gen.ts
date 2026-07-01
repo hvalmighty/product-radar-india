@@ -14,12 +14,17 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as MarketDataRouteImport } from './routes/market-data'
+import { Route as CustomerRouteImport } from './routes/customer'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CustomerIndexRouteImport } from './routes/customer.index'
 import { Route as AssistantIndexRouteImport } from './routes/assistant.index'
 import { Route as DebugLogsRouteImport } from './routes/debug.logs'
+import { Route as CustomerLoginRouteImport } from './routes/customer.login'
+import { Route as CustomerInvestRouteImport } from './routes/customer.invest'
+import { Route as CustomerDashboardRouteImport } from './routes/customer.dashboard'
 import { Route as AssistantThreadIdRouteImport } from './routes/assistant.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiPublicDebugLogsRouteImport } from './routes/api/public/debug-logs'
@@ -49,6 +54,11 @@ const MarketDataRoute = MarketDataRouteImport.update({
   path: '/market-data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomerRoute = CustomerRouteImport.update({
+  id: '/customer',
+  path: '/customer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssistantRoute = AssistantRouteImport.update({
   id: '/assistant',
   path: '/assistant',
@@ -69,6 +79,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomerIndexRoute = CustomerIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CustomerRoute,
+} as any)
 const AssistantIndexRoute = AssistantIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -78,6 +93,21 @@ const DebugLogsRoute = DebugLogsRouteImport.update({
   id: '/debug/logs',
   path: '/debug/logs',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CustomerLoginRoute = CustomerLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => CustomerRoute,
+} as any)
+const CustomerInvestRoute = CustomerInvestRouteImport.update({
+  id: '/invest',
+  path: '/invest',
+  getParentRoute: () => CustomerRoute,
+} as any)
+const CustomerDashboardRoute = CustomerDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => CustomerRoute,
 } as any)
 const AssistantThreadIdRoute = AssistantThreadIdRouteImport.update({
   id: '/$threadId',
@@ -100,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/assistant': typeof AssistantRouteWithChildren
+  '/customer': typeof CustomerRouteWithChildren
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
@@ -107,8 +138,12 @@ export interface FileRoutesByFullPath {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
+  '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
+  '/customer/': typeof CustomerIndexRoute
   '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRoutesByTo {
@@ -122,8 +157,12 @@ export interface FileRoutesByTo {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
+  '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant': typeof AssistantIndexRoute
+  '/customer': typeof CustomerIndexRoute
   '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRoutesById {
@@ -132,6 +171,7 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/assistant': typeof AssistantRouteWithChildren
+  '/customer': typeof CustomerRouteWithChildren
   '/market-data': typeof MarketDataRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
@@ -139,8 +179,12 @@ export interface FileRoutesById {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
+  '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
+  '/customer/': typeof CustomerIndexRoute
   '/api/public/debug-logs': typeof ApiPublicDebugLogsRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +194,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/assistant'
+    | '/customer'
     | '/market-data'
     | '/portfolio'
     | '/proposal'
@@ -157,8 +202,12 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
+    | '/customer/login'
     | '/debug/logs'
     | '/assistant/'
+    | '/customer/'
     | '/api/public/debug-logs'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -172,8 +221,12 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
+    | '/customer/login'
     | '/debug/logs'
     | '/assistant'
+    | '/customer'
     | '/api/public/debug-logs'
   id:
     | '__root__'
@@ -181,6 +234,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/assistant'
+    | '/customer'
     | '/market-data'
     | '/portfolio'
     | '/proposal'
@@ -188,8 +242,12 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
+    | '/customer/login'
     | '/debug/logs'
     | '/assistant/'
+    | '/customer/'
     | '/api/public/debug-logs'
   fileRoutesById: FileRoutesById
 }
@@ -198,6 +256,7 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRoute
   AnalyticsRoute: typeof AnalyticsRoute
   AssistantRoute: typeof AssistantRouteWithChildren
+  CustomerRoute: typeof CustomerRouteWithChildren
   MarketDataRoute: typeof MarketDataRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
@@ -245,6 +304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customer': {
+      id: '/customer'
+      path: '/customer'
+      fullPath: '/customer'
+      preLoaderRoute: typeof CustomerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assistant': {
       id: '/assistant'
       path: '/assistant'
@@ -273,6 +339,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customer/': {
+      id: '/customer/'
+      path: '/'
+      fullPath: '/customer/'
+      preLoaderRoute: typeof CustomerIndexRouteImport
+      parentRoute: typeof CustomerRoute
+    }
     '/assistant/': {
       id: '/assistant/'
       path: '/'
@@ -286,6 +359,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/debug/logs'
       preLoaderRoute: typeof DebugLogsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/customer/login': {
+      id: '/customer/login'
+      path: '/login'
+      fullPath: '/customer/login'
+      preLoaderRoute: typeof CustomerLoginRouteImport
+      parentRoute: typeof CustomerRoute
+    }
+    '/customer/invest': {
+      id: '/customer/invest'
+      path: '/invest'
+      fullPath: '/customer/invest'
+      preLoaderRoute: typeof CustomerInvestRouteImport
+      parentRoute: typeof CustomerRoute
+    }
+    '/customer/dashboard': {
+      id: '/customer/dashboard'
+      path: '/dashboard'
+      fullPath: '/customer/dashboard'
+      preLoaderRoute: typeof CustomerDashboardRouteImport
+      parentRoute: typeof CustomerRoute
     }
     '/assistant/$threadId': {
       id: '/assistant/$threadId'
@@ -325,11 +419,30 @@ const AssistantRouteWithChildren = AssistantRoute._addFileChildren(
   AssistantRouteChildren,
 )
 
+interface CustomerRouteChildren {
+  CustomerDashboardRoute: typeof CustomerDashboardRoute
+  CustomerInvestRoute: typeof CustomerInvestRoute
+  CustomerLoginRoute: typeof CustomerLoginRoute
+  CustomerIndexRoute: typeof CustomerIndexRoute
+}
+
+const CustomerRouteChildren: CustomerRouteChildren = {
+  CustomerDashboardRoute: CustomerDashboardRoute,
+  CustomerInvestRoute: CustomerInvestRoute,
+  CustomerLoginRoute: CustomerLoginRoute,
+  CustomerIndexRoute: CustomerIndexRoute,
+}
+
+const CustomerRouteWithChildren = CustomerRoute._addFileChildren(
+  CustomerRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
   AnalyticsRoute: AnalyticsRoute,
   AssistantRoute: AssistantRouteWithChildren,
+  CustomerRoute: CustomerRouteWithChildren,
   MarketDataRoute: MarketDataRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,

@@ -6,6 +6,7 @@ import { fmtMoney, REGION_META } from "@/lib/region";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  LineChart, Line,
 } from "recharts";
 import { TrendingUp, TrendingDown, Wallet, PieChart as PieIcon, Target, ShoppingBag, ShieldAlert } from "lucide-react";
 
@@ -91,15 +92,31 @@ function DashboardPage() {
 
   // Benchmark comparison (mocked)
   const benchmark = pseudoRandom(seed + "bm", 6, 18);
-  const benchmarkYtd = pseudoRandom(seed + "bmytd", -3, 18);
 
-  const perf = [
-    { period: "YTD", portfolio: +ytdReturn.toFixed(2), benchmark: +benchmarkYtd.toFixed(2) },
-    { period: "1Y", portfolio: +oneYear.toFixed(2), benchmark: +benchmark.toFixed(2) },
-    { period: "3Y", portfolio: +threeYearCagr.toFixed(2), benchmark: +(benchmark - 1.2).toFixed(2) },
-    { period: "5Y", portfolio: +(threeYearCagr - 1.5).toFixed(2), benchmark: +(benchmark - 2.1).toFixed(2) },
-    { period: "SI", portfolio: +xirr.toFixed(2), benchmark: +(benchmark - 0.8).toFixed(2) },
-  ];
+  // Time-series (rebased to 100). Monthly points for last 36 months, deterministic walk.
+  const perfSeries = useMemo(() => {
+    const months = 36;
+    const now = new Date();
+    const pDrift = xirr / 12 / 100;
+    const bDrift = benchmark / 12 / 100;
+    const pVol = 0.028;
+    const bVol = 0.022;
+    let p = 100, b = 100;
+    const rows: { date: string; portfolio: number; benchmark: number }[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const pShock = (pseudoRandom(seed + "p" + i, -1, 1)) * pVol;
+      const bShock = (pseudoRandom(seed + "b" + i, -1, 1)) * bVol;
+      p = p * (1 + pDrift + pShock);
+      b = b * (1 + bDrift + bShock);
+      rows.push({
+        date: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+        portfolio: +p.toFixed(2),
+        benchmark: +b.toFixed(2),
+      });
+    }
+    return rows;
+  }, [seed, xirr, benchmark]);
 
   // Risk profile radar (target vs current)
   const target = riskTargetFor(session.riskProfile);
@@ -134,24 +151,24 @@ function DashboardPage() {
           sub={`${new Set(holdings.map(assetClassOf)).size} product types`} />
       </div>
 
-      {/* Performance vs benchmark */}
-      <Panel title="Performance vs Benchmark" subtitle="Portfolio blended returns vs regional benchmark index.">
-        <div className="h-[280px]">
+      {/* Performance vs benchmark — time series */}
+      <Panel title="Performance vs Benchmark" subtitle="Rebased to 100 · monthly · trailing 36 months.">
+        <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={perf}>
+            <LineChart data={perfSeries} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis dataKey="period" fontSize={12} />
-              <YAxis fontSize={12} unit="%" />
-              <Tooltip formatter={(v: number) => `${v}%`} />
+              <XAxis dataKey="date" fontSize={11} minTickGap={20} />
+              <YAxis fontSize={11} domain={["auto", "auto"]} />
+              <Tooltip formatter={(v: number) => v.toFixed(2)} />
               <Legend />
-              <Bar dataKey="portfolio" name="Your Portfolio" fill="#4f46e5" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="benchmark" name="Benchmark" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Line type="monotone" dataKey="portfolio" name="Your Portfolio" stroke="#4f46e5" strokeWidth={2.2} dot={false} />
+              <Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 3" dot={false} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </Panel>
 
-      {/* Two-col: Risk radar + Broad asset class */}
+      {/* Risk radar + Unified exposure switcher */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel title="Risk Profile" subtitle={`Target allocation for "${session.riskProfile}" vs your current mix.`}>
           <div className="flex items-center gap-3 mb-2 text-xs">
@@ -172,20 +189,14 @@ function DashboardPage() {
           </div>
         </Panel>
 
-        <Panel title="Asset Class Exposure" subtitle="Split across equity, fixed income, hybrids and alternatives.">
-          <ExposureChart data={byClass} totalValue={totalValue} />
-        </Panel>
+        <ExposureSwitcher
+          byClass={byClass}
+          byProduct={byProduct}
+          bySector={bySector}
+          totalValue={totalValue}
+        />
       </div>
 
-      {/* Product & Sector & Issuer */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title="Product Exposure" subtitle="By product category.">
-          <ExposureBar data={byProduct} totalValue={totalValue} />
-        </Panel>
-        <Panel title="Sector Exposure" subtitle="Underlying sector concentration.">
-          <ExposureChart data={bySector} totalValue={totalValue} />
-        </Panel>
-      </div>
 
       <Panel title="Top Issuers" subtitle="Top 10 issuer / instrument level exposure.">
         <div className="overflow-auto">
@@ -337,3 +348,45 @@ function ExposureBar({ data, totalValue }: { data: Row[]; totalValue: number }) 
     </div>
   );
 }
+
+function ExposureSwitcher({
+  byClass, byProduct, bySector, totalValue,
+}: { byClass: Row[]; byProduct: Row[]; bySector: Row[]; totalValue: number }) {
+  const [view, setView] = useState<"class" | "product" | "sector">("class");
+  const map = {
+    class:   { data: byClass,   subtitle: "Split across equity, fixed income, hybrids and alternatives.", kind: "pie" as const },
+    product: { data: byProduct, subtitle: "By product category (MF, PMS, AIF, Direct Equity, etc.).",    kind: "bar" as const },
+    sector:  { data: bySector,  subtitle: "Underlying sector concentration.",                             kind: "pie" as const },
+  };
+  const active = map[view];
+  const btn = (k: "class" | "product" | "sector", label: string) => (
+    <button
+      key={k}
+      onClick={() => setView(k)}
+      className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+        view === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">Portfolio Exposure</h2>
+          <p className="text-xs text-muted-foreground">{active.subtitle}</p>
+        </div>
+        <div className="inline-flex items-center gap-1 p-1 rounded-md bg-muted">
+          {btn("class",   "Asset Class")}
+          {btn("product", "Product")}
+          {btn("sector",  "Sector")}
+        </div>
+      </div>
+      {active.kind === "pie"
+        ? <ExposureChart data={active.data} totalValue={totalValue} />
+        : <ExposureBar   data={active.data} totalValue={totalValue} />}
+    </section>
+  );
+}
+

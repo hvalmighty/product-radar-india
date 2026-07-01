@@ -230,37 +230,14 @@ function DashboardPage() {
         </div>
       </Panel>
 
-      {/* Product performance table */}
-      <Panel title="Product Performance Summary" subtitle="Blended return per product category.">
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground border-b">
-              <tr>
-                <th className="text-left py-2 px-2">Product</th>
-                <th className="text-right py-2 px-2">Value</th>
-                <th className="text-right py-2 px-2">Weight</th>
-                <th className="text-right py-2 px-2">1Y Return</th>
-                <th className="text-right py-2 px-2">3Y CAGR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byProduct.map(r => {
-                const w = (r.value / totalValue) * 100;
-                const oneY = pseudoRandom(seed + r.name + "1y", -4, 24);
-                const threeY = pseudoRandom(seed + r.name + "3y", 4, 18);
-                return (
-                  <tr key={r.name} className="border-b border-border/50">
-                    <td className="py-2 px-2 font-medium">{r.name}</td>
-                    <td className="py-2 px-2 text-right mono-num">{fmtMoney(r.value)}</td>
-                    <td className="py-2 px-2 text-right mono-num">{w.toFixed(2)}%</td>
-                    <td className={`py-2 px-2 text-right mono-num ${oneY >= 0 ? "text-positive" : "text-negative"}`}>{oneY >= 0 ? "+" : ""}{oneY.toFixed(2)}%</td>
-                    <td className={`py-2 px-2 text-right mono-num ${threeY >= 0 ? "text-positive" : "text-negative"}`}>{threeY >= 0 ? "+" : ""}{threeY.toFixed(2)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Product performance table with drill-down */}
+      <Panel title="Product Performance Summary" subtitle="Click a product row to drill down into underlying holdings, purchase price, current valuation, returns and short/long-term capital gains.">
+        <ProductPerformanceTable
+          byProduct={byProduct}
+          holdings={holdings}
+          totalValue={totalValue}
+          seed={seed}
+        />
       </Panel>
     </div>
   );

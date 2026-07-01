@@ -348,3 +348,45 @@ function ExposureBar({ data, totalValue }: { data: Row[]; totalValue: number }) 
     </div>
   );
 }
+
+function ExposureSwitcher({
+  byClass, byProduct, bySector, totalValue,
+}: { byClass: Row[]; byProduct: Row[]; bySector: Row[]; totalValue: number }) {
+  const [view, setView] = useState<"class" | "product" | "sector">("class");
+  const map = {
+    class:   { data: byClass,   subtitle: "Split across equity, fixed income, hybrids and alternatives.", kind: "pie" as const },
+    product: { data: byProduct, subtitle: "By product category (MF, PMS, AIF, Direct Equity, etc.).",    kind: "bar" as const },
+    sector:  { data: bySector,  subtitle: "Underlying sector concentration.",                             kind: "pie" as const },
+  };
+  const active = map[view];
+  const btn = (k: "class" | "product" | "sector", label: string) => (
+    <button
+      key={k}
+      onClick={() => setView(k)}
+      className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+        view === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <section className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">Portfolio Exposure</h2>
+          <p className="text-xs text-muted-foreground">{active.subtitle}</p>
+        </div>
+        <div className="inline-flex items-center gap-1 p-1 rounded-md bg-muted">
+          {btn("class",   "Asset Class")}
+          {btn("product", "Product")}
+          {btn("sector",  "Sector")}
+        </div>
+      </div>
+      {active.kind === "pie"
+        ? <ExposureChart data={active.data} totalValue={totalValue} />
+        : <ExposureBar   data={active.data} totalValue={totalValue} />}
+    </section>
+  );
+}
+

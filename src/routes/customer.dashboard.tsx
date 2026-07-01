@@ -6,6 +6,7 @@ import { fmtMoney, REGION_META } from "@/lib/region";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  LineChart, Line,
 } from "recharts";
 import { TrendingUp, TrendingDown, Wallet, PieChart as PieIcon, Target, ShoppingBag, ShieldAlert } from "lucide-react";
 
@@ -91,15 +92,31 @@ function DashboardPage() {
 
   // Benchmark comparison (mocked)
   const benchmark = pseudoRandom(seed + "bm", 6, 18);
-  const benchmarkYtd = pseudoRandom(seed + "bmytd", -3, 18);
 
-  const perf = [
-    { period: "YTD", portfolio: +ytdReturn.toFixed(2), benchmark: +benchmarkYtd.toFixed(2) },
-    { period: "1Y", portfolio: +oneYear.toFixed(2), benchmark: +benchmark.toFixed(2) },
-    { period: "3Y", portfolio: +threeYearCagr.toFixed(2), benchmark: +(benchmark - 1.2).toFixed(2) },
-    { period: "5Y", portfolio: +(threeYearCagr - 1.5).toFixed(2), benchmark: +(benchmark - 2.1).toFixed(2) },
-    { period: "SI", portfolio: +xirr.toFixed(2), benchmark: +(benchmark - 0.8).toFixed(2) },
-  ];
+  // Time-series (rebased to 100). Monthly points for last 36 months, deterministic walk.
+  const perfSeries = useMemo(() => {
+    const months = 36;
+    const now = new Date();
+    const pDrift = xirr / 12 / 100;
+    const bDrift = benchmark / 12 / 100;
+    const pVol = 0.028;
+    const bVol = 0.022;
+    let p = 100, b = 100;
+    const rows: { date: string; portfolio: number; benchmark: number }[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const pShock = (pseudoRandom(seed + "p" + i, -1, 1)) * pVol;
+      const bShock = (pseudoRandom(seed + "b" + i, -1, 1)) * bVol;
+      p = p * (1 + pDrift + pShock);
+      b = b * (1 + bDrift + bShock);
+      rows.push({
+        date: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+        portfolio: +p.toFixed(2),
+        benchmark: +b.toFixed(2),
+      });
+    }
+    return rows;
+  }, [seed, xirr, benchmark]);
 
   // Risk profile radar (target vs current)
   const target = riskTargetFor(session.riskProfile);

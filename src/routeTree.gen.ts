@@ -23,6 +23,8 @@ import { Route as CustomerIndexRouteImport } from './routes/customer.index'
 import { Route as AssistantIndexRouteImport } from './routes/assistant.index'
 import { Route as DebugLogsRouteImport } from './routes/debug.logs'
 import { Route as CustomerLoginRouteImport } from './routes/customer.login'
+import { Route as CustomerInvestRouteImport } from './routes/customer.invest'
+import { Route as CustomerDashboardRouteImport } from './routes/customer.dashboard'
 import { Route as AssistantThreadIdRouteImport } from './routes/assistant.$threadId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiPublicDebugLogsRouteImport } from './routes/api/public/debug-logs'
@@ -97,6 +99,16 @@ const CustomerLoginRoute = CustomerLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => CustomerRoute,
 } as any)
+const CustomerInvestRoute = CustomerInvestRouteImport.update({
+  id: '/invest',
+  path: '/invest',
+  getParentRoute: () => CustomerRoute,
+} as any)
+const CustomerDashboardRoute = CustomerDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => CustomerRoute,
+} as any)
 const AssistantThreadIdRoute = AssistantThreadIdRouteImport.update({
   id: '/$threadId',
   path: '/$threadId',
@@ -126,6 +138,8 @@ export interface FileRoutesByFullPath {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
   '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
@@ -143,6 +157,8 @@ export interface FileRoutesByTo {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
   '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant': typeof AssistantIndexRoute
@@ -163,6 +179,8 @@ export interface FileRoutesById {
   '/tax': typeof TaxRoute
   '/api/chat': typeof ApiChatRoute
   '/assistant/$threadId': typeof AssistantThreadIdRoute
+  '/customer/dashboard': typeof CustomerDashboardRoute
+  '/customer/invest': typeof CustomerInvestRoute
   '/customer/login': typeof CustomerLoginRoute
   '/debug/logs': typeof DebugLogsRoute
   '/assistant/': typeof AssistantIndexRoute
@@ -184,6 +202,8 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
     | '/customer/login'
     | '/debug/logs'
     | '/assistant/'
@@ -201,6 +221,8 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
     | '/customer/login'
     | '/debug/logs'
     | '/assistant'
@@ -220,6 +242,8 @@ export interface FileRouteTypes {
     | '/tax'
     | '/api/chat'
     | '/assistant/$threadId'
+    | '/customer/dashboard'
+    | '/customer/invest'
     | '/customer/login'
     | '/debug/logs'
     | '/assistant/'
@@ -343,6 +367,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomerLoginRouteImport
       parentRoute: typeof CustomerRoute
     }
+    '/customer/invest': {
+      id: '/customer/invest'
+      path: '/invest'
+      fullPath: '/customer/invest'
+      preLoaderRoute: typeof CustomerInvestRouteImport
+      parentRoute: typeof CustomerRoute
+    }
+    '/customer/dashboard': {
+      id: '/customer/dashboard'
+      path: '/dashboard'
+      fullPath: '/customer/dashboard'
+      preLoaderRoute: typeof CustomerDashboardRouteImport
+      parentRoute: typeof CustomerRoute
+    }
     '/assistant/$threadId': {
       id: '/assistant/$threadId'
       path: '/$threadId'
@@ -382,11 +420,15 @@ const AssistantRouteWithChildren = AssistantRoute._addFileChildren(
 )
 
 interface CustomerRouteChildren {
+  CustomerDashboardRoute: typeof CustomerDashboardRoute
+  CustomerInvestRoute: typeof CustomerInvestRoute
   CustomerLoginRoute: typeof CustomerLoginRoute
   CustomerIndexRoute: typeof CustomerIndexRoute
 }
 
 const CustomerRouteChildren: CustomerRouteChildren = {
+  CustomerDashboardRoute: CustomerDashboardRoute,
+  CustomerInvestRoute: CustomerInvestRoute,
   CustomerLoginRoute: CustomerLoginRoute,
   CustomerIndexRoute: CustomerIndexRoute,
 }

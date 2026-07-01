@@ -59,7 +59,7 @@ function TopBarTicker() {
   );
 }
 
-function ResearchTerminal() {
+export function ResearchTerminal() {
   const { region, meta: regionMeta } = useRegion();
   // Reset selection across region switches so UI doesn't carry stale ids
   const [cat, setCat] = useState<Category>("MF");

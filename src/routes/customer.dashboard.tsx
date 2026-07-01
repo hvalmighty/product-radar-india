@@ -94,7 +94,7 @@ function DashboardPage() {
   const benchmark = pseudoRandom(seed + "bm", 6, 18);
 
   // Time-series (rebased to 100). Monthly points for last 36 months, deterministic walk.
-  const perfSeries = useMemo(() => {
+  const perfSeries = (() => {
     const months = 36;
     const now = new Date();
     const pDrift = xirr / 12 / 100;
@@ -116,7 +116,7 @@ function DashboardPage() {
       });
     }
     return rows;
-  }, [seed, xirr, benchmark]);
+  })();
 
   // Risk profile radar (target vs current)
   const target = riskTargetFor(session.riskProfile);

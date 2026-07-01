@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   LineChart, Line,
 } from "recharts";
-import { TrendingUp, TrendingDown, Wallet, PieChart as PieIcon, Target, ShoppingBag, ShieldAlert } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, PieChart as PieIcon, Target, ShoppingBag, ShieldAlert, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/customer/dashboard")({
   component: DashboardPage,
@@ -230,37 +230,14 @@ function DashboardPage() {
         </div>
       </Panel>
 
-      {/* Product performance table */}
-      <Panel title="Product Performance Summary" subtitle="Blended return per product category.">
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground border-b">
-              <tr>
-                <th className="text-left py-2 px-2">Product</th>
-                <th className="text-right py-2 px-2">Value</th>
-                <th className="text-right py-2 px-2">Weight</th>
-                <th className="text-right py-2 px-2">1Y Return</th>
-                <th className="text-right py-2 px-2">3Y CAGR</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byProduct.map(r => {
-                const w = (r.value / totalValue) * 100;
-                const oneY = pseudoRandom(seed + r.name + "1y", -4, 24);
-                const threeY = pseudoRandom(seed + r.name + "3y", 4, 18);
-                return (
-                  <tr key={r.name} className="border-b border-border/50">
-                    <td className="py-2 px-2 font-medium">{r.name}</td>
-                    <td className="py-2 px-2 text-right mono-num">{fmtMoney(r.value)}</td>
-                    <td className="py-2 px-2 text-right mono-num">{w.toFixed(2)}%</td>
-                    <td className={`py-2 px-2 text-right mono-num ${oneY >= 0 ? "text-positive" : "text-negative"}`}>{oneY >= 0 ? "+" : ""}{oneY.toFixed(2)}%</td>
-                    <td className={`py-2 px-2 text-right mono-num ${threeY >= 0 ? "text-positive" : "text-negative"}`}>{threeY >= 0 ? "+" : ""}{threeY.toFixed(2)}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Product performance table with drill-down */}
+      <Panel title="Product Performance Summary" subtitle="Click a product row to drill down into underlying holdings, purchase price, current valuation, returns and short/long-term capital gains.">
+        <ProductPerformanceTable
+          byProduct={byProduct}
+          holdings={holdings}
+          totalValue={totalValue}
+          seed={seed}
+        />
       </Panel>
     </div>
   );
@@ -387,6 +364,212 @@ function ExposureSwitcher({
         ? <ExposureChart data={active.data} totalValue={totalValue} />
         : <ExposureBar   data={active.data} totalValue={totalValue} />}
     </section>
+  );
+}
+
+/* ---------- Product performance drill-down ---------- */
+
+type HoldingDetail = {
+  h: Holding;
+  purchasePrice: number;
+  invested: number;
+  currentValue: number;
+  gain: number;
+  returnPct: number;
+  holdingMonths: number;
+  gainType: "LT" | "ST";
+  ltGain: number;
+  stGain: number;
+  purchaseDate: Date;
+};
+
+function isEquityLike(h: Holding): string {
+  const c = (h.productCategory || h.type || "").toLowerCase();
+  if (c.includes("equity") || c.includes("stock") || c.includes("etf") || c.includes("reit")) return "equity";
+  return "nonequity";
+}
+
+function buildHoldingDetail(h: Holding, seed: string): HoldingDetail {
+  const key = seed + (h.isin || h.name);
+  // Purchase price 55%-95% of current price → gains, occasional negatives via wider band
+  const factor = pseudoRandom(key + "pp", 0.55, 1.15);
+  const purchasePrice = +(h.price * factor).toFixed(2);
+  const invested = +(purchasePrice * h.quantity).toFixed(2);
+  const currentValue = h.value;
+  const gain = +(currentValue - invested).toFixed(2);
+  const returnPct = invested > 0 ? +(((currentValue - invested) / invested) * 100).toFixed(2) : 0;
+  // Purchase 1-48 months ago
+  const holdingMonths = Math.round(pseudoRandom(key + "hm", 1, 48));
+  const purchaseDate = new Date();
+  purchaseDate.setMonth(purchaseDate.getMonth() - holdingMonths);
+  // LT / ST classification: equity >12m LT, non-equity >24m LT
+  const cutoff = isEquityLike(h) === "equity" ? 12 : 24;
+  const gainType: "LT" | "ST" = holdingMonths > cutoff ? "LT" : "ST";
+  return {
+    h, purchasePrice, invested, currentValue, gain, returnPct, holdingMonths, purchaseDate,
+    gainType,
+    ltGain: gainType === "LT" ? gain : 0,
+    stGain: gainType === "ST" ? gain : 0,
+  };
+}
+
+function ProductPerformanceTable({
+  byProduct, holdings, totalValue, seed,
+}: { byProduct: Row[]; holdings: Holding[]; totalValue: number; seed: string }) {
+  const [openProduct, setOpenProduct] = useState<string | null>(null);
+
+  // Group holdings by product name (matching assetClassOf) and precompute details
+  const detailsByProduct = useMemo(() => {
+    const m = new Map<string, HoldingDetail[]>();
+    holdings.forEach(h => {
+      const key = assetClassOf(h);
+      const arr = m.get(key) ?? [];
+      arr.push(buildHoldingDetail(h, seed));
+      m.set(key, arr);
+    });
+    // sort by current value desc within each product
+    m.forEach(v => v.sort((a, b) => b.currentValue - a.currentValue));
+    return m;
+  }, [holdings, seed]);
+
+  return (
+    <div className="overflow-auto">
+      <table className="w-full text-sm">
+        <thead className="text-xs text-muted-foreground border-b">
+          <tr>
+            <th className="text-left py-2 px-2 w-6"></th>
+            <th className="text-left py-2 px-2">Product</th>
+            <th className="text-right py-2 px-2">Invested</th>
+            <th className="text-right py-2 px-2">Current Value</th>
+            <th className="text-right py-2 px-2">Weight</th>
+            <th className="text-right py-2 px-2">Unrealised G/L</th>
+            <th className="text-right py-2 px-2">Return %</th>
+            <th className="text-right py-2 px-2">LTCG</th>
+            <th className="text-right py-2 px-2">STCG</th>
+          </tr>
+        </thead>
+        <tbody>
+          {byProduct.map(r => {
+            const details = detailsByProduct.get(r.name) ?? [];
+            const invested = details.reduce((s, d) => s + d.invested, 0);
+            const gain = details.reduce((s, d) => s + d.gain, 0);
+            const lt = details.reduce((s, d) => s + d.ltGain, 0);
+            const st = details.reduce((s, d) => s + d.stGain, 0);
+            const w = (r.value / totalValue) * 100;
+            const ret = invested > 0 ? ((r.value - invested) / invested) * 100 : 0;
+            const isOpen = openProduct === r.name;
+            return (
+              <>
+                <tr
+                  key={r.name}
+                  className="border-b border-border/50 hover:bg-accent/40 cursor-pointer"
+                  onClick={() => setOpenProduct(isOpen ? null : r.name)}
+                >
+                  <td className="py-2 px-2 text-muted-foreground">
+                    <ChevronRight className={`w-4 h-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                  </td>
+                  <td className="py-2 px-2 font-medium">
+                    {r.name}
+                    <span className="ml-2 text-xs text-muted-foreground">({details.length})</span>
+                  </td>
+                  <td className="py-2 px-2 text-right mono-num">{fmtMoney(invested)}</td>
+                  <td className="py-2 px-2 text-right mono-num">{fmtMoney(r.value)}</td>
+                  <td className="py-2 px-2 text-right mono-num">{w.toFixed(2)}%</td>
+                  <td className={`py-2 px-2 text-right mono-num ${gain >= 0 ? "text-positive" : "text-negative"}`}>
+                    {gain >= 0 ? "+" : ""}{fmtMoney(gain)}
+                  </td>
+                  <td className={`py-2 px-2 text-right mono-num ${ret >= 0 ? "text-positive" : "text-negative"}`}>
+                    {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
+                  </td>
+                  <td className={`py-2 px-2 text-right mono-num ${lt >= 0 ? "text-positive" : "text-negative"}`}>
+                    {lt >= 0 ? "+" : ""}{fmtMoney(lt)}
+                  </td>
+                  <td className={`py-2 px-2 text-right mono-num ${st >= 0 ? "text-positive" : "text-negative"}`}>
+                    {st >= 0 ? "+" : ""}{fmtMoney(st)}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr key={r.name + "-drill"} className="bg-muted/20">
+                    <td colSpan={9} className="p-3">
+                      <HoldingsDrilldown details={details} />
+                    </td>
+                  </tr>
+                )}
+              </>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function HoldingsDrilldown({ details }: { details: HoldingDetail[] }) {
+  return (
+    <div className="rounded-md border border-border bg-card">
+      <div className="px-3 py-2 border-b border-border text-xs font-medium text-muted-foreground">
+        Underlying Holdings — {details.length} securities
+      </div>
+      <div className="overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="text-[11px] text-muted-foreground border-b">
+            <tr>
+              <th className="text-left py-2 px-2">Security</th>
+              <th className="text-left py-2 px-2">ISIN</th>
+              <th className="text-right py-2 px-2">Qty</th>
+              <th className="text-right py-2 px-2">Avg Cost</th>
+              <th className="text-right py-2 px-2">Current Price</th>
+              <th className="text-right py-2 px-2">Invested</th>
+              <th className="text-right py-2 px-2">Current Value</th>
+              <th className="text-right py-2 px-2">Unrealised G/L</th>
+              <th className="text-right py-2 px-2">Return %</th>
+              <th className="text-left py-2 px-2">Purchase Date</th>
+              <th className="text-center py-2 px-2">Holding</th>
+              <th className="text-right py-2 px-2">LTCG</th>
+              <th className="text-right py-2 px-2">STCG</th>
+            </tr>
+          </thead>
+          <tbody>
+            {details.map(d => (
+              <tr key={d.h.isin || d.h.name} className="border-b border-border/40">
+                <td className="py-2 px-2 font-medium">{d.h.name}</td>
+                <td className="py-2 px-2 mono-num text-muted-foreground">{d.h.isin || "—"}</td>
+                <td className="py-2 px-2 text-right mono-num">{d.h.quantity.toLocaleString()}</td>
+                <td className="py-2 px-2 text-right mono-num">{d.purchasePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-2 text-right mono-num">{d.h.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                <td className="py-2 px-2 text-right mono-num">{fmtMoney(d.invested)}</td>
+                <td className="py-2 px-2 text-right mono-num">{fmtMoney(d.currentValue)}</td>
+                <td className={`py-2 px-2 text-right mono-num ${d.gain >= 0 ? "text-positive" : "text-negative"}`}>
+                  {d.gain >= 0 ? "+" : ""}{fmtMoney(d.gain)}
+                </td>
+                <td className={`py-2 px-2 text-right mono-num ${d.returnPct >= 0 ? "text-positive" : "text-negative"}`}>
+                  {d.returnPct >= 0 ? "+" : ""}{d.returnPct.toFixed(2)}%
+                </td>
+                <td className="py-2 px-2 mono-num">
+                  {d.purchaseDate.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
+                </td>
+                <td className="py-2 px-2 text-center">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    d.gainType === "LT" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                  }`}>
+                    {d.holdingMonths}m · {d.gainType}
+                  </span>
+                </td>
+                <td className={`py-2 px-2 text-right mono-num ${d.ltGain >= 0 ? "text-positive" : "text-negative"}`}>
+                  {d.ltGain !== 0 ? (d.ltGain >= 0 ? "+" : "") + fmtMoney(d.ltGain) : "—"}
+                </td>
+                <td className={`py-2 px-2 text-right mono-num ${d.stGain >= 0 ? "text-positive" : "text-negative"}`}>
+                  {d.stGain !== 0 ? (d.stGain >= 0 ? "+" : "") + fmtMoney(d.stGain) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-3 py-2 border-t border-border text-[11px] text-muted-foreground">
+        LT/ST basis: equity &amp; equity-oriented &gt; 12 months = long-term; other assets &gt; 24 months = long-term. Purchase price and dates are illustrative.
+      </div>
+    </div>
   );
 }
 

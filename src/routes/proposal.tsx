@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles, Lightbulb } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -73,8 +73,16 @@ function ProposalPage() {
   const [activeClass, setActiveClass] = useState<AssetClassKey>("MF");
   const [search, setSearch] = useState("");
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  // Wipe holdings on region switch so we never carry over India product IDs into AE catalog.
-  useEffect(() => { setHoldings([]); }, [region]);
+  const [thesis, setThesis] = useState<null | {
+    strategyLabel: string;
+    profile: string;
+    headline: string;
+    bullets: string[];
+    classNotes: { klass: AssetClassKey; label: string; pct: number; note: string }[];
+    caveats: string[];
+  }>(null);
+  // Wipe holdings + thesis on region switch so we never carry over India product IDs into AE catalog.
+  useEffect(() => { setHoldings([]); setThesis(null); }, [region]);
 
   // Catalog by class
   const catalog = useMemo(() => {
@@ -290,6 +298,72 @@ function ProposalPage() {
       risk: p.risk,
     }));
     setHoldings(newHoldings);
+
+    // ---- Build commentary / investment thesis ----
+    const stratMeta: Record<AllocStrategy, { label: string; how: string }> = {
+      equal:   { label: "Equal Weight (1/N)",     how: "sizes every pick to the same rupee amount — a naive but bias-free baseline" },
+      sharpe:  { label: "Max Sharpe Ratio",       how: "over-weights holdings that deliver the highest return per unit of risk (excess return over 6.5% ÷ risk score)" },
+      maxret:  { label: "Max Return",             how: "aggressively tilts to the highest expected-return holdings using cubic emphasis" },
+      minrisk: { label: "Min Risk (Defensive)",   how: "inversely weights by risk² so safer holdings dominate — capital preservation first" },
+      maxrisk: { label: "Max Risk (Aggressive)",  how: "concentrates capital in the highest-risk holdings (risk³ weighting) chasing maximum growth" },
+    };
+    const meta = stratMeta[allocStrategy];
+    const classTotals = new Map<AssetClassKey, number>();
+    let totalAlloc = 0;
+    newHoldings.forEach(h => {
+      classTotals.set(h.klass, (classTotals.get(h.klass) || 0) + h.amount);
+      totalAlloc += h.amount;
+    });
+    const classNoteMap: Record<AssetClassKey, string> = {
+      MF:   "Diversified equity/debt via professionally managed schemes — daily liquidity and low ticket size.",
+      EQ:   "Direct equity for higher alpha potential and full control over holding period and tax treatment.",
+      PMS:  "Concentrated, actively managed strategies for HNI capital — targets alpha over broad indices.",
+      AIF:  "Alternative exposures (private equity / credit / long-short) uncorrelated to listed markets.",
+      DEBT: "Fixed income sleeve — anchors yield and dampens equity drawdowns.",
+      FD:   "Bank/NBFC fixed deposits — sovereign-adjacent capital safety with predictable coupons.",
+      CASH: "Idle liquidity buffer for opportunistic deployment and near-term expenses.",
+    };
+    const classNotes = ASSET_CLASSES
+      .map(c => ({
+        klass: c.key,
+        label: c.label,
+        pct: totalAlloc > 0 ? ((classTotals.get(c.key) || 0) / totalAlloc) * 100 : 0,
+        note: classNoteMap[c.key],
+      }))
+      .filter(x => x.pct > 0.5)
+      .sort((a, b) => b.pct - a.pct);
+
+    const wR = totalAlloc > 0
+      ? newHoldings.reduce((s, h) => s + h.expectedReturn * h.amount, 0) / totalAlloc
+      : 0;
+    const wRisk = totalAlloc > 0
+      ? newHoldings.reduce((s, h) => s + (RISK_SCORE[h.risk] || 3) * h.amount, 0) / totalAlloc
+      : 0;
+    const wRiskLabel = wRisk < 1.8 ? "Low" : wRisk < 2.8 ? "Low-Moderate" : wRisk < 3.8 ? "Moderate" : wRisk < 4.6 ? "Mod-High" : wRisk < 5.4 ? "High" : "Very High";
+    const horizon = Math.max(1, parseInt(prospect.horizonYears) || 5);
+    const fv = totalCorpus * Math.pow(1 + wR / 100, horizon);
+
+    const bullets: string[] = [];
+    bullets.push(`Starting universe was filtered to holdings with a risk score ≤ ${policy.cap} to honour the ${profile} mandate.`);
+    bullets.push(`From that universe, top candidates were ranked ${allocStrategy === "sharpe" ? "by Sharpe score" : allocStrategy === "maxret" || allocStrategy === "equal" ? "by expected return" : "by risk-weighted score"} within each asset class — ${policy.mfN} MF · ${policy.eqN} Equity · ${policy.pmsN} PMS · ${policy.aifN} AIF · ${policy.dbtN} Debt · ${policy.fdN} FD${policy.cash ? " · +Cash sleeve" : ""}.`);
+    bullets.push(`Rupee weights were then set by the ${meta.label} rule, which ${meta.how}.`);
+    bullets.push(`A profile tilt was layered on top — growthBoost=${policy.growthBoost.toFixed(1)} lifts higher-risk holdings, defBoost=${policy.defBoost.toFixed(1)} lifts lower-risk holdings — to keep the final mix aligned to a ${profile} investor.`);
+    bullets.push(`Resulting portfolio: ${newHoldings.length} holdings, weighted expected IRR ${wR.toFixed(2)}%, portfolio risk ${wRiskLabel}, projected FV in ${horizon}Y ≈ ${fmtINR(fv)}.`);
+
+    const caveats: string[] = [
+      "Expected returns are point estimates from research inputs (3Y CAGR, YTM, net IRR, forward earnings) — not guarantees; realised returns will vary with markets, credit events and manager skill.",
+      "Risk scores are heuristic bands (Low → Very High); a full mean-variance optimisation with a live covariance matrix will refine weights further.",
+      "This is a starting model — RM to overlay client-specific liquidity needs, tax posture, existing exposures and any exclusion lists before execution.",
+    ];
+
+    setThesis({
+      strategyLabel: meta.label,
+      profile,
+      headline: `${profile} portfolio built with ${meta.label} across ${newHoldings.length} holdings, targeting ${wR.toFixed(2)}% IRR at ${wRiskLabel} risk.`,
+      bullets,
+      classNotes,
+      caveats,
+    });
   }
   // Keep cash holdings synced to cashRate input
   const holdingsLive = useMemo(() => holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h), [holdings, cashRate]);
@@ -519,7 +593,63 @@ function ProposalPage() {
                 </div>
               )}
             </section>
+
+            {thesis && (
+              <section className="border border-border rounded-md bg-surface">
+                <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
+                  <Lightbulb className="w-3.5 h-3.5" /> Portfolio Thesis
+                  <button
+                    onClick={() => setThesis(null)}
+                    className="ml-auto text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground"
+                  >
+                    dismiss
+                  </button>
+                </div>
+                <div className="p-3 space-y-3 text-[11px] leading-relaxed">
+                  <div className="text-foreground">{thesis.headline}</div>
+
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">How it was constructed</div>
+                    <ul className="space-y-1.5">
+                      {thesis.bullets.map((b, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="mt-1.5 w-1 h-1 rounded-full bg-foreground/60 shrink-0" />
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {thesis.classNotes.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Why each sleeve is in the mix</div>
+                      <ul className="space-y-1.5">
+                        {thesis.classNotes.map(c => (
+                          <li key={c.klass} className="flex gap-2">
+                            <span className="mono-num text-muted-foreground shrink-0 w-11">{c.pct.toFixed(1)}%</span>
+                            <span><span className="font-medium text-foreground">{c.label}:</span> {c.note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Caveats</div>
+                    <ul className="space-y-1 text-muted-foreground">
+                      {thesis.caveats.map((c, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/60 shrink-0" />
+                          <span>{c}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            )}
           </aside>
+
 
           {/* CENTER: Catalog */}
           <section className="col-span-12 lg:col-span-5">

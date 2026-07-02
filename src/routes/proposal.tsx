@@ -594,8 +594,13 @@ function ProposalPage() {
               )}
             </section>
 
+          </aside>
+
+
+          {/* CENTER: Catalog */}
+          <section className="col-span-12 lg:col-span-5 space-y-4">
             {thesis && (
-              <section className="border border-border rounded-md bg-surface">
+              <div className="border border-border rounded-md bg-surface">
                 <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
                   <Lightbulb className="w-3.5 h-3.5" /> Portfolio Thesis
                   <button
@@ -646,13 +651,8 @@ function ProposalPage() {
                     </ul>
                   </div>
                 </div>
-              </section>
+              </div>
             )}
-          </aside>
-
-
-          {/* CENTER: Catalog */}
-          <section className="col-span-12 lg:col-span-5">
             <div className="border border-border rounded-md bg-surface">
               <div className="border-b border-border flex flex-wrap">
                 {ASSET_CLASSES.map(c => (

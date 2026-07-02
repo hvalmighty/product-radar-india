@@ -599,6 +599,59 @@ function ProposalPage() {
 
           {/* CENTER: Catalog */}
           <section className="col-span-12 lg:col-span-5 space-y-4">
+            <div className="border border-border rounded-md bg-surface">
+              <div className="border-b border-border flex flex-wrap">
+                {ASSET_CLASSES.map(c => (
+                  <button key={c.key} onClick={() => { setActiveClass(c.key); setSearch(""); }}
+                    className={`px-3 py-2 text-[11px] font-medium tracking-wide border-b-2 -mb-px ${activeClass === c.key ? `border-foreground text-foreground` : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div className="px-3 py-2 border-b border-border bg-background/40 flex items-center gap-3">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="text-foreground">{ASSET_CLASSES.find(a => a.key === activeClass)?.product}</span> → {ASSET_CLASSES.find(a => a.key === activeClass)?.security}
+                </div>
+                <div className="ml-auto flex items-center gap-1.5 text-xs">
+                  <Search className="w-3 h-3 text-muted-foreground" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search securities…"
+                    className="bg-background border border-border rounded-sm px-2 py-1 text-xs w-48" />
+                </div>
+              </div>
+              <div className="max-h-[calc(100vh-280px)] overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-surface border-b border-border">
+                    <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">Security</th>
+                      <th className="px-2 py-2 text-right">Exp. Return</th>
+                      <th className="px-2 py-2">Risk</th>
+                      <th className="px-2 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catalog?.map(it => {
+                      const added = holdings.some(h => h.id === it.id && h.klass === activeClass);
+                      return (
+                        <tr key={it.id} className="border-b border-border/40 hover:bg-secondary/30">
+                          <td className="px-3 py-2">
+                            <div className="font-medium leading-tight">{it.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{it.sub} · {it.extra}</div>
+                          </td>
+                          <td className="px-2 py-2 text-right mono-num text-positive">{it.ret.toFixed(2)}%</td>
+                          <td className="px-2 py-2 text-[10px]">{it.risk}</td>
+                          <td className="px-2 py-2 text-right">
+                            <button onClick={() => addHolding(it)} disabled={added}
+                              className="inline-flex items-center justify-center w-6 h-6 border border-border rounded-sm hover:bg-secondary disabled:opacity-30">
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             {thesis && (
               <div className="border border-border rounded-md bg-surface">
                 <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
@@ -653,59 +706,6 @@ function ProposalPage() {
                 </div>
               </div>
             )}
-            <div className="border border-border rounded-md bg-surface">
-              <div className="border-b border-border flex flex-wrap">
-                {ASSET_CLASSES.map(c => (
-                  <button key={c.key} onClick={() => { setActiveClass(c.key); setSearch(""); }}
-                    className={`px-3 py-2 text-[11px] font-medium tracking-wide border-b-2 -mb-px ${activeClass === c.key ? `border-foreground text-foreground` : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <div className="px-3 py-2 border-b border-border bg-background/40 flex items-center gap-3">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <span className="text-foreground">{ASSET_CLASSES.find(a => a.key === activeClass)?.product}</span> → {ASSET_CLASSES.find(a => a.key === activeClass)?.security}
-                </div>
-                <div className="ml-auto flex items-center gap-1.5 text-xs">
-                  <Search className="w-3 h-3 text-muted-foreground" />
-                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search securities…"
-                    className="bg-background border border-border rounded-sm px-2 py-1 text-xs w-48" />
-                </div>
-              </div>
-              <div className="max-h-[calc(100vh-280px)] overflow-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-surface border-b border-border">
-                    <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="px-3 py-2">Security</th>
-                      <th className="px-2 py-2 text-right">Exp. Return</th>
-                      <th className="px-2 py-2">Risk</th>
-                      <th className="px-2 py-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catalog?.map(it => {
-                      const added = holdings.some(h => h.id === it.id && h.klass === activeClass);
-                      return (
-                        <tr key={it.id} className="border-b border-border/40 hover:bg-secondary/30">
-                          <td className="px-3 py-2">
-                            <div className="font-medium leading-tight">{it.name}</div>
-                            <div className="text-[10px] text-muted-foreground">{it.sub} · {it.extra}</div>
-                          </td>
-                          <td className="px-2 py-2 text-right mono-num text-positive">{it.ret.toFixed(2)}%</td>
-                          <td className="px-2 py-2 text-[10px]">{it.risk}</td>
-                          <td className="px-2 py-2 text-right">
-                            <button onClick={() => addHolding(it)} disabled={added}
-                              className="inline-flex items-center justify-center w-6 h-6 border border-border rounded-sm hover:bg-secondary disabled:opacity-30">
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </section>
 
           {/* RIGHT: Selected Holdings */}

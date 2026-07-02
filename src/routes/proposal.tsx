@@ -73,8 +73,16 @@ function ProposalPage() {
   const [activeClass, setActiveClass] = useState<AssetClassKey>("MF");
   const [search, setSearch] = useState("");
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  // Wipe holdings on region switch so we never carry over India product IDs into AE catalog.
-  useEffect(() => { setHoldings([]); }, [region]);
+  const [thesis, setThesis] = useState<null | {
+    strategyLabel: string;
+    profile: string;
+    headline: string;
+    bullets: string[];
+    classNotes: { klass: AssetClassKey; label: string; pct: number; note: string }[];
+    caveats: string[];
+  }>(null);
+  // Wipe holdings + thesis on region switch so we never carry over India product IDs into AE catalog.
+  useEffect(() => { setHoldings([]); setThesis(null); }, [region]);
 
   // Catalog by class
   const catalog = useMemo(() => {

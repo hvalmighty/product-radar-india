@@ -489,7 +489,7 @@ const P_DIM_LABEL: Record<PDim, string> = {
 // FlatHolding type + flatHoldings/lookthroughHoldings now come from @/lib/analytics-data.
 
 function PortfolioAnalytics() {
-  const [view, setView] = useState<"healthcheck" | "pivot" | "drift" | "concentration" | "underperform" | "lookup">("healthcheck");
+  const [view, setView] = useState<"healthcheck" | "pivot" | "drift" | "concentration" | "underperform" | "fees" | "liquidity" | "sectorheat" | "risk" | "lookup">("healthcheck");
 
   return (
     <main className="px-4 sm:px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
@@ -500,6 +500,10 @@ function PortfolioAnalytics() {
           { k: "drift",         label: "Allocation Drift vs IPS",  icon: <Target className="h-3.5 w-3.5" /> },
           { k: "concentration", label: "Concentration Risk",       icon: <AlertTriangle className="h-3.5 w-3.5" /> },
           { k: "underperform",  label: "Underperformance",         icon: <TrendingDown className="h-3.5 w-3.5" /> },
+          { k: "fees",          label: "Fee Leakage",              icon: <Percent className="h-3.5 w-3.5" /> },
+          { k: "liquidity",     label: "Liquidity Ladder",         icon: <Droplet className="h-3.5 w-3.5" /> },
+          { k: "sectorheat",    label: "Sector Heatmap",           icon: <Layers className="h-3.5 w-3.5" /> },
+          { k: "risk",          label: "Risk Exposure",            icon: <Activity className="h-3.5 w-3.5" /> },
           { k: "lookup",        label: "Security Lookup",          icon: <Search className="h-3.5 w-3.5" /> },
         ] as const).map(t => (
           <button
@@ -515,6 +519,10 @@ function PortfolioAnalytics() {
       {view === "drift" && <DriftView />}
       {view === "concentration" && <ConcentrationView />}
       {view === "underperform" && <UnderperformView />}
+      {view === "fees" && <FeeLeakageView />}
+      {view === "liquidity" && <LiquidityLadderView />}
+      {view === "sectorheat" && <SectorHeatmapView />}
+      {view === "risk" && <RiskExposureView />}
       {view === "lookup" && <LookupView />}
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">

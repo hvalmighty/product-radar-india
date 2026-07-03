@@ -10,7 +10,7 @@ import {
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
-  Treemap,
+  Treemap, ScatterChart, Scatter, ZAxis,
 } from "recharts";
 import { REGION_META, getCurrentRegion, useRegion as useRegionReactive } from "@/lib/region";
 import {

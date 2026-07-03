@@ -826,8 +826,8 @@ function HoldingsPivot() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <Select label="Rows" value={rowDim} onChange={v => setRowDim(v as PDim)} options={Object.entries(P_DIM_LABEL).map(([k, v]) => ({ value: k, label: v }))} />
         <Select label="Columns" value={colDim} onChange={v => setColDim(v as PDim | "none")} options={[{ value: "none", label: "(none)" }, ...Object.entries(P_DIM_LABEL).map(([k, v]) => ({ value: k, label: v }))]} />
-        <Select label="" value={showHeatmap ? "heat" : "plain"} onChange={v => setShowHeatmap(v === "heat")} options={[{ value: "heat", label: "Show heatmap" }, { value: "plain", label: "Plain table" }]} />
-        <div className="flex items-end text-[11px] text-muted-foreground">{pivot.rows.length} × {pivot.cols.length} cells · ₹{pivot.grand.toFixed(1)} Cr</div>
+        <Select label="Display" value={showHeatmap ? "heat" : "plain"} onChange={v => setShowHeatmap(v === "heat")} options={[{ value: "heat", label: "Show heatmap" }, { value: "plain", label: "Plain table" }]} />
+        <div className="flex items-end justify-end text-[11px] text-muted-foreground pb-1.5">{pivot.rows.length} × {pivot.cols.length} cells · ₹{pivot.grand.toFixed(1)} Cr</div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">

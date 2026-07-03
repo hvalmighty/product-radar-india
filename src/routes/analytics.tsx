@@ -409,7 +409,131 @@ function BusinessAnalytics() {
         </Panel>
       </section>
 
+      {/* NEW: Product Mix Trend + RM Quadrant */}
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <Panel title="Product Mix Trend" subtitle="Share of AUM by product over time (100% stacked)" className="xl:col-span-2">
+          {(() => {
+            const data = MONTHS.map(m => {
+              const rowFacts = filteredFacts.filter(f => f.month === m);
+              const total = rowFacts.reduce((s, f) => s + f.aum, 0) || 1;
+              const row: Record<string, number | string> = { month: m };
+              PRODUCTS.forEach(p => {
+                const v = rowFacts.filter(f => f.product === p).reduce((s, f) => s + f.aum, 0);
+                row[p] = +(v / total * 100).toFixed(2);
+              });
+              return row;
+            });
+            return (
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={data} stackOffset="expand">
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
+                    formatter={(v: number, k) => [`${(+v).toFixed(1)}%`, k as string]} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  {PRODUCTS.map((p, i) => (
+                    <Area key={p} type="monotone" dataKey={p} stackId="1" stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.55} />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </Panel>
+
+        <Panel title="RM Productivity Quadrant" subtitle="AUM (x) vs Net-New-Money TTM (y). Bubble = revenue TTM.">
+          {(() => {
+            const latestMonth = MONTHS[MONTHS.length - 1];
+            const ttm = MONTHS.slice(-12);
+            const scatter = RM_INFO.map(r => {
+              const aum = businessFacts.filter(f => f.rm === r.rm && f.month === latestMonth).reduce((s, f) => s + f.aum, 0);
+              const nnm = businessFacts.filter(f => f.rm === r.rm && ttm.includes(f.month)).reduce((s, f) => s + f.netFlows, 0);
+              const rev = businessFacts.filter(f => f.rm === r.rm && ttm.includes(f.month)).reduce((s, f) => s + f.revenue, 0);
+              return { x: +aum.toFixed(0), y: +nnm.toFixed(1), z: +rev.toFixed(2), name: r.rm };
+            });
+            return (
+              <ResponsiveContainer width="100%" height={280}>
+                <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" dataKey="x" name="AUM" tick={{ fontSize: 10 }} />
+                  <YAxis type="number" dataKey="y" name="NNM" tick={{ fontSize: 10 }} />
+                  <ZAxis type="number" dataKey="z" range={[80, 480]} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }}
+                    content={({ active, payload }) => active && payload && payload.length ? (
+                      <div className="bg-card border border-border rounded p-2 text-[11px]">
+                        <div className="font-medium">{(payload[0].payload as any).name}</div>
+                        <div>AUM: {fmtCr((payload[0].payload as any).x)}</div>
+                        <div>NNM (TTM): {fmtCr((payload[0].payload as any).y)}</div>
+                        <div>Revenue (TTM): {fmtCr((payload[0].payload as any).z)}</div>
+                      </div>
+                    ) : null}
+                  />
+                  <Scatter data={scatter} fill="#10b981" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </Panel>
+      </section>
+
+      {/* NEW: Segment migration + Revenue mix */}
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <Panel title="Segment Contribution — AUM vs Revenue" subtitle="Where AUM sits vs where revenue is generated (period totals)">
+          {(() => {
+            const data = SEGMENTS.map(s => {
+              const seg = filteredFacts.filter(f => f.segment === s);
+              const aum = seg.filter(f => f.month === periodMonths[periodMonths.length - 1]).reduce((a, f) => a + f.aum, 0);
+              const rev = seg.reduce((a, f) => a + f.revenue, 0);
+              return { name: s, "AUM Share %": 0, "Revenue Share %": 0, aum, rev };
+            });
+            const aumT = data.reduce((s, r) => s + r.aum, 0) || 1;
+            const revT = data.reduce((s, r) => s + r.rev, 0) || 1;
+            data.forEach(r => { r["AUM Share %"] = +(r.aum / aumT * 100).toFixed(1); r["Revenue Share %"] = +(r.rev / revT * 100).toFixed(1); });
+            return (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} unit="%" />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="AUM Share %" fill="#6366f1" />
+                  <Bar dataKey="Revenue Share %" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </Panel>
+
+        <Panel title="Channel Efficiency" subtitle="Revenue per ₹ of AUM (yield %) & NNM/AUM (growth %) by channel, TTM">
+          {(() => {
+            const ttm = MONTHS.slice(-12);
+            const data = CHANNELS.map(c => {
+              const cf = filteredFacts.filter(f => f.channel === c && ttm.includes(f.month));
+              const aum = cf.filter(f => f.month === ttm[ttm.length - 1]).reduce((s, f) => s + f.aum, 0);
+              const rev = cf.reduce((s, f) => s + f.revenue, 0);
+              const nnm = cf.reduce((s, f) => s + f.netFlows, 0);
+              return { name: c, "Yield %": aum ? +(rev / aum * 100).toFixed(2) : 0, "Growth %": aum ? +(nnm / aum * 100).toFixed(2) : 0 };
+            });
+            return (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 10 }} unit="%" />
+                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Yield %" fill="#10b981" />
+                  <Bar dataKey="Growth %" fill="#6366f1" />
+                </BarChart>
+              </ResponsiveContainer>
+            );
+          })()}
+        </Panel>
+      </section>
+
       {/* Advisor performance — NO NPS */}
+
       <Panel title="Advisor Performance" subtitle="RM-level AUM, NNM, revenue, retention & productivity (TTM)">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">

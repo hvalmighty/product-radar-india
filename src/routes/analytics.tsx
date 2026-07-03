@@ -1259,6 +1259,320 @@ function LookupView() {
 }
 
 // ============================================================
+// NEW: Fee Leakage
+// ============================================================
+function FeeLeakageView() {
+  // benchmark fee by product (illustrative median)
+  const BENCH: Record<string, number> = { MF: 1.10, PMS: 1.80, AIF: 2.00, Equity: 0.20, Bond: 0.40, Cash: 0.00 };
+  const rows = useMemo(() => clientPortfolios.map(p => {
+    const wFee = p.holdings.reduce((s, h) => s + h.fee * h.value, 0) / p.aum;
+    // effective benchmark fee weighted by product mix
+    const bench = p.holdings.reduce((s, h) => s + (BENCH[h.product] ?? 1) * h.value, 0) / p.aum;
+    const leakBps = (wFee - bench) * 100;
+    const leakValue = ((wFee - bench) / 100) * p.aum; // in same currency unit
+    const byProduct = new Map<string, { fee: number; val: number }>();
+    p.holdings.forEach(h => {
+      const cur = byProduct.get(h.product) ?? { fee: 0, val: 0 };
+      cur.fee += h.fee * h.value; cur.val += h.value;
+      byProduct.set(h.product, cur);
+    });
+    const topProduct = [...byProduct.entries()].map(([k, v]) => ({ k, avg: v.fee / v.val, bench: BENCH[k] ?? 1, gap: (v.fee / v.val) - (BENCH[k] ?? 1) })).sort((a, b) => b.gap - a.gap)[0];
+    return { p, wFee, bench, leakBps, leakValue, topProduct };
+  }).sort((a, b) => b.leakBps - a.leakBps), []);
+
+  const chart = rows.slice(0, 12).map(r => ({ name: r.p.client, "Actual Fee": +r.wFee.toFixed(2), "Benchmark Fee": +r.bench.toFixed(2) }));
+  const totalLeak = rows.reduce((s, r) => s + Math.max(0, r.leakValue), 0);
+
+  return (
+    <>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={<Percent className="h-4 w-4" />} label="Firm Wtd Avg Fee" value={`${(rows.reduce((s, r) => s + r.wFee, 0) / rows.length).toFixed(2)}%`} delta={-0.05} sub="QoQ" reverse />
+        <KpiCard icon={<AlertCircle className="h-4 w-4" />} label="Est. Overpayment (annual)" value={fmtCr(totalLeak)} delta={-8.4} sub="QoQ" reverse />
+        <KpiCard icon={<TrendingUp className="h-4 w-4" />} label="Portfolios > Benchmark" value={`${rows.filter(r => r.leakBps > 0).length}/${rows.length}`} delta={-5} sub="vs prev" reverse />
+        <KpiCard icon={<Award className="h-4 w-4" />} label="Most Efficient" value={rows[rows.length - 1]?.p.client ?? "—"} delta={0} sub="lowest bps" />
+      </section>
+
+      <Panel title="Actual vs Benchmark Fee — by Portfolio" subtitle="Weighted average fee (%) compared to product-mix benchmark median">
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={chart}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-20} textAnchor="end" height={60} />
+            <YAxis tick={{ fontSize: 10 }} unit="%" />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="Actual Fee" fill="#ef4444" />
+            <Bar dataKey="Benchmark Fee" fill="#10b981" />
+          </BarChart>
+        </ResponsiveContainer>
+      </Panel>
+
+      <Panel title="Fee Leakage Ranking" subtitle="Excess fee over benchmark, in bps and estimated ₹/yr">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="text-left p-2">Client</th>
+                <th className="text-left p-2">RM</th>
+                <th className="text-right p-2">AUM</th>
+                <th className="text-right p-2">Wtd Fee</th>
+                <th className="text-right p-2">Bench Fee</th>
+                <th className="text-right p-2">Leak (bps)</th>
+                <th className="text-right p-2">Est. Overpayment / yr</th>
+                <th className="text-left p-2">Worst Product</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const tone = r.leakBps > 40 ? "text-negative" : r.leakBps > 15 ? "text-amber-600" : "text-positive";
+                return (
+                  <tr key={r.p.id} className="border-t border-border">
+                    <td className="p-2 font-medium">{r.p.client}</td>
+                    <td className="p-2 text-muted-foreground">{r.p.rm}</td>
+                    <td className="text-right p-2 tabular-nums">{fmtCr(r.p.aum)}</td>
+                    <td className="text-right p-2 tabular-nums">{r.wFee.toFixed(2)}%</td>
+                    <td className="text-right p-2 tabular-nums text-muted-foreground">{r.bench.toFixed(2)}%</td>
+                    <td className={`text-right p-2 tabular-nums font-semibold ${tone}`}>{r.leakBps >= 0 ? "+" : ""}{r.leakBps.toFixed(0)}</td>
+                    <td className={`text-right p-2 tabular-nums ${tone}`}>{fmtCr(Math.max(0, r.leakValue))}</td>
+                    <td className="p-2 text-[10px]">{r.topProduct ? `${r.topProduct.k} · ${(r.topProduct.avg).toFixed(2)}% vs ${r.topProduct.bench.toFixed(2)}%` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
+// NEW: Liquidity Ladder
+// ============================================================
+function LiquidityLadderView() {
+  const rows = useMemo(() => clientPortfolios.map(p => {
+    const b: Record<string, number> = { "T+1": 0, "T+3": 0, "T+30": 0, "Locked": 0 };
+    p.holdings.forEach(h => { b[h.liquidity] += h.value; });
+    const pct = Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v / p.aum * 100]));
+    const raiseIn3d = (b["T+1"] + b["T+3"]);
+    return { p, b, pct, raiseIn3d };
+  }).sort((a, b) => a.raiseIn3d / a.p.aum - b.raiseIn3d / b.p.aum), []);
+
+  const chart = rows.map(r => ({ name: r.p.client, "T+1": +r.pct["T+1"].toFixed(1), "T+3": +r.pct["T+3"].toFixed(1), "T+30": +r.pct["T+30"].toFixed(1), "Locked": +r.pct["Locked"].toFixed(1) }));
+  const totals = rows.reduce((acc, r) => { (["T+1","T+3","T+30","Locked"] as const).forEach(k => acc[k] += r.b[k]); return acc; }, { "T+1": 0, "T+3": 0, "T+30": 0, "Locked": 0 } as Record<string, number>);
+  const totalAum = rows.reduce((s, r) => s + r.p.aum, 0);
+  const LCOLORS: Record<string, string> = { "T+1": "#10b981", "T+3": "#6366f1", "T+30": "#f59e0b", "Locked": "#ef4444" };
+
+  return (
+    <>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {(["T+1","T+3","T+30","Locked"] as const).map(k => (
+          <KpiCard key={k} icon={<Droplet className="h-4 w-4" />} label={`${k} liquidity`} value={`${(totals[k] / totalAum * 100).toFixed(1)}%`} delta={k === "Locked" ? 1.2 : -0.4} sub="firm-wide" reverse={k === "Locked"} />
+        ))}
+      </section>
+
+      <Panel title="Liquidity Ladder by Portfolio" subtitle="Share of AUM redeemable in each settlement bucket (stacked, 100%)">
+        <ResponsiveContainer width="100%" height={340}>
+          <BarChart data={chart} layout="vertical" margin={{ left: 60 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis type="number" tick={{ fontSize: 10 }} unit="%" domain={[0, 100]} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={140} />
+            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            {(["T+1","T+3","T+30","Locked"] as const).map(k => <Bar key={k} dataKey={k} stackId="a" fill={LCOLORS[k]} />)}
+          </BarChart>
+        </ResponsiveContainer>
+      </Panel>
+
+      <Panel title="Stress-Test: Redemption Coverage" subtitle="Cash raisable within 3 days as % of AUM — flag <15%">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="text-left p-2">Client</th>
+                <th className="text-right p-2">AUM</th>
+                <th className="text-right p-2">T+1</th>
+                <th className="text-right p-2">T+3</th>
+                <th className="text-right p-2">T+30</th>
+                <th className="text-right p-2">Locked</th>
+                <th className="text-right p-2">3-day Coverage</th>
+                <th className="text-left p-2">Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const cov = (r.b["T+1"] + r.b["T+3"]) / r.p.aum * 100;
+                const verdict = cov < 15 ? { l: "Stressed", c: "bg-negative/15 text-negative" } : cov < 30 ? { l: "Tight", c: "bg-amber-500/15 text-amber-600" } : { l: "Comfortable", c: "bg-positive/15 text-positive" };
+                return (
+                  <tr key={r.p.id} className="border-t border-border">
+                    <td className="p-2 font-medium">{r.p.client}</td>
+                    <td className="text-right p-2 tabular-nums">{fmtCr(r.p.aum)}</td>
+                    <td className="text-right p-2 tabular-nums">{r.pct["T+1"].toFixed(0)}%</td>
+                    <td className="text-right p-2 tabular-nums">{r.pct["T+3"].toFixed(0)}%</td>
+                    <td className="text-right p-2 tabular-nums">{r.pct["T+30"].toFixed(0)}%</td>
+                    <td className="text-right p-2 tabular-nums">{r.pct["Locked"].toFixed(0)}%</td>
+                    <td className="text-right p-2 tabular-nums font-semibold">{cov.toFixed(0)}%</td>
+                    <td className="p-2"><span className={classNames("text-[10px] px-1.5 py-0.5 rounded", verdict.c)}>{verdict.l}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
+// NEW: Sector Heatmap (client × sector, look-through)
+// ============================================================
+function SectorHeatmapView() {
+  const { clients, sectors, matrix, maxCell } = useMemo(() => {
+    const bySec = new Map<string, Map<string, number>>();
+    const secSet = new Set<string>();
+    lookthroughHoldings.forEach(h => {
+      const key = h.client;
+      if (!bySec.has(key)) bySec.set(key, new Map());
+      const m = bySec.get(key)!;
+      m.set(h.sector, (m.get(h.sector) ?? 0) + h.value);
+      secSet.add(h.sector);
+    });
+    const clientArr = clientPortfolios.map(p => p.client);
+    const sectorArr = [...secSet].sort();
+    const mat: Record<string, Record<string, number>> = {};
+    let max = 0;
+    clientArr.forEach(c => {
+      mat[c] = {};
+      const p = clientPortfolios.find(x => x.client === c)!;
+      sectorArr.forEach(s => {
+        const v = (bySec.get(c)?.get(s) ?? 0) / p.aum * 100;
+        mat[c][s] = v; if (v > max) max = v;
+      });
+    });
+    return { clients: clientArr, sectors: sectorArr, matrix: mat, maxCell: max };
+  }, []);
+
+  return (
+    <Panel title="Sector Exposure Heatmap — Client × Sector" subtitle="Look-through sector allocation (% of AUM). Darker = larger position.">
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] border-separate border-spacing-0">
+          <thead className="bg-muted/40 text-muted-foreground">
+            <tr>
+              <th className="text-left p-2 sticky left-0 bg-muted/40 z-10">Client</th>
+              {sectors.map(s => <th key={s} className="text-center p-2 rotate-0 whitespace-nowrap">{s}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map(c => (
+              <tr key={c}>
+                <td className="p-2 font-medium sticky left-0 bg-card border-t border-border">{c}</td>
+                {sectors.map(s => {
+                  const v = matrix[c][s];
+                  const intensity = maxCell ? v / maxCell : 0;
+                  const style = v > 0 ? { background: `hsla(243, 75%, 59%, ${Math.min(0.75, intensity * 0.85)})`, color: intensity > 0.55 ? "#fff" : undefined } : undefined;
+                  return <td key={s} style={style} className="text-center p-2 tabular-nums border-t border-border">{v > 0.5 ? v.toFixed(0) : v > 0 ? "·" : "—"}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-3">Values shown are % of that client's AUM. Cells &lt; 0.5% shown as “·”.</p>
+    </Panel>
+  );
+}
+
+// ============================================================
+// NEW: Risk Exposure (deterministic proxies: beta, vol, VaR)
+// ============================================================
+function seededRand(seed: string) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967295; };
+}
+function RiskExposureView() {
+  const rows = useMemo(() => clientPortfolios.map(p => {
+    const r = seededRand(p.id);
+    const eqW = p.holdings.filter(h => h.assetClass === "Equity").reduce((s, h) => s + h.value, 0) / p.aum;
+    const altW = p.holdings.filter(h => h.assetClass === "Alternates").reduce((s, h) => s + h.value, 0) / p.aum;
+    const beta = +(0.55 + eqW * 0.75 + altW * 0.15 + (r() - 0.5) * 0.1).toFixed(2);
+    const vol = +(6 + eqW * 14 + altW * 6 + (r() - 0.5) * 2).toFixed(1); // annualised %
+    const var95 = +(vol * 1.65).toFixed(1);
+    const sharpe = +((p.ytdReturn - 6) / Math.max(vol, 1) + (r() - 0.5) * 0.1).toFixed(2);
+    const maxDD = +(-(8 + vol * 0.55 + (r() * 4))).toFixed(1);
+    return { p, beta, vol, var95, sharpe, maxDD };
+  }).sort((a, b) => b.vol - a.vol), []);
+
+  const scatter = rows.map(r => ({ x: r.vol, y: r.p.ytdReturn, z: r.p.aum, name: r.p.client }));
+
+  return (
+    <>
+      <Panel title="Risk-Return Map" subtitle="Portfolio YTD return vs annualised volatility. Bubble size = AUM.">
+        <ResponsiveContainer width="100%" height={320}>
+          <ScatterChart margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis type="number" dataKey="x" name="Volatility" unit="%" tick={{ fontSize: 10 }} label={{ value: "Volatility (ann.)", position: "insideBottom", offset: -5, style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" } }} />
+            <YAxis type="number" dataKey="y" name="YTD Return" unit="%" tick={{ fontSize: 10 }} label={{ value: "YTD Return", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" } }} />
+            <ZAxis type="number" dataKey="z" range={[60, 500]} />
+            <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
+              formatter={(v: number | string, k: string) => [typeof v === "number" ? v.toFixed(1) : v, k]}
+              labelFormatter={() => ""}
+              content={({ active, payload }) => active && payload && payload.length ? (
+                <div className="bg-card border border-border rounded p-2 text-[11px]">
+                  <div className="font-medium">{(payload[0].payload as any).name}</div>
+                  <div>Vol: {(payload[0].payload as any).x.toFixed(1)}%</div>
+                  <div>YTD: {(payload[0].payload as any).y.toFixed(1)}%</div>
+                  <div>AUM: {fmtCr((payload[0].payload as any).z)}</div>
+                </div>
+              ) : null}
+            />
+            <Scatter data={scatter} fill="#6366f1" />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </Panel>
+
+      <Panel title="Risk Metrics by Portfolio" subtitle="Beta, volatility, 95% VaR (1-day, parametric proxy), Sharpe & max drawdown">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="text-left p-2">Client</th>
+                <th className="text-left p-2">Segment</th>
+                <th className="text-right p-2">AUM</th>
+                <th className="text-right p-2">Beta</th>
+                <th className="text-right p-2">Vol (ann.)</th>
+                <th className="text-right p-2">VaR 95%</th>
+                <th className="text-right p-2">Sharpe</th>
+                <th className="text-right p-2">Max DD</th>
+                <th className="text-left p-2">Risk Band</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const band = r.vol > 16 ? { l: "Aggressive", c: "bg-negative/15 text-negative" } : r.vol > 11 ? { l: "Growth", c: "bg-amber-500/15 text-amber-600" } : r.vol > 7 ? { l: "Balanced", c: "bg-primary/15 text-primary" } : { l: "Conservative", c: "bg-positive/15 text-positive" };
+                return (
+                  <tr key={r.p.id} className="border-t border-border">
+                    <td className="p-2 font-medium">{r.p.client}</td>
+                    <td className="p-2 text-muted-foreground">{r.p.segment}</td>
+                    <td className="text-right p-2 tabular-nums">{fmtCr(r.p.aum)}</td>
+                    <td className="text-right p-2 tabular-nums">{r.beta.toFixed(2)}</td>
+                    <td className="text-right p-2 tabular-nums">{r.vol.toFixed(1)}%</td>
+                    <td className="text-right p-2 tabular-nums text-negative">-{r.var95.toFixed(1)}%</td>
+                    <td className={`text-right p-2 tabular-nums font-medium ${r.sharpe >= 0.5 ? "text-positive" : r.sharpe >= 0 ? "text-amber-600" : "text-negative"}`}>{r.sharpe.toFixed(2)}</td>
+                    <td className="text-right p-2 tabular-nums text-negative">{r.maxDD.toFixed(1)}%</td>
+                    <td className="p-2"><span className={classNames("text-[10px] px-1.5 py-0.5 rounded", band.c)}>{band.l}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
 // UI atoms
 // ============================================================
 function Panel({ title, subtitle, children, className = "", right }: { title: string; subtitle?: string; children: React.ReactNode; className?: string; right?: React.ReactNode }) {

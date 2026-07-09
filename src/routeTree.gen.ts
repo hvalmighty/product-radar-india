@@ -13,6 +13,7 @@ import { Route as TaxRouteImport } from './routes/tax'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProposalRouteImport } from './routes/proposal'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketDataRouteImport } from './routes/market-data'
 import { Route as CustomerRouteImport } from './routes/customer'
 import { Route as AssistantRouteImport } from './routes/assistant'
@@ -47,6 +48,11 @@ const ProposalRoute = ProposalRouteImport.update({
 const PortfolioRoute = PortfolioRouteImport.update({
   id: '/portfolio',
   path: '/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketDataRoute = MarketDataRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/assistant': typeof AssistantRouteWithChildren
   '/customer': typeof CustomerRouteWithChildren
   '/market-data': typeof MarketDataRoute
+  '/onboarding': typeof OnboardingRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/market-data': typeof MarketDataRoute
+  '/onboarding': typeof OnboardingRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/assistant': typeof AssistantRouteWithChildren
   '/customer': typeof CustomerRouteWithChildren
   '/market-data': typeof MarketDataRoute
+  '/onboarding': typeof OnboardingRoute
   '/portfolio': typeof PortfolioRoute
   '/proposal': typeof ProposalRoute
   '/reports': typeof ReportsRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/customer'
     | '/market-data'
+    | '/onboarding'
     | '/portfolio'
     | '/proposal'
     | '/reports'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/market-data'
+    | '/onboarding'
     | '/portfolio'
     | '/proposal'
     | '/reports'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/customer'
     | '/market-data'
+    | '/onboarding'
     | '/portfolio'
     | '/proposal'
     | '/reports'
@@ -258,6 +270,7 @@ export interface RootRouteChildren {
   AssistantRoute: typeof AssistantRouteWithChildren
   CustomerRoute: typeof CustomerRouteWithChildren
   MarketDataRoute: typeof MarketDataRoute
+  OnboardingRoute: typeof OnboardingRoute
   PortfolioRoute: typeof PortfolioRoute
   ProposalRoute: typeof ProposalRoute
   ReportsRoute: typeof ReportsRoute
@@ -295,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/portfolio'
       fullPath: '/portfolio'
       preLoaderRoute: typeof PortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market-data': {
@@ -444,6 +464,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssistantRoute: AssistantRouteWithChildren,
   CustomerRoute: CustomerRouteWithChildren,
   MarketDataRoute: MarketDataRoute,
+  OnboardingRoute: OnboardingRoute,
   PortfolioRoute: PortfolioRoute,
   ProposalRoute: ProposalRoute,
   ReportsRoute: ReportsRoute,

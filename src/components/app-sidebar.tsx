@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles, UserCircle2 } from "lucide-react";
+import { LayoutGrid, FilePlus2, Briefcase, LineChart, Bell, FileText, Calculator, BarChart3, Sparkles, UserCircle2, UserPlus } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import mpowerLogo from "@/assets/mpower-logo.png";
 
@@ -19,6 +19,7 @@ import {
 import { RegionSwitcher } from "@/components/region-switcher";
 
 const items = [
+  { title: "Onboarding",  url: "/onboarding",  icon: UserPlus },
   { title: "Screener",    url: "/",            icon: LayoutGrid },
   { title: "Proposal",    url: "/proposal",    icon: FilePlus2 },
   { title: "Held Away Assets", url: "/portfolio",   icon: Briefcase },

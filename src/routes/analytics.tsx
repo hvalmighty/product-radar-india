@@ -1714,14 +1714,8 @@ function hashStrRR(s: string) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
-// Build 36 monthly returns for portfolio & benchmark that end at the annualised
-// figures on ClientPortfolio (ytdReturn / benchmarkReturn interpreted as annualised).
 function buildMonthlySeries(p: ClientPortfolio) {
-  const rand = seededRand(hashStr(p.id));
+  const rand = seededRandNum(hashStrRR(p.id));
   const gauss = () => {
     const u = Math.max(1e-9, rand()), v = rand();
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);

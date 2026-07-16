@@ -613,7 +613,7 @@ const P_DIM_LABEL: Record<PDim, string> = {
 // FlatHolding type + flatHoldings/lookthroughHoldings now come from @/lib/analytics-data.
 
 function PortfolioAnalytics() {
-  const [view, setView] = useState<"healthcheck" | "pivot" | "drift" | "concentration" | "underperform" | "fees" | "liquidity" | "sectorheat" | "risk" | "lookup">("healthcheck");
+  const [view, setView] = useState<"healthcheck" | "pivot" | "drift" | "concentration" | "underperform" | "fees" | "liquidity" | "sectorheat" | "risk" | "riskratios" | "attribution" | "lookup">("healthcheck");
 
   return (
     <main className="px-4 sm:px-6 py-5 space-y-5 max-w-[1600px] mx-auto">
@@ -628,6 +628,8 @@ function PortfolioAnalytics() {
           { k: "liquidity",     label: "Liquidity Ladder",         icon: <Droplet className="h-3.5 w-3.5" /> },
           { k: "sectorheat",    label: "Sector Heatmap",           icon: <Layers className="h-3.5 w-3.5" /> },
           { k: "risk",          label: "Risk Exposure",            icon: <Activity className="h-3.5 w-3.5" /> },
+          { k: "riskratios",    label: "Risk-Adjusted Ratios",     icon: <Award className="h-3.5 w-3.5" /> },
+          { k: "attribution",   label: "Attribution (BF)",         icon: <BarChart2 className="h-3.5 w-3.5" /> },
           { k: "lookup",        label: "Security Lookup",          icon: <Search className="h-3.5 w-3.5" /> },
         ] as const).map(t => (
           <button
@@ -647,6 +649,8 @@ function PortfolioAnalytics() {
       {view === "liquidity" && <LiquidityLadderView />}
       {view === "sectorheat" && <SectorHeatmapView />}
       {view === "risk" && <RiskExposureView />}
+      {view === "riskratios" && <RiskRatiosView />}
+      {view === "attribution" && <AttributionView />}
       {view === "lookup" && <LookupView />}
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
@@ -1694,6 +1698,339 @@ function RiskExposureView() {
     </>
   );
 }
+
+// ---- Risk-Adjusted Ratios & Attribution helpers ----
+// Deterministic pseudo-random monthly return generator seeded by portfolio id,
+// so numbers stay stable across renders while looking realistic per portfolio.
+function seededRandNum(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+function hashStrRR(s: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function buildMonthlySeries(p: ClientPortfolio) {
+  const rand = seededRandNum(hashStrRR(p.id));
+  const gauss = () => {
+    const u = Math.max(1e-9, rand()), v = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const pMonMean = p.ytdReturn / 12;
+  const bMonMean = p.benchmarkReturn / 12;
+  const pVol = 4.2 + rand() * 2.4;   // % monthly
+  const bVol = 3.6 + rand() * 1.6;
+  const rho = 0.55 + rand() * 0.35;  // correlation of portfolio with benchmark
+  const months: { m: string; port: number; bench: number }[] = [];
+  const monthLabels = MONTHS;
+  for (let i = 0; i < 36; i++) {
+    const z1 = gauss(), z2 = gauss();
+    const bench = bMonMean + bVol * z1;
+    const port  = pMonMean + pVol * (rho * z1 + Math.sqrt(1 - rho * rho) * z2);
+    months.push({ m: monthLabels[i % 12] + " " + (26 - Math.floor((35 - i) / 12)), port, bench });
+  }
+  return months;
+}
+function mean(a: number[]) { return a.reduce((s, x) => s + x, 0) / (a.length || 1); }
+function stdev(a: number[]) {
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / Math.max(1, a.length - 1));
+}
+function covariance(a: number[], b: number[]) {
+  const ma = mean(a), mb = mean(b);
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += (a[i] - ma) * (b[i] - mb);
+  return s / Math.max(1, a.length - 1);
+}
+
+function computeRiskRatios(p: ClientPortfolio, rfAnnualPct: number) {
+  const series = buildMonthlySeries(p);
+  const port = series.map(s => s.port);
+  const bench = series.map(s => s.bench);
+  const active = port.map((v, i) => v - bench[i]);
+
+  const rfMon = rfAnnualPct / 12;
+  const excessPort = port.map(v => v - rfMon);
+  const excessBench = bench.map(v => v - rfMon);
+
+  const portMeanA = mean(port) * 12;
+  const benchMeanA = mean(bench) * 12;
+  const activeMeanA = mean(active) * 12;
+  const portVolA = stdev(port) * Math.sqrt(12);
+  const benchVolA = stdev(bench) * Math.sqrt(12);
+  const trackingErrA = stdev(active) * Math.sqrt(12);
+
+  const covPB = covariance(port, bench);
+  const varB = covariance(bench, bench);
+  const beta = varB === 0 ? 0 : covPB / varB;
+  const alphaA = (mean(excessPort) - beta * mean(excessBench)) * 12;
+
+  const sharpe = portVolA === 0 ? 0 : (portMeanA - rfAnnualPct) / portVolA;
+  const info = trackingErrA === 0 ? 0 : activeMeanA / trackingErrA;
+  const treynor = beta === 0 ? 0 : (portMeanA - rfAnnualPct) / beta;
+  const downside = Math.sqrt(
+    excessPort.reduce((s, x) => s + (x < 0 ? x * x : 0), 0) / Math.max(1, excessPort.length - 1)
+  ) * Math.sqrt(12);
+  const sortino = downside === 0 ? 0 : (portMeanA - rfAnnualPct) / downside;
+  const benchSharpe = benchVolA === 0 ? 0 : (benchMeanA - rfAnnualPct) / benchVolA;
+
+  return {
+    series, port, bench, active,
+    portMeanA, benchMeanA, activeMeanA, portVolA, benchVolA, trackingErrA,
+    beta, alphaA, sharpe, info, treynor, sortino, downside, benchSharpe,
+    rfAnnualPct,
+  };
+}
+
+// Brinson–Fachler attribution across 4 asset classes: computes allocation,
+// selection and interaction effects vs. the client's IPS policy weights.
+function computeBFAttribution(p: ClientPortfolio) {
+  const classes = ["Equity", "Fixed Income", "Alternates", "Cash"] as const;
+  const policy: Record<string, number> = {
+    "Equity": p.ipsEquity / 100,
+    "Fixed Income": p.ipsFI / 100,
+    "Alternates": p.ipsAlt / 100,
+    "Cash": p.ipsCash / 100,
+  };
+  const actualVal: Record<string, number> = { "Equity": 0, "Fixed Income": 0, "Alternates": 0, "Cash": 0 };
+  p.holdings.forEach(h => { actualVal[h.assetClass] = (actualVal[h.assetClass] ?? 0) + h.value; });
+  const actual: Record<string, number> = {};
+  for (const c of classes) actual[c] = (actualVal[c] ?? 0) / p.aum;
+
+  // deterministic per-portfolio, per-class returns for benchmark & segment
+  const rand = seededRandNum(hashStrRR(p.id + "bf"));
+  const benchClass: Record<string, number> = {
+    "Equity": 12 + (rand() * 6 - 3),
+    "Fixed Income": 7 + (rand() * 2 - 1),
+    "Alternates": 9 + (rand() * 4 - 2),
+    "Cash": 6.5 + (rand() * 0.6 - 0.3),
+  };
+  const portClass: Record<string, number> = {};
+  for (const c of classes) portClass[c] = benchClass[c] + (rand() * 6 - 3);
+
+  const benchTotal = classes.reduce((s, c) => s + policy[c] * benchClass[c], 0);
+
+  const rows = classes.map(c => {
+    const wP = actual[c] ?? 0;
+    const wB = policy[c] ?? 0;
+    const rP = portClass[c];
+    const rB = benchClass[c];
+    // Brinson–Fachler: uses (rB - benchTotal) for allocation
+    const allocation = (wP - wB) * (rB - benchTotal);
+    const selection = wB * (rP - rB);
+    const interaction = (wP - wB) * (rP - rB);
+    return { c, wP: wP * 100, wB: wB * 100, rP, rB, allocation, selection, interaction, total: allocation + selection + interaction };
+  });
+  const totals = rows.reduce((acc, r) => ({
+    allocation: acc.allocation + r.allocation,
+    selection: acc.selection + r.selection,
+    interaction: acc.interaction + r.interaction,
+    total: acc.total + r.total,
+  }), { allocation: 0, selection: 0, interaction: 0, total: 0 });
+  const portTotal = classes.reduce((s, c) => s + (actual[c] ?? 0) * portClass[c], 0);
+  return { rows, totals, benchTotal, portTotal };
+}
+
+function PortfolioPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="min-w-[220px]">
+      <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolio</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="mt-1 w-full bg-card border border-border rounded-md px-2 py-1.5 text-xs"
+      >
+        {clientPortfolios.map(p => (
+          <option key={p.id} value={p.id}>{p.client} · {fmtCr(p.aum)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function RatioTile({ label, value, hint, tone = "neutral" }: { label: string; value: string; hint?: string; tone?: "good" | "bad" | "neutral" }) {
+  const cls = tone === "good" ? "text-positive" : tone === "bad" ? "text-negative" : "text-foreground";
+  return (
+    <div className="bg-muted/30 border border-border rounded-md p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`text-xl font-semibold tabular-nums mt-1 ${cls}`}>{value}</div>
+      {hint && <div className="text-[10px] text-muted-foreground mt-1">{hint}</div>}
+    </div>
+  );
+}
+
+function RiskRatiosView() {
+  const [pid, setPid] = useState(clientPortfolios[0]?.id ?? "");
+  const [rf, setRf] = useState(6.75); // 91-D T-bill proxy, %
+  const p = clientPortfolios.find(x => x.id === pid) ?? clientPortfolios[0];
+  const r = useMemo(() => computeRiskRatios(p, rf), [p, rf]);
+  const cum = useMemo(() => {
+    let cp = 100, cb = 100;
+    return r.series.map(s => { cp *= 1 + s.port / 100; cb *= 1 + s.bench / 100; return { m: s.m, Portfolio: +cp.toFixed(2), Benchmark: +cb.toFixed(2) }; });
+  }, [r]);
+
+  return (
+    <>
+      <Panel
+        title="Risk-Adjusted Performance"
+        subtitle={`Selected portfolio vs ${p.benchmark} — 36-month synthetic series, annualised`}
+        right={
+          <div className="flex items-end gap-2">
+            <PortfolioPicker value={p.id} onChange={setPid} />
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Risk-free (%)</label>
+              <input
+                type="number" step={0.25} value={rf}
+                onChange={e => setRf(Number(e.target.value) || 0)}
+                className="mt-1 w-24 bg-card border border-border rounded-md px-2 py-1.5 text-xs tabular-nums"
+              />
+            </div>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <RatioTile label="Portfolio Return (a)" value={pct(r.portMeanA)} tone={r.portMeanA >= 0 ? "good" : "bad"} hint="Annualised, gross" />
+          <RatioTile label="Benchmark Return (a)" value={pct(r.benchMeanA)} hint={p.benchmark} />
+          <RatioTile label="Active Return (a)" value={pct(r.activeMeanA)} tone={r.activeMeanA >= 0 ? "good" : "bad"} hint="Portfolio − Benchmark" />
+          <RatioTile label="Alpha (Jensen, a)" value={pct(r.alphaA)} tone={r.alphaA >= 0 ? "good" : "bad"} hint={`β = ${r.beta.toFixed(2)}`} />
+          <RatioTile label="Tracking Error (a)" value={`${r.trackingErrA.toFixed(2)}%`} hint="σ of active returns" />
+          <RatioTile label="Portfolio Vol (a)" value={`${r.portVolA.toFixed(2)}%`} hint={`Bench σ ${r.benchVolA.toFixed(2)}%`} />
+          <RatioTile label="Sharpe Ratio" value={r.sharpe.toFixed(2)} tone={r.sharpe >= 1 ? "good" : r.sharpe < 0 ? "bad" : "neutral"} hint={`Bench Sharpe ${r.benchSharpe.toFixed(2)}`} />
+          <RatioTile label="Information Ratio" value={r.info.toFixed(2)} tone={r.info >= 0.5 ? "good" : r.info < 0 ? "bad" : "neutral"} hint="Active / TE" />
+          <RatioTile label="Treynor Ratio" value={r.treynor.toFixed(2)} tone={r.treynor >= 0 ? "good" : "bad"} hint="(Rp − Rf) / β" />
+          <RatioTile label="Sortino Ratio" value={r.sortino.toFixed(2)} tone={r.sortino >= 1 ? "good" : r.sortino < 0 ? "bad" : "neutral"} hint={`Downside σ ${r.downside.toFixed(2)}%`} />
+          <RatioTile label="Beta (vs bench)" value={r.beta.toFixed(2)} hint={r.beta > 1 ? "More volatile than benchmark" : "Less volatile"} />
+          <RatioTile label="Risk-free used" value={`${rf.toFixed(2)}%`} hint="Editable above" />
+        </div>
+      </Panel>
+
+      <Panel title="Growth of 100 — Portfolio vs Benchmark" subtitle="Cumulative rebased to 100 at the start of the 36-month window">
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={cum}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey="m" tick={{ fontSize: 10 }} interval={2} />
+              <YAxis tick={{ fontSize: 10 }} domain={["auto", "auto"]} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="Portfolio" stroke="#6366f1" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Benchmark" stroke="#10b981" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
+
+      <Panel title="How to read these ratios" subtitle="Quick reference for reviewing risk-adjusted performance">
+        <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-5">
+          <li><b className="text-foreground">Sharpe</b> — excess return per unit of total risk. &gt;1 solid, &gt;2 excellent.</li>
+          <li><b className="text-foreground">Information Ratio</b> — active return per unit of tracking error. &gt;0.5 shows persistent skill.</li>
+          <li><b className="text-foreground">Treynor</b> — excess return per unit of market (β) risk. Compare only within a peer group.</li>
+          <li><b className="text-foreground">Active Return</b> — arithmetic outperformance vs benchmark, before fees.</li>
+          <li><b className="text-foreground">Jensen's α</b> — return above what β alone would predict. Positive = value added.</li>
+        </ul>
+      </Panel>
+    </>
+  );
+}
+
+function AttributionView() {
+  const [pid, setPid] = useState(clientPortfolios[0]?.id ?? "");
+  const p = clientPortfolios.find(x => x.id === pid) ?? clientPortfolios[0];
+  const bf = useMemo(() => computeBFAttribution(p), [p]);
+  const chartData = bf.rows.map(r => ({
+    name: r.c, Allocation: +r.allocation.toFixed(2), Selection: +r.selection.toFixed(2), Interaction: +r.interaction.toFixed(2),
+  }));
+
+  return (
+    <>
+      <Panel
+        title="Performance Attribution — Brinson–Fachler"
+        subtitle={`Decomposes active return of ${p.client} vs ${p.benchmark} into allocation, selection & interaction effects`}
+        right={<PortfolioPicker value={p.id} onChange={setPid} />}
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          <RatioTile label="Portfolio Return" value={pct(bf.portTotal)} tone={bf.portTotal >= bf.benchTotal ? "good" : "bad"} hint="Weighted class returns" />
+          <RatioTile label="Benchmark Return" value={pct(bf.benchTotal)} hint="Policy weights × bench" />
+          <RatioTile label="Active Return" value={pct(bf.portTotal - bf.benchTotal)} tone={bf.portTotal - bf.benchTotal >= 0 ? "good" : "bad"} hint="Portfolio − Benchmark" />
+          <RatioTile label="Sum of Effects" value={pct(bf.totals.total)} hint="Allocation + Selection + Interaction" />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="text-left p-2">Asset Class</th>
+                <th className="text-right p-2">Actual W%</th>
+                <th className="text-right p-2">Policy W%</th>
+                <th className="text-right p-2">Portfolio R%</th>
+                <th className="text-right p-2">Benchmark R%</th>
+                <th className="text-right p-2">Allocation</th>
+                <th className="text-right p-2">Selection</th>
+                <th className="text-right p-2">Interaction</th>
+                <th className="text-right p-2">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bf.rows.map(r => (
+                <tr key={r.c} className="border-t border-border">
+                  <td className="p-2 font-medium">{r.c}</td>
+                  <td className="text-right p-2 tabular-nums">{r.wP.toFixed(1)}</td>
+                  <td className="text-right p-2 tabular-nums text-muted-foreground">{r.wB.toFixed(1)}</td>
+                  <td className="text-right p-2 tabular-nums">{r.rP.toFixed(2)}</td>
+                  <td className="text-right p-2 tabular-nums text-muted-foreground">{r.rB.toFixed(2)}</td>
+                  <td className={classNames("text-right p-2 tabular-nums", clsPct(r.allocation))}>{pct(r.allocation, 2)}</td>
+                  <td className={classNames("text-right p-2 tabular-nums", clsPct(r.selection))}>{pct(r.selection, 2)}</td>
+                  <td className={classNames("text-right p-2 tabular-nums", clsPct(r.interaction))}>{pct(r.interaction, 2)}</td>
+                  <td className={classNames("text-right p-2 tabular-nums font-semibold", clsPct(r.total))}>{pct(r.total, 2)}</td>
+                </tr>
+              ))}
+              <tr className="border-t border-border bg-muted/30 font-semibold">
+                <td className="p-2">Total</td>
+                <td className="p-2" colSpan={4}></td>
+                <td className={classNames("text-right p-2 tabular-nums", clsPct(bf.totals.allocation))}>{pct(bf.totals.allocation, 2)}</td>
+                <td className={classNames("text-right p-2 tabular-nums", clsPct(bf.totals.selection))}>{pct(bf.totals.selection, 2)}</td>
+                <td className={classNames("text-right p-2 tabular-nums", clsPct(bf.totals.interaction))}>{pct(bf.totals.interaction, 2)}</td>
+                <td className={classNames("text-right p-2 tabular-nums", clsPct(bf.totals.total))}>{pct(bf.totals.total, 2)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <Panel title="Attribution Effects by Asset Class" subtitle="Stacked contribution to active return (%)">
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="Allocation" stackId="a" fill="#6366f1" />
+              <Bar dataKey="Selection"  stackId="a" fill="#10b981" />
+              <Bar dataKey="Interaction" stackId="a" fill="#f59e0b" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
+
+      <Panel title="Method note — Brinson–Fachler" subtitle="How the effects are computed">
+        <ul className="text-[11px] text-muted-foreground space-y-1 list-disc pl-5">
+          <li><b className="text-foreground">Allocation</b> = (wP − wB) × (rB − R<sub>B</sub>) — value added by over/underweighting classes that beat the total benchmark.</li>
+          <li><b className="text-foreground">Selection</b> = wB × (rP − rB) — value added by picking securities within each class.</li>
+          <li><b className="text-foreground">Interaction</b> = (wP − wB) × (rP − rB) — joint effect of allocation and selection decisions.</li>
+          <li>Policy weights come from the client's IPS; asset-class returns are illustrative for this demo.</li>
+        </ul>
+      </Panel>
+    </>
+  );
+}
+
+
 
 // ============================================================
 // UI atoms

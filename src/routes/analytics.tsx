@@ -1702,14 +1702,18 @@ function RiskExposureView() {
 // ---- Risk-Adjusted Ratios & Attribution helpers ----
 // Deterministic pseudo-random monthly return generator seeded by portfolio id,
 // so numbers stay stable across renders while looking realistic per portfolio.
-function seededRand(seed: number) {
+function seededRandNum(seed: number) {
   let s = seed >>> 0;
   return () => {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 0xffffffff;
   };
 }
-function hashStr(s: string) {
+function hashStrRR(s: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;

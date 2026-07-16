@@ -1802,7 +1802,7 @@ function computeBFAttribution(p: ClientPortfolio) {
   for (const c of classes) actual[c] = (actualVal[c] ?? 0) / p.aum;
 
   // deterministic per-portfolio, per-class returns for benchmark & segment
-  const rand = seededRand(hashStr(p.id + "bf"));
+  const rand = seededRandNum(hashStrRR(p.id + "bf"));
   const benchClass: Record<string, number> = {
     "Equity": 12 + (rand() * 6 - 3),
     "Fixed Income": 7 + (rand() * 2 - 1),
@@ -1894,7 +1894,7 @@ function RiskRatiosView() {
       >
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <RatioTile label="Portfolio Return (a)" value={pct(r.portMeanA)} tone={r.portMeanA >= 0 ? "good" : "bad"} hint="Annualised, gross" />
-          <RatioTile label="Benchmark Return (a)" value={pct(r.benchmarkMeanA ?? r.benchMeanA)} hint={p.benchmark} />
+          <RatioTile label="Benchmark Return (a)" value={pct(r.benchMeanA)} hint={p.benchmark} />
           <RatioTile label="Active Return (a)" value={pct(r.activeMeanA)} tone={r.activeMeanA >= 0 ? "good" : "bad"} hint="Portfolio − Benchmark" />
           <RatioTile label="Alpha (Jensen, a)" value={pct(r.alphaA)} tone={r.alphaA >= 0 ? "good" : "bad"} hint={`β = ${r.beta.toFixed(2)}`} />
           <RatioTile label="Tracking Error (a)" value={`${r.trackingErrA.toFixed(2)}%`} hint="σ of active returns" />

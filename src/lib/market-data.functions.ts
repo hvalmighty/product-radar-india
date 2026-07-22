@@ -504,7 +504,7 @@ export const getNews = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => {
     const cat = (d as any)?.category as string;
     const raw = (d as any)?.region;
-    const region: "IN" | "AE" | "PH" = raw === "AE" ? "AE" : raw === "PH" ? "PH" : "IN";
+    const region: "IN" | "AE" | "PH" | "SG" = raw === "AE" ? "AE" : raw === "PH" ? "PH" : raw === "SG" ? "SG" : "IN";
     if (!["markets", "india", "macro", "global"].includes(cat)) throw new Error("invalid category");
     return { category: cat as FeedCat, region };
   })

@@ -1,6 +1,6 @@
 import { useSyncExternalStore, useCallback, type ReactNode } from "react";
 
-export type Region = "IN" | "AE" | "PH";
+export type Region = "IN" | "AE" | "PH" | "SG";
 
 export const REGION_META: Record<Region, {
   code: Region;
@@ -27,10 +27,15 @@ export const REGION_META: Record<Region, {
     currency: "PHP", symbol: "₱", locale: "en-PH",
     bigUnits: [{ name: "B", value: 1e9 }, { name: "M", value: 1e6 }, { name: "K", value: 1e3 }],
   },
+  SG: {
+    code: "SG", label: "Singapore", flag: "🇸🇬",
+    currency: "SGD", symbol: "S$", locale: "en-SG",
+    bigUnits: [{ name: "B", value: 1e9 }, { name: "M", value: 1e6 }, { name: "K", value: 1e3 }],
+  },
 };
 
 /** Scale factor that converts mock-data AUM/corpus units to base currency.
- * India arrays store crore (1e7); UAE and Philippines arrays store millions (1e6). */
+ * India arrays store crore (1e7); UAE, Philippines and Singapore arrays store millions (1e6). */
 export function aumScale(): number {
   return _region === "IN" ? 1e7 : 1e6;
 }
@@ -42,7 +47,7 @@ let _region: Region = "IN";
 if (typeof window !== "undefined") {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === "IN" || saved === "AE") _region = saved;
+    if (saved === "IN" || saved === "AE" || saved === "PH" || saved === "SG") _region = saved;
   } catch { /* noop */ }
 }
 

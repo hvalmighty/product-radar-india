@@ -17,6 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { RegionSwitcher } from "@/components/region-switcher";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 const items = [
   { title: "Onboarding",  url: "/onboarding",  icon: UserPlus },

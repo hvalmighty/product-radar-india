@@ -410,6 +410,38 @@ const mkPhRe: Mk = (name, value, opts) => ({
   source: "PSE", productCategory: "Real Estate", ...opts,
 });
 
+// --- Singapore factory helpers (SGD) -------------------------------------------
+const mkSgEquity: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name, type: "Equity",
+  quantity: Math.round(value / 100), price: 100, value,
+  source: "SGX", productCategory: "Direct Equity", ...opts,
+});
+const mkSgBond: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name, type: "Bond",
+  quantity: Math.round(value / 1000), price: 1000, value,
+  source: "SGX", productCategory: "Direct Debt", ...opts,
+});
+const mkSgMfEquity: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name, type: "Mutual Fund",
+  quantity: Math.round(value / 10), price: 10, value,
+  source: "SGX", productCategory: "Mutual Fund - Equity", ...opts,
+});
+const mkSgMfDebt: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name, type: "Mutual Fund",
+  quantity: Math.round(value / 1000), price: 1000, value,
+  source: "SGX", productCategory: "Mutual Fund - Debt", ...opts,
+});
+const mkSgReit: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name: `${name}`, type: "Equity",
+  quantity: Math.round(value / 38), price: 38, value,
+  source: "SGX", productCategory: "REIT", ...opts,
+});
+const mkSgRe: Mk = (name, value, opts) => ({
+  isin: isin("SGD"), name: `${name} Real Estate`, type: "Other",
+  quantity: 1, price: value, value,
+  source: "SGX", productCategory: "Real Estate", ...opts,
+});
+
 function buildPortfoliosPH(): SavedPortfolio[] {
   const now = Date.now();
   const ph = (investor: string, pan: string, holdings: Holding[]) =>

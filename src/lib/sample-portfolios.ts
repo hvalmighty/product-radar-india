@@ -525,12 +525,99 @@ function buildPortfoliosPH(): SavedPortfolio[] {
 }
 
 // ============================================================================
+// SINGAPORE portfolios (SGD, SGX securities, CPF/SRS, SGS bonds)
+// ============================================================================
+function buildPortfoliosSG(): SavedPortfolio[] {
+  const now = Date.now();
+  const sg = (investor: string, pan: string, holdings: Holding[]) =>
+    pkg(investor, pan, holdings, { source: "SGX Custodian", asOf: "31-May-2026" });
+  const list: Array<Omit<SavedPortfolio, "savedAt" | "isSample">> = [
+    {
+      id: "sample-sg-lee-wei", name: "Lee Wei Ling — Patriarch", family: "Lee Family",
+      data: sg("Lee Wei Ling", "S1234567A", [
+        mkSgEquity("DBS Group", 4_200_000),
+        mkSgEquity("OCBC Bank", 3_100_000),
+        mkSgEquity("UOB", 2_400_000),
+        mkSgEquity("Singtel", 1_800_000),
+        mkSgMfEquity("LionGlobal Infinity Global Stock Index Fund", 2_800_000),
+        mkSgMfEquity("ABF Singapore Bond Index Fund", 2_100_000),
+        mkSgMfDebt("Fullerton SGD Cash Fund", 3_500_000),
+        mkSgBond("SGS 10Y 2.75% 2034", 5_000_000),
+        mkSgBond("Temasek Bond 3.25% 2031 AAA", 2_500_000),
+        mkSgBond("Mapletree Treasury 4.0% 2029", 2_000_000),
+        mkSgReit("CapitaLand Integrated Commercial Trust", 900_000),
+        mkSgReit("Ascendas REIT", 700_000),
+        mkSgRe("Sentosa Cove Bungalow", 28_000_000),
+        mkSgRe("Orchard Road Commercial Unit", 18_000_000),
+      ]),
+    },
+    {
+      id: "sample-sg-lee-sarah", name: "Sarah Lee", family: "Lee Family",
+      data: sg("Sarah Lee", "S2345678B", [
+        mkSgEquity("CapitaLand Integrated Commercial Trust", 1_500_000),
+        mkSgEquity("Keppel Corp", 1_200_000),
+        mkSgMfEquity("Nikko AM Singapore STI ETF", 1_800_000),
+        mkSgMfEquity("LionGlobal Infinity US 500 Stock Index", 1_400_000),
+        mkSgMfDebt("Fullerton Short Term Interest Rate Fund", 1_200_000),
+        mkSgBond("SGS 2Y T-bill 3.15%", 1_500_000),
+        mkSgReit("Mapletree Industrial Trust", 450_000),
+      ]),
+    },
+    {
+      id: "sample-sg-tan-marcus", name: "Marcus Tan — Family Office", family: "Tan Family Office",
+      data: sg("Marcus Tan", "S3456789C", [
+        mkSgEquity("Singapore Exchange", 6_500_000),
+        mkSgEquity("ComfortDelGro", 4_200_000),
+        mkSgEquity("Singapore Airlines", 3_800_000),
+        mkSgEquity("Wilmar International", 2_400_000),
+        mkSgEquity("Venture Corporation", 1_800_000),
+        mkSgEquity("ST Engineering", 1_500_000),
+        mkSgMfEquity("Phillip SING Income ETF", 4_500_000),
+        mkSgMfDebt("Nikko AM SGD Investment Grade Corporate Bond ETF", 3_500_000),
+        mkSgBond("SGS 30Y 2.625% 2054", 6_000_000),
+        mkSgBond("HDB Bond 3.1% 2034 AAA", 4_500_000),
+        mkSgBond("JTC Corporation 3.35% 2034", 5_500_000),
+        mkSgBond("UOB AT1 4.75% Perp", 3_500_000),
+        mkSgRe("Marina Bay Financial District Office", 32_000_000),
+        mkSgRe("Sentosa Cove Villa", 16_000_000),
+      ]),
+    },
+    {
+      id: "sample-sg-tan-chloe", name: "Chloe Tan", family: "Tan Family Office",
+      data: sg("Chloe Tan", "S4567890D", [
+        mkSgEquity("Sea Ltd", 800_000),
+        mkSgEquity("Grab Holdings", 700_000),
+        mkSgMfEquity("LionGlobal India Fund", 1_200_000),
+        mkSgMfDebt("Fullerton SGD Cash Fund", 900_000),
+        mkSgBond("SGS 6M T-bill 3.45%", 1_000_000),
+      ]),
+    },
+    {
+      id: "sample-sg-ong-alex", name: "Alex Ong — PR Professional", family: "Ong Family",
+      data: sg("Alex Ong (Singapore PR)", "S5678901E", [
+        mkSgEquity("DBS Group", 1_500_000),
+        mkSgEquity("Ascott Residence Trust", 600_000),
+        mkSgEquity("NetLink NBN Trust", 800_000),
+        mkSgMfEquity("Nikko AM Singapore STI ETF", 1_800_000),
+        mkSgMfDebt("ABF Singapore Bond Index Fund", 1_200_000),
+        mkSgBond("SGS 10Y 2.75% 2034", 1_500_000),
+        mkSgBond("CapitaLand Treasury 3.5% 2030", 1_000_000),
+        mkSgReit("Frasers Centrepoint Trust", 400_000),
+        mkSgRe("Tampines Condo Unit", 4_500_000),
+      ]),
+    },
+  ];
+  return list.map(p => ({ ...p, savedAt: now, isSample: true }));
+}
+
+// ============================================================================
 // Region-keyed registries
 // ============================================================================
 export const SAMPLE_PORTFOLIOS_BY_REGION: Record<Region, SavedPortfolio[]> = {
   IN: buildPortfoliosIN(),
   AE: buildPortfoliosAE(),
   PH: buildPortfoliosPH(),
+  SG: buildPortfoliosSG(),
 };
 
 export const SAMPLE_FAMILIES_BY_REGION: Record<Region, { name: string; portfolioIds: string[] }[]> = {
@@ -547,6 +634,10 @@ export const SAMPLE_FAMILIES_BY_REGION: Record<Region, { name: string; portfolio
   PH: [
     { name: "Santos Family",       portfolioIds: ["sample-ph-santos-miguel", "sample-ph-santos-isabella"] },
     { name: "Reyes Family Office", portfolioIds: ["sample-ph-reyes-antonio", "sample-ph-reyes-sofia"] },
+  ],
+  SG: [
+    { name: "Lee Family", portfolioIds: ["sample-sg-lee-wei", "sample-sg-lee-sarah"] },
+    { name: "Tan Family Office", portfolioIds: ["sample-sg-tan-marcus", "sample-sg-tan-chloe"] },
   ],
 };
 

@@ -473,7 +473,7 @@ function parseRss(xml: string, sourceFallback = ""): NewsItem[] {
 }
 
 type FeedCat = "markets" | "india" | "macro" | "global";
-const FEEDS_BY_REGION: Record<"IN" | "AE" | "PH", Record<FeedCat, { url: string; source: string }[]>> = {
+const FEEDS_BY_REGION: Record<"IN" | "AE" | "PH" | "SG", Record<FeedCat, { url: string; source: string }[]>> = {
   IN: {
     markets: [{ url: "https://news.google.com/rss/search?q=indian+stock+market+nifty+sensex+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
     india:   [{ url: "https://news.google.com/rss/search?q=india+economy+business+rbi+when:1d&hl=en-IN&gl=IN&ceid=IN:en", source: "Google News" }],
@@ -489,6 +489,12 @@ const FEEDS_BY_REGION: Record<"IN" | "AE" | "PH", Record<FeedCat, { url: string;
   PH: {
     markets: [{ url: "https://news.google.com/rss/search?q=PSE+Philippine+stock+market+PSEi+when:1d&hl=en-PH&gl=PH&ceid=PH:en", source: "Google News" }],
     india:   [{ url: "https://news.google.com/rss/search?q=Philippines+economy+business+BSP+when:1d&hl=en-PH&gl=PH&ceid=PH:en", source: "Google News" }],
+    macro:   [{ url: "https://news.google.com/rss/search?q=ASEAN+inflation+US+Fed+rates+Asia+markets+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+    global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
+  },
+  SG: {
+    markets: [{ url: "https://news.google.com/rss/search?q=SGX+Singapore+stock+market+STI+when:1d&hl=en-SG&gl=SG&ceid=SG:en", source: "Google News" }],
+    india:   [{ url: "https://news.google.com/rss/search?q=Singapore+economy+business+MAS+when:1d&hl=en-SG&gl=SG&ceid=SG:en", source: "Google News" }],
     macro:   [{ url: "https://news.google.com/rss/search?q=ASEAN+inflation+US+Fed+rates+Asia+markets+when:1d&hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
     global:  [{ url: "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en", source: "Google News" }],
   },

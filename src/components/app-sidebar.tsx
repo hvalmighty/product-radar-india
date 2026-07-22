@@ -17,6 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { RegionSwitcher } from "@/components/region-switcher";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 
 const items = [
   { title: "Onboarding",  url: "/onboarding",  icon: UserPlus },
@@ -69,6 +70,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-border p-2 space-y-2">
         <RegionSwitcher />
+        <ThemeSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Customer Portal">

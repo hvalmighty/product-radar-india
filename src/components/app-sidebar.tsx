@@ -70,6 +70,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-border p-2 space-y-2">
         <RegionSwitcher />
+        <ThemeSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Customer Portal">

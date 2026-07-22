@@ -979,6 +979,335 @@ const bondsAE: Bond[] = BOND_SEED_AE.map((b, i) => ({
   risk: b.rating === "Sovereign" ? "Low" : b.type === "Perpetual / AT1" ? "Mod-High" : b.rating.startsWith("AA") ? "Low-Mod" : b.rating.startsWith("A") ? "Moderate" : "Mod-High",
 }));
 
+
+// =====================================================================
+// ================ SINGAPORE DATASET ===================================
+// =====================================================================
+// SG-flavoured mock data. SGD-denominated; SGX-listed equities, SGS bonds,
+// MAS-regulated funds, CPF/SRS-friendly products, LionGlobal/Nikko AM/Fullerton
+// fund families, plus SGX REITs and local corporate bonds.
+
+const randSG = seeded(7821);
+const pickSG = <T,>(arr: T[]) => arr[Math.floor(randSG() * arr.length)];
+const rSG = (min: number, max: number, dp = 2) => +(min + randSG() * (max - min)).toFixed(dp);
+
+const AMCS_SG = [
+  "Lion Global Investors", "Nikko AM", "Fullerton Fund Management", "Phillip Capital Management",
+  "ABF", "Schroders Singapore", "Franklin Templeton Singapore", "Eastspring Investments",
+  "Dimensional Fund Advisors", "Vanguard Singapore", "BlackRock Singapore", "State Street Global",
+  "Fidelity Singapore", "JPMorgan Asset Management SG", "Allianz Global Investors SG",
+];
+const MF_SUB_SG = [
+  "Singapore Equity", "Asia Pacific ex-Japan Equity", "Global Equity", "US Equity", "China Equity",
+  "Singapore Bond", "Singapore Investment Grade Bond", "Singapore High Yield Bond", "Global Bond",
+  "Money Market", "Balanced", "Multi-Asset Income", "REITs & Property", "Singapore Dividend", "ESG / Sustainable",
+];
+const BENCH_SG = [
+  "FTSE ST All-Share", "Straits Times Index", "MSCI AC Asia Pacific ex-Japan", "MSCI World",
+  "MSCI Emerging Markets", "Bloomberg Barclays Global Aggregate", "Markit iBoxx ABF Singapore",
+];
+const FUND_MGRS_SG = [
+  "K. Lim", "S. Tan", "A. Ong", "M. Wong", "C. Ng", "D. Goh", "B. K. Chia",
+  "J. L. Lee", "P. Yeo", "R. S. Chew", "H. Chan", "T. Koh",
+];
+
+const mutualFundsSG: MutualFund[] = Array.from({ length: 30 }, (_, i) => {
+  const sub = pickSG(MF_SUB_SG);
+  const isDebt = ["Singapore Bond", "Singapore Investment Grade Bond", "Singapore High Yield Bond", "Global Bond", "Money Market"].includes(sub);
+  const isHybrid = sub === "Balanced" || sub === "Multi-Asset Income";
+  const assetClass: MutualFund["assetClass"] = isDebt ? "Debt" : isHybrid ? "Hybrid" : sub === "REITs & Property" ? "Commodity" : "Equity";
+  const amc = pickSG(AMCS_SG);
+  const r3 = rSG(isDebt ? 2.5 : 5, isDebt ? 5 : 16);
+  const sharpe = rSG(0.25, 1.75);
+  return {
+    category: "MF",
+    id: `MF-SG-${1000 + i}`,
+    name: `${amc} ${sub} Fund`,
+    amc,
+    subCategory: sub,
+    assetClass,
+    nav: rSG(0.9, 32),
+    aum: Math.round(rSG(50, 12000, 0)),
+    expenseRatio: rSG(0.3, 2.2),
+    returns1y: rSG(isDebt ? 1.5 : -5, isDebt ? 5.5 : 22),
+    returns3y: r3,
+    returns5y: rSG(isDebt ? 2.5 : 5, isDebt ? 5 : 14),
+    ytdReturn: rSG(isDebt ? 0.8 : -3, isDebt ? 4 : 16),
+    sharpe,
+    sortino: +(sharpe * rSG(1.1, 1.6)).toFixed(2),
+    alpha: rSG(-1.5, 4),
+    beta: isDebt ? rSG(0.05, 0.35) : rSG(0.65, 1.15),
+    maxDrawdown: isDebt ? rSG(-4, -0.5) : isHybrid ? rSG(-15, -5) : rSG(-32, -8),
+    risk: isDebt ? "Low-Mod" : isHybrid ? "Moderate" : pickSG(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rSG(2, 5, 0)),
+    minInvestment: pickSG([1000, 5000, 10000, 50000, 100000]),
+    sipMin: pickSG([100, 500, 1000, 2500]),
+    exitLoad: isDebt ? "Nil" : "1% if <90 days",
+    exitLoadDays: isDebt ? 0 : 90,
+    lockInYears: 0,
+    taxation: isDebt ? "Debt" : isHybrid ? "Hybrid" : "Equity",
+    benchmark: isDebt ? "Markit iBoxx ABF Singapore" : pickSG(BENCH_SG),
+    fundManager: pickSG(FUND_MGRS_SG),
+    inceptionYear: Math.round(rSG(2005, 2023, 0)),
+  };
+});
+
+const BANKS_SG_PUB = ["DBS Bank", "OCBC Bank", "UOB"];
+const BANKS_SG_PVT = ["Bank of Singapore", "HSBC Singapore", "Standard Chartered Singapore", "Citibank Singapore", "Maybank Singapore"];
+const FINCO_SG = ["Sing Investments & Finance", "Hong Leong Finance", "SBI Singapore"];
+const FD_ENTRIES_SG: { issuer: string; sub: FixedDeposit["subCategory"]; rating: string }[] = [
+  ...BANKS_SG_PUB.map(b => ({ issuer: b, sub: "Public Bank" as const, rating: "AAA" })),
+  ...BANKS_SG_PVT.map(b => ({ issuer: b, sub: "Private Bank" as const, rating: pickSG(["AAA", "AA+"]) })),
+  ...FINCO_SG.map(b => ({ issuer: b, sub: "NBFC" as const, rating: pickSG(["AA-", "A+"]) })),
+];
+
+const fixedDepositsSG: FixedDeposit[] = FD_ENTRIES_SG.flatMap((e, i) =>
+  TENURES.slice(0, 4 + (i % 3)).map((t, j) => {
+    const base = e.sub === "NBFC" ? 4.0 : e.sub === "Private Bank" ? 3.4 : 3.1;
+    const rate = +(base + (t > 12 ? 0.3 : 0) + randSG() * 0.9).toFixed(2);
+    return {
+      category: "FD",
+      id: `FD-SG-${2000 + i * 10 + j}`,
+      name: `${e.issuer} ${t}M Fixed Deposit`,
+      issuer: e.issuer,
+      subCategory: e.sub,
+      tenureMonths: t,
+      interestRate: rate,
+      seniorRate: +(rate + 0.2).toFixed(2),
+      compounding: pickSG(["Quarterly", "Monthly", "At Maturity"] as FixedDeposit["compounding"][]),
+      minInvestment: pickSG([5000, 10000, 25000, 50000, 100000]),
+      maxInvestment: null,
+      premature: randSG() > 0.2,
+      rating: e.rating,
+      insuredDICGC: true,
+      payout: pickSG(["Cumulative", "Non-Cumulative"] as const),
+    };
+  })
+);
+
+const INSURERS_SG = [
+  "Prudential Singapore", "AIA Singapore", "Great Eastern Life", "NTUC Income",
+  "Manulife Singapore", "AXA Life Singapore", "HSBC Life Singapore", "Singlife",
+  "China Life Singapore", "Tokio Marine Life",
+];
+
+const insuranceSG: Insurance[] = Array.from({ length: 24 }, (_, i) => {
+  const sub = INS_SUB[i % INS_SUB.length];
+  const insurer = pickSG(INSURERS_SG);
+  const isTerm = sub === "Term";
+  const isHealth = sub === "Health";
+  const sa = isTerm ? pickSG([500000, 1000000, 2000000, 5000000]) : isHealth ? pickSG([100000, 250000, 500000, 1000000]) : pickSG([250000, 500000, 1000000, 2500000]);
+  const premium = isTerm ? Math.round(sa * rSG(0.001, 0.0025)) : isHealth ? Math.round(sa * rSG(0.02, 0.05)) : Math.round(sa * rSG(0.04, 0.11));
+  return {
+    category: "INS",
+    id: `IN-SG-${3000 + i}`,
+    name: `${insurer} ${sub} ${isTerm ? "Protect" : isHealth ? "Care" : "Plus"}`,
+    insurer,
+    subCategory: sub,
+    sumAssured: sa,
+    premiumAnnual: premium,
+    policyTermYears: isTerm ? pickSG([15, 20, 25, 30]) : sub === "Annuity" ? pickSG([10, 15, 20]) : pickSG([10, 15, 20]),
+    ppt: isTerm ? pickSG([5, 10, 15, 20]) : pickSG([3, 5, 7, 10]),
+    claimSettlement: rSG(90, 99),
+    solvencyRatio: rSG(1.6, 2.8),
+    irr: ["Endowment", "ULIP", "Annuity", "Child"].includes(sub) ? rSG(2.5, 5.5) : undefined,
+    taxBenefit: "SRS/CPF top-up eligible; tax relief under IRAS",
+    riders: pickSG([["Critical Illness"], ["Accidental Death"], ["Critical Illness", "Waiver of Premium"], ["Accidental Death", "Critical Illness"]]),
+    rating: Math.round(rSG(3, 5, 0)),
+  };
+});
+
+const PMS_HOUSES_SG = [
+  "Bank of Singapore IAM", "DBS Treasures Private Client", "UOB Privilege Reserve", "OCBC Premier Private Client",
+  "Credit Suisse Singapore", "Julius Baer Singapore", "Lombard Odier Singapore", "UBS Singapore",
+  "Morgan Stanley Private Wealth", "Goldman Sachs Private Wealth",
+  "Eastspring Private Wealth", "Lion Global Private Wealth",
+];
+const PMS_STRATEGIES_SG: PMS["strategy"][] = [
+  "Multi Cap", "Large Cap", "Mid & Small Cap", "Small Cap", "Thematic",
+  "Sector - Banking & Financials", "Sector - Pharma", "Contra / Value", "Debt", "Hybrid",
+];
+const PMS_STRUCT_SG: PMS["structure"][] = ["Discretionary", "Discretionary", "Discretionary", "Non-Discretionary", "Advisory"];
+
+const pmsSchemesSG: PMS[] = Array.from({ length: 14 }, (_, i) => {
+  const strategy = PMS_STRATEGIES_SG[i % PMS_STRATEGIES_SG.length];
+  const isDebt = strategy === "Debt";
+  const isHybrid = strategy === "Hybrid";
+  const house = PMS_HOUSES_SG[i % PMS_HOUSES_SG.length];
+  const r3 = rSG(isDebt ? 2.5 : 4, isDebt ? 5 : 14);
+  return {
+    category: "PMS",
+    id: `PM-SG-${4000 + i}`,
+    name: `${house} ${strategy} Portfolio`,
+    manager: house,
+    structure: PMS_STRUCT_SG[i % PMS_STRUCT_SG.length],
+    strategy,
+    benchmark: isDebt ? "FTSE ST All-Share" : "Straits Times Index",
+    aum: Math.round(rSG(5, 500, 0)),
+    minInvestment: 1000000,
+    returns1y: rSG(isDebt ? 1.5 : -4, isDebt ? 5 : 18),
+    returns3y: r3,
+    returns5y: rSG(isDebt ? 2.5 : 5, isDebt ? 5 : 13),
+    alpha: rSG(-1.5, 4),
+    sharpe: rSG(0.2, 1.6),
+    beta: isDebt ? rSG(0.05, 0.35) : rSG(0.65, 1.15),
+    maxDrawdown: isDebt ? rSG(-4, -0.5) : isHybrid ? rSG(-15, -5) : rSG(-30, -8),
+    fixedFee: rSG(0.5, 2.0),
+    performanceFee: `${pickSG([15, 20, 20, 20])}% over ${pickSG([6, 8, 10])}% hurdle`,
+    exitLoad: " negotiable; typically 1% if <12M",
+    inception: `${2008 + (i % 16)}`,
+    risk: isDebt ? "Low-Mod" : isHybrid ? "Moderate" : pickSG(["Mod-High", "High", "Very High"] as RiskLevel[]),
+    rating: Math.round(rSG(3, 5, 0)),
+  };
+});
+
+const AIF_MGRS_SG = [
+  "Azalea Asset Management", "Clifford Capital", "Investcorp-Tiga Asia", "Olympus Capital Asia",
+  "Northstar Group", "Advantage Partners Asia", "Creador", "DAIWA Securities",
+  "Marquee Capital", "Tembusu Partners", "Heliconia Capital", "Octava",
+];
+const AIF_SUB_SG: AIF["subStrategy"][] = [
+  "Venture Capital", "SME Fund", "Infrastructure", "Private Equity", "Real Estate",
+  "Private Credit / Debt", "Distressed / Special Sit.", "Long-Short Hedge", "Long-Only Equity",
+];
+
+const aifSchemesSG: AIF[] = Array.from({ length: 12 }, (_, i) => {
+  const subStrategy = AIF_SUB_SG[i % AIF_SUB_SG.length];
+  const isDebt = subStrategy === "Private Credit / Debt" || subStrategy === "Distressed / Special Sit.";
+  const isHedge = subStrategy === "Long-Short Hedge";
+  const isReal = subStrategy === "Real Estate" || subStrategy === "Infrastructure";
+  const manager = AIF_MGRS_SG[i % AIF_MGRS_SG.length];
+  const corpus = Math.round(rSG(50, 800, 0));
+  const sebiCategory: AIF["sebiCategory"] = isDebt || isReal ? "Category II" : isHedge ? "Category III" : "Category I";
+  return {
+    category: "AIF",
+    id: `AI-SG-${5000 + i}`,
+    name: `${manager} ${subStrategy} Fund`,
+    manager,
+    sebiCategory,
+    subStrategy,
+    structure: sebiCategory === "Category III" && isHedge ? pickSG(["Open-Ended", "Close-Ended"] as const) : "Close-Ended",
+    vintage: 2015 + Math.floor(randSG() * 9),
+    corpusTarget: corpus,
+    commitments: Math.round(corpus * rSG(0.4, 1.0)),
+    minInvestment: 250000,
+    tenureYears: sebiCategory === "Category III" ? pickSG([3, 5, 7]) : pickSG([7, 8, 10, 12]),
+    drawdownStatus: Math.round(rSG(15, 100, 0)),
+    targetIRR: rSG(isDebt ? 10 : 15, isDebt ? 14 : 28),
+    netIRR: rSG(isDebt ? 7 : -3, isDebt ? 12 : 30),
+    moic: rSG(0.9, 3.2),
+    hurdleRate: rSG(7, 10),
+    carry: pickSG([15, 20, 20, 20]),
+    managementFee: rSG(1.0, 2.5),
+    domicile: "India - Onshore",
+    risk: isDebt ? "Mod-High" : isHedge ? "High" : "Very High",
+    rating: Math.round(rSG(3, 5, 0)),
+  };
+});
+
+const STOCKS_SEED_SG: { ticker: string; name: string; sector: string; cap: EquityStock["marketCap"]; price: number }[] = [
+  { ticker: "D05.SI", name: "DBS Group", sector: "Banking", cap: "Large Cap", price: 42.5 },
+  { ticker: "O39.SI", name: "OCBC Bank", sector: "Banking", cap: "Large Cap", price: 17.2 },
+  { ticker: "U11.SI", name: "UOB", sector: "Banking", cap: "Large Cap", price: 33.8 },
+  { ticker: "Z74.SI", name: "Singtel", sector: "Telecommunications", cap: "Large Cap", price: 3.95 },
+  { ticker: "C38U.SI", name: "CapitaLand Integrated Commercial Trust", sector: "Real Estate", cap: "Large Cap", price: 2.28 },
+  { ticker: "A17U.SI", name: "Ascendas REIT", sector: "Real Estate", cap: "Large Cap", price: 2.65 },
+  { ticker: "S68.SI", name: "Singapore Exchange", sector: "Financial Services", cap: "Large Cap", price: 11.3 },
+  { ticker: "C6L.SI", name: "Singapore Airlines", sector: "Transport", cap: "Large Cap", price: 6.85 },
+  { ticker: "G13.SI", name: "Genting Singapore", sector: "Hospitality & Gaming", cap: "Large Cap", price: 0.92 },
+  { ticker: "Y92.SI", name: "Thai Beverage", sector: "Consumer Staples", cap: "Large Cap", price: 0.52 },
+  { ticker: "S63.SI", name: "ST Engineering", sector: "Industrials", cap: "Large Cap", price: 4.35 },
+  { ticker: "V03.SI", name: "Venture Corporation", sector: "Technology", cap: "Large Cap", price: 15.7 },
+  { ticker: "F34.SI", name: "Wilmar International", sector: "Consumer Staples", cap: "Large Cap", price: 3.45 },
+  { ticker: "K71U.SI", name: "Keppel DC REIT", sector: "Real Estate", cap: "Mid Cap", price: 1.85 },
+  { ticker: "N2IU.SI", name: "Mapletree Industrial Trust", sector: "Real Estate", cap: "Mid Cap", price: 2.25 },
+  { ticker: "J69U.SI", name: "Frasers Centrepoint Trust", sector: "Real Estate", cap: "Mid Cap", price: 2.05 },
+  { ticker: "ME8U.SI", name: "Mapletree Logistics Trust", sector: "Real Estate", cap: "Mid Cap", price: 1.55 },
+  { ticker: "T82U.SI", name: "Suntec REIT", sector: "Real Estate", cap: "Mid Cap", price: 1.35 },
+  { ticker: "CJLU.SI", name: "CapitaLand China Trust", sector: "Real Estate", cap: "Mid Cap", price: 1.05 },
+  { ticker: "BUOU.SI", name: "Frasers Logistics & Commercial Trust", sector: "Real Estate", cap: "Mid Cap", price: 1.25 },
+  { ticker: "SE1.SI", name: "Seatrium", sector: "Industrials", cap: "Mid Cap", price: 1.55 },
+  { ticker: "U14.SI", name: "UOL Group", sector: "Real Estate", cap: "Mid Cap", price: 6.35 },
+  { ticker: "S58.SI", name: "SATS", sector: "Transport & Logistics", cap: "Mid Cap", price: 3.55 },
+  { ticker: "K11.SI", name: "Keppel Infrastructure Trust", sector: "Utilities", cap: "Mid Cap", price: 0.49 },
+  { ticker: "SPY.SI", name: "SPDR Straits Times Index ETF", sector: "ETF", cap: "Large Cap", price: 3.75 },
+  { ticker: "ES3.SI", name: "Nikko AM STI ETF", sector: "ETF", cap: "Large Cap", price: 3.45 },
+  { ticker: "G3B.SI", name: "Nikko AM STI ETF 100", sector: "ETF", cap: "Large Cap", price: 3.55 },
+  { ticker: "CLR0.SI", name: "LionGlobal Infinity Global Stock Index", sector: "ETF/Fund", cap: "Mid Cap", price: 1.25 },
+  { ticker: "A35.SI", name: "ABF Singapore Bond Index Fund", sector: "ETF/Fund", cap: "Mid Cap", price: 1.35 },
+  { ticker: "MBH.SI", name: "MindChamps PreSchool", sector: "Consumer Discretionary", cap: "Small Cap", price: 0.18 },
+];
+
+const equityStocksSG: EquityStock[] = STOCKS_SEED_SG.map((s, i) => {
+  const pe = rSG(8, 28);
+  const pb = +(pe * rSG(0.08, 0.45)).toFixed(2);
+  const dy = rSG(0.0, 6.5);
+  return {
+    category: "EQ",
+    id: `EQ-SG-${6000 + i}`,
+    ticker: s.ticker,
+    name: s.name,
+    sector: s.sector,
+    marketCap: s.cap,
+    price: s.price,
+    pe,
+    pb,
+    dividendYield: dy,
+    roe: rSG(6, 22),
+    beta: rSG(0.55, 1.35),
+    cagr3y: rSG(-3, 22),
+    cagr5y: rSG(0, 18),
+    expectedReturn: rSG(5, 16),
+    risk: s.cap === "Large Cap" ? (dy > 4.5 ? "Low-Mod" : "Moderate") : s.cap === "Mid Cap" ? "Mod-High" : "High",
+  };
+});
+
+const BOND_SEED_SG: { issuer: string; type: Bond["bondType"]; rating: string; coupon: number; tenor: number; taxable: boolean }[] = [
+  // Government / SGS
+  { issuer: "Singapore Government Securities 6M T-bill", type: "G-Sec", rating: "Sovereign", coupon: 3.35, tenor: 1, taxable: true },
+  { issuer: "Singapore Government Securities 1Y T-bill", type: "G-Sec", rating: "Sovereign", coupon: 3.45, tenor: 1, taxable: true },
+  { issuer: "SGS 2Y T-bill", type: "G-Sec", rating: "Sovereign", coupon: 3.15, tenor: 2, taxable: true },
+  { issuer: "SGS 5Y Bond", type: "G-Sec", rating: "Sovereign", coupon: 3.05, tenor: 5, taxable: true },
+  { issuer: "SGS 10Y Bond", type: "G-Sec", rating: "Sovereign", coupon: 2.75, tenor: 10, taxable: true },
+  { issuer: "SGS 30Y Bond", type: "G-Sec", rating: "Sovereign", coupon: 2.625, tenor: 30, taxable: true },
+  // Statutory / AAA corporates
+  { issuer: "HDB Bond", type: "PSU Bond", rating: "AAA", coupon: 3.1, tenor: 5, taxable: true },
+  { issuer: "JTC Corporation", type: "PSU Bond", rating: "AAA", coupon: 3.35, tenor: 7, taxable: true },
+  { issuer: "Temasek Bond", type: "PSU Bond", rating: "AAA", coupon: 3.25, tenor: 10, taxable: true },
+  // Corporates
+  { issuer: "DBS Group", type: "Corporate Bond", rating: "AAA", coupon: 3.45, tenor: 5, taxable: true },
+  { issuer: "OCBC Bank", type: "Corporate Bond", rating: "AAA", coupon: 3.55, tenor: 5, taxable: true },
+  { issuer: "UOB", type: "Corporate Bond", rating: "AAA", coupon: 3.5, tenor: 7, taxable: true },
+  { issuer: "Singtel", type: "Corporate Bond", rating: "AA+", coupon: 3.75, tenor: 7, taxable: true },
+  { issuer: "Keppel Corp", type: "Corporate Bond", rating: "AA+", coupon: 3.85, tenor: 10, taxable: true },
+  { issuer: "CapitaLand Treasury", type: "Corporate Bond", rating: "AA+", coupon: 3.5, tenor: 5, taxable: true },
+  { issuer: "Mapletree Treasury", type: "Corporate Bond", rating: "AA", coupon: 3.95, tenor: 7, taxable: true },
+  { issuer: "Ascott Residence Trust", type: "Corporate Bond", rating: "BBB+", coupon: 4.55, tenor: 5, taxable: true },
+  { issuer: "Suntec REIT", type: "Corporate Bond", rating: "BBB", coupon: 4.65, tenor: 7, taxable: true },
+  { issuer: "Frasers Property", type: "Corporate Bond", rating: "BBB+", coupon: 4.45, tenor: 5, taxable: true },
+  // AT1 / Perp
+  { issuer: "DBS AT1 Perpetual", type: "Perpetual / AT1", rating: "AA-", coupon: 4.75, tenor: 5, taxable: true },
+  { issuer: "UOB AT1 Perpetual", type: "Perpetual / AT1", rating: "AA-", coupon: 4.65, tenor: 5, taxable: true },
+  { issuer: "OCBC AT1 Perpetual", type: "Perpetual / AT1", rating: "AA-", coupon: 4.7, tenor: 5, taxable: true },
+];
+
+const bondsSG: Bond[] = BOND_SEED_SG.map((b, i) => ({
+  category: "BOND",
+  id: `BD-SG-${7000 + i}`,
+  name: `${b.issuer} ${b.coupon}% ${b.tenor}Y`,
+  issuer: b.issuer,
+  bondType: b.type,
+  rating: b.rating,
+  couponRate: b.coupon,
+  ytm: +(b.coupon + rSG(-0.3, 0.6)).toFixed(2),
+  residualTenorYears: b.tenor,
+  faceValue: 1000,
+  minInvestment: b.type === "G-Sec" ? 1000 : 250000,
+  payout: b.type === "Zero Coupon" ? "Cumulative" : "Semi-Annual",
+  taxable: b.taxable,
+  risk: b.rating === "Sovereign" ? "Low" : b.type === "Perpetual / AT1" ? "Mod-High" : b.rating.startsWith("AA") ? "Low-Mod" : b.rating.startsWith("A") ? "Moderate" : "Mod-High",
+}));
+
 // =====================================================================
 // ================ REGION-AWARE PROXY EXPORTS =========================
 // =====================================================================
@@ -1379,6 +1708,15 @@ const DATA_SETS: Record<Region, {
     aifSchemes: aifSchemesPH,
     equityStocks: equityStocksPH,
     bonds: bondsPH,
+  },
+  SG: {
+    mutualFunds: mutualFundsSG,
+    fixedDeposits: fixedDepositsSG,
+    insurance: insuranceSG,
+    pmsSchemes: pmsSchemesSG,
+    aifSchemes: aifSchemesSG,
+    equityStocks: equityStocksSG,
+    bonds: bondsSG,
   },
 };
 

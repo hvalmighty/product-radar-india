@@ -4,7 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { buildSystemPrompt } from "@/lib/assistant-context";
 import { pushDebugLog, serializeError } from "@/lib/debug-log";
 
-type Region = "IN" | "AE" | "PH";
+type Region = "IN" | "AE" | "PH" | "SG";
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/chat")({
         try {
           const body = (await request.json()) as { messages?: UIMessage[]; region?: Region };
           messages = body.messages;
-          if (body.region === "IN" || body.region === "AE" || body.region === "PH") region = body.region;
+          if (body.region === "IN" || body.region === "AE" || body.region === "PH" || body.region === "SG") region = body.region;
         } catch (err) {
           pushDebugLog({ level: "error", source: "chat", message: "invalid json body", data: serializeError(err) });
           return new Response("invalid json", { status: 400 });

@@ -502,6 +502,149 @@ const PH_CONFIG: RegionConfig = {
   ],
 };
 
+
+// ===== SINGAPORE =====
+const SG_MF: RegionConfig["mfUnderlyings"] = {
+  "LionGlobal Infinity Global Stock Index": [
+    { issuer: "Apple", sector: "Technology", weight: 8.2 },
+    { issuer: "Microsoft", sector: "Technology", weight: 7.5 },
+    { issuer: "NVIDIA", sector: "Technology", weight: 4.2 },
+    { issuer: "DBS Group", sector: "Financials", weight: 3.1 },
+    { issuer: "Alphabet", sector: "Communication", weight: 2.8 },
+    { issuer: "Others", sector: "Mixed", weight: 74.2 },
+  ],
+  "Nikko AM Singapore STI ETF": [
+    { issuer: "DBS Group", sector: "Financials", weight: 20.5 },
+    { issuer: "OCBC Bank", sector: "Financials", weight: 16.4 },
+    { issuer: "UOB", sector: "Financials", weight: 14.2 },
+    { issuer: "Singtel", sector: "Telecom", weight: 5.6 },
+    { issuer: "CapitaLand Integrated Commercial Trust", sector: "Real Estate", weight: 4.8 },
+    { issuer: "Others", sector: "Mixed", weight: 38.5 },
+  ],
+  "ABF Singapore Bond Index Fund": [
+    { issuer: "Singapore Government", sector: "Sovereign", weight: 42.5 },
+    { issuer: "HDB", sector: "Statutory Board", weight: 18.2 },
+    { issuer: "JTC Corporation", sector: "Statutory Board", weight: 12.4 },
+    { issuer: "DBS Group", sector: "Financials", weight: 7.1 },
+    { issuer: "OCBC Bank", sector: "Financials", weight: 6.3 },
+    { issuer: "Others", sector: "Mixed", weight: 13.5 },
+  ],
+  "Fullerton SGD Cash Fund": [
+    { issuer: "DBS Bank", sector: "Banking", weight: 28.4 },
+    { issuer: "OCBC Bank", sector: "Banking", weight: 24.6 },
+    { issuer: "UOB", sector: "Banking", weight: 22.8 },
+    { issuer: "Others", sector: "Mixed", weight: 24.2 },
+  ],
+};
+
+const SG_CONFIG: RegionConfig = {
+  rmInfo: [
+    { rm: "Wei Ling Lee", region: "Orchard / Central" },
+    { rm: "Marcus Tan", region: "Marina Bay / Raffles" },
+    { rm: "Sarah Lee", region: "Sentosa / Harbourfront" },
+    { rm: "Alex Ong", region: "East / Tampines" },
+    { rm: "Chloe Tan", region: "Jurong / West" },
+    { rm: "Daniel Goh", region: "Orchard / Central" },
+    { rm: "Emily Yeo", region: "Marina Bay / Raffles" },
+    { rm: "Felix Chua", region: "East / Tampines" },
+  ],
+  geoRegions: ["Orchard / Central", "Marina Bay / Raffles", "Sentosa / Harbourfront", "East / Tampines", "Jurong / West"],
+  regionWeight: { "Orchard / Central": 0.36, "Marina Bay / Raffles": 0.28, "Sentosa / Harbourfront": 0.14, "East / Tampines": 0.12, "Jurong / West": 0.10 },
+  products: ["Mutual Funds / ETFs", "PMS / IAM", "AIF / VCC", "Direct Equities (SGX)", "SGS Bonds / T-bills", "Cash / Fixed Deposits", "REITs", "Insurance (ILP / VUL)"],
+  productWeight: {
+    "Mutual Funds / ETFs": 0.30, "PMS / IAM": 0.18, "AIF / VCC": 0.12, "Direct Equities (SGX)": 0.16,
+    "SGS Bonds / T-bills": 0.12, "Cash / Fixed Deposits": 0.06, "REITs": 0.04, "Insurance (ILP / VUL)": 0.02,
+  },
+  productMargin: {
+    "Mutual Funds / ETFs": 0.90, "PMS / IAM": 1.80, "AIF / VCC": 2.20, "Direct Equities (SGX)": 0.85,
+    "SGS Bonds / T-bills": 0.45, "Cash / Fixed Deposits": 0.35, "REITs": 0.75, "Insurance (ILP / VUL)": 2.00,
+  },
+  totalAumBase: 9_600, // SGD M
+  mfUnderlyings: SG_MF,
+  quickFilters: ["DBS Group", "OCBC Bank", "UOB", "Singtel", "CapitaLand", "REITs"],
+  buildClientPortfolios: () => [
+    {
+      id: "SG001", client: "Lee Family Office", segment: "UHNI", rm: "Wei Ling Lee",
+      benchmark: "Straits Times Index", ytdReturn: 8.4, benchmarkReturn: 7.2, aum: 78.2,
+      ipsEquity: 50, ipsFI: 30, ipsAlt: 15, ipsCash: 5,
+      holdings: [
+        mkMfH("LionGlobal Infinity Global Stock Index", "Lion Global", 14.2, SG_MF),
+        mkBondMfH("ABF Singapore Bond Index Fund", "ABF", 10.8, SG_MF),
+        { security: "DBS Group", issuer: "DBS Group", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 12.4, fee: 0 },
+        { security: "OCBC Bank", issuer: "OCBC Bank", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 8.6, fee: 0 },
+        { security: "UOB", issuer: "UOB", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 6.2, fee: 0 },
+        { security: "Bank of Singapore IAM - Asia Core", issuer: "Bank of Singapore", amc: "Bank of Singapore", product: "PMS", assetClass: "Equity", sector: "Diversified", liquidity: "T+30", value: 16.4, fee: 1.8 },
+        { security: "Temasek-linked Private Equity IV", issuer: "Azalea Asset Management", amc: "Azalea", product: "AIF", assetClass: "Alternates", sector: "Private Equity", liquidity: "Locked", value: 11.2, fee: 2.2 },
+        { security: "SGD Cash Sweep", issuer: "DBS Bank", product: "Cash", assetClass: "Cash", sector: "Cash", liquidity: "T+1", value: 4.4, fee: 0 },
+      ],
+    },
+    {
+      id: "SG002", client: "Tan Family Office", segment: "UHNI", rm: "Marcus Tan",
+      benchmark: "FTSE ST All-Share", ytdReturn: 11.6, benchmarkReturn: 7.5, aum: 64.8,
+      ipsEquity: 55, ipsFI: 25, ipsAlt: 15, ipsCash: 5,
+      holdings: [
+        mkMfH("Nikko AM Singapore STI ETF", "Nikko AM", 12.4, SG_MF),
+        mkMfH("LionGlobal Infinity Global Stock Index", "Lion Global", 9.6, SG_MF),
+        { security: "Singapore Exchange", issuer: "Singapore Exchange", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 8.2, fee: 0 },
+        { security: "Singapore Airlines", issuer: "Singapore Airlines", product: "Equity", assetClass: "Equity", sector: "Transport", liquidity: "T+1", value: 5.8, fee: 0 },
+        { security: "SGS 10Y 2.75% 2034", issuer: "Singapore Government", product: "Bond", assetClass: "Fixed Income", sector: "Sovereign", liquidity: "T+3", value: 9.6, fee: 0 },
+        { security: "Mapletree Treasury 4.0% 2029", issuer: "Mapletree Treasury", product: "Bond", assetClass: "Fixed Income", sector: "Real Estate", liquidity: "T+3", value: 6.4, fee: 0 },
+        { security: "Keppel DC REIT", issuer: "Keppel DC REIT", product: "Equity", assetClass: "Equity", sector: "REIT", liquidity: "T+1", value: 3.6, fee: 0 },
+        { security: "Investcorp-Tiga Private Credit III", issuer: "Investcorp-Tiga", amc: "Investcorp-Tiga", product: "AIF", assetClass: "Alternates", sector: "Private Credit", liquidity: "Locked", value: 9.2, fee: 2.0 },
+      ],
+    },
+    {
+      id: "SG003", client: "Sarah Lee Trust", segment: "HNI", rm: "Sarah Lee",
+      benchmark: "MSCI World", ytdReturn: 6.2, benchmarkReturn: 9.8, aum: 18.4,
+      ipsEquity: 60, ipsFI: 30, ipsAlt: 5, ipsCash: 5,
+      holdings: [
+        mkMfH("LionGlobal Infinity US 500 Stock Index", "Lion Global", 6.2, SG_MF),
+        mkBondMfH("Fullerton SGD Cash Fund", "Fullerton", 3.8, SG_MF),
+        { security: "CapitaLand Integrated Commercial Trust", issuer: "CapitaLand", product: "Equity", assetClass: "Equity", sector: "Real Estate", liquidity: "T+1", value: 2.8, fee: 0 },
+        { security: "Singtel", issuer: "Singtel", product: "Equity", assetClass: "Equity", sector: "Telecom", liquidity: "T+1", value: 2.1, fee: 0 },
+        { security: "SGS 6M T-bill 3.35%", issuer: "Singapore Government", product: "Bond", assetClass: "Fixed Income", sector: "Sovereign", liquidity: "T+1", value: 3.5, fee: 0 },
+      ],
+    },
+    {
+      id: "SG004", client: "Alex Ong (PR Professional)", segment: "HNI", rm: "Alex Ong",
+      benchmark: "Straits Times Index", ytdReturn: 5.8, benchmarkReturn: 7.2, aum: 12.8,
+      ipsEquity: 50, ipsFI: 35, ipsAlt: 5, ipsCash: 10,
+      holdings: [
+        mkMfH("Nikko AM Singapore STI ETF", "Nikko AM", 3.8, SG_MF),
+        mkBondMfH("ABF Singapore Bond Index Fund", "ABF", 2.8, SG_MF),
+        { security: "DBS Group", issuer: "DBS Group", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 3.2, fee: 0 },
+        { security: "Ascendas REIT", issuer: "Ascendas REIT", product: "Equity", assetClass: "Equity", sector: "REIT", liquidity: "T+1", value: 1.6, fee: 0 },
+        { security: "SGD 12M Fixed Deposit", issuer: "OCBC Bank", product: "Bond", assetClass: "Fixed Income", sector: "Time Deposit", liquidity: "T+30", value: 1.4, fee: 0 },
+      ],
+    },
+    {
+      id: "SG005", client: "Chloe Tan", segment: "Affluent", rm: "Chloe Tan",
+      benchmark: "MSCI AC Asia Pacific ex-Japan", ytdReturn: 4.4, benchmarkReturn: 8.2, aum: 4.2,
+      ipsEquity: 55, ipsFI: 35, ipsAlt: 0, ipsCash: 10,
+      holdings: [
+        mkMfH("LionGlobal India Fund", "Lion Global", 1.8, SG_MF),
+        mkBondMfH("Fullerton SGD Cash Fund", "Fullerton", 1.2, SG_MF),
+        { security: "Sea Ltd", issuer: "Sea Ltd", product: "Equity", assetClass: "Equity", sector: "Technology", liquidity: "T+1", value: 1.2, fee: 0 },
+      ],
+    },
+    {
+      id: "SG006", client: "Goh Family Office", segment: "UHNI", rm: "Daniel Goh",
+      benchmark: "Straits Times Index", ytdReturn: 9.8, benchmarkReturn: 7.2, aum: 92.4,
+      ipsEquity: 45, ipsFI: 30, ipsAlt: 20, ipsCash: 5,
+      holdings: [
+        mkMfH("LionGlobal Infinity Global Stock Index", "Lion Global", 16.2, SG_MF),
+        mkMfH("Nikko AM Singapore STI ETF", "Nikko AM", 11.8, SG_MF),
+        mkBondMfH("ABF Singapore Bond Index Fund", "ABF", 10.4, SG_MF),
+        { security: "DBS Group", issuer: "DBS Group", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 13.6, fee: 0 },
+        { security: "OCBC Bank", issuer: "OCBC Bank", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 9.4, fee: 0 },
+        { security: "UOB", issuer: "UOB", product: "Equity", assetClass: "Equity", sector: "Financials", liquidity: "T+1", value: 7.8, fee: 0 },
+        { security: "DBS Treasures Private Client - SG Core", issuer: "DBS Bank", amc: "DBS Bank", product: "PMS", assetClass: "Equity", sector: "Diversified", liquidity: "T+30", value: 18.2, fee: 1.7 },
+        { security: "Northstar Group Asia Buyout III", issuer: "Northstar Group", amc: "Northstar", product: "AIF", assetClass: "Alternates", sector: "Private Equity", liquidity: "Locked", value: 15.0, fee: 2.2 },
+      ],
+    },
+  ],
+};
+
 // ----------------------------------------------------------------------------
 // Build derived data (facts + flat/lookthrough holdings) per region
 // ----------------------------------------------------------------------------
@@ -603,6 +746,7 @@ const DATASETS: Record<Region, DataSet> = {
   IN: buildDataset(424242, IN_CONFIG),
   AE: buildDataset(909090, AE_CONFIG),
   PH: buildDataset(717171, PH_CONFIG),
+  SG: buildDataset(565656, SG_CONFIG),
 };
 
 function ds(): DataSet { return DATASETS[getCurrentRegion()]; }

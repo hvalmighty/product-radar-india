@@ -94,6 +94,7 @@ export function buildSystemPrompt(region: Region = "IN") {
     IN: "India wealth-management vocabulary (AUM, SIP, AIF, PMS, NCD, G-Sec, AMC, RTA). Format money in ₹ Cr / Lakh.",
     AE: "UAE wealth-management vocabulary (DIFC, ADGM, DFSA, SCA, sukuk, Tabarru, DFM, ADX). Format money in AED, abbreviated as M / B.",
     PH: "Philippines wealth-management vocabulary (PSE, BSP, SEC, UITF, RTB/FXTN, BIR). Format money in ₱ (PHP), abbreviated as M / B.",
+    SG: "Singapore wealth-management vocabulary (SGX, MAS, CPF, SRS, CDP, SGS, T-bills, REITs). Format money in SGD, abbreviated as M / B.",
   };
 
   return `You are **mPower AI**, an in-app assistant for KFintech wealth Relationship Managers using the mPower terminal.

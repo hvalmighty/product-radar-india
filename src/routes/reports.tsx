@@ -361,6 +361,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
   portfolios: SavedPortfolio[]; title: string; mode: "customer" | "family"; onBack: () => void;
 }) {
   const allHoldings = useMemo(() => portfolios.flatMap(p => p.data.holdings), [portfolios]);
+  const [expandedAC, setExpandedAC] = useState<Record<string, boolean>>({});
+  const [factsheet, setFactsheet] = useState<Holding | null>(null);
   const totalValue = useMemo(() => allHoldings.reduce((s, h) => s + h.value, 0), [allHoldings]);
 
   // Synthesize cashflows (deterministic from total)
@@ -812,18 +814,39 @@ function ReportView({ portfolios, title, mode, onBack }: {
                 {byAssetClass.map(a => {
                   const review1Y = a.ret * 0.6;
                   const alpha = a.ret - a.bench.ret;
+                  const open = !!expandedAC[a.name];
                   return (
-                    <tr key={a.name} className="border-b border-border/50">
-                      <td className="py-2.5 font-medium">{a.name}</td>
-                      <td className="py-2.5 text-right mono-num">{a.count}</td>
-                      <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
-                      <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
-                      <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
-                      <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
-                      <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
-                      <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
-                      <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
-                    </tr>
+                    <React.Fragment key={a.name}>
+                      <tr
+                        className="border-b border-border/50 cursor-pointer hover:bg-secondary/40"
+                        onClick={() => setExpandedAC(s => ({ ...s, [a.name]: !s[a.name] }))}
+                      >
+                        <td className="py-2.5 font-medium">
+                          <span className="inline-flex items-center gap-1.5">
+                            <ChevronRight className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} />
+                            {a.name}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right mono-num">{a.count}</td>
+                        <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
+                        <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
+                        <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
+                        <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
+                        <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
+                      </tr>
+                      {open && (
+                        <tr className="border-b border-border/50 bg-secondary/20">
+                          <td colSpan={9} className="p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                              Underlying securities — {a.name} ({a.count})
+                            </div>
+                            <SleeveHoldingsTable ac={a} onFactsheet={setFactsheet} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -888,40 +911,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       <Section id="products" title="5. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
         {byAssetClass.map(ac => (
           <Card key={ac.name} title={`${ac.name} — ${fmtINR(ac.value)} (${pct(ac.pct)})`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2">Scheme / Security</th>
-                    <th className="text-left py-2">ISIN</th>
-                    <th className="text-right py-2">Quantity</th>
-                    <th className="text-right py-2">Price</th>
-                    <th className="text-right py-2">Value</th>
-                    <th className="text-right py-2">% Sleeve</th>
-                    <th className="text-right py-2">Return</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ac.holdings.sort((a, b) => b.value - a.value).slice(0, 15).map(h => {
-                    const r = seedNum(h.isin, -8, 28);
-                    return (
-                      <tr key={h.isin} className="border-b border-border/50">
-                        <td className="py-2 max-w-[280px] whitespace-normal break-words leading-snug">{h.name}</td>
-                        <td className="py-2 mono-num text-muted-foreground whitespace-nowrap">{h.isin}</td>
-                        <td className="py-2 text-right mono-num">{h.quantity.toFixed(3)}</td>
-                        <td className="py-2 text-right mono-num">{h.price.toFixed(2)}</td>
-                        <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>
-                        <td className="py-2 text-right mono-num">{pct((h.value / ac.value) * 100)}</td>
-                        <td className={`py-2 text-right mono-num ${clsPct(r)}`}>{pct(r)}</td>
-                      </tr>
-                    );
-                  })}
-                  {ac.holdings.length > 15 && (
-                    <tr><td colSpan={7} className="py-2 text-center text-[10px] text-muted-foreground">+ {ac.holdings.length - 15} more</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <SleeveHoldingsTable ac={ac} onFactsheet={setFactsheet} />
           </Card>
         ))}
 

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
 import {
   ArrowLeft, FileText, Users, User, Printer, Download, ChevronRight,
@@ -361,6 +361,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
   portfolios: SavedPortfolio[]; title: string; mode: "customer" | "family"; onBack: () => void;
 }) {
   const allHoldings = useMemo(() => portfolios.flatMap(p => p.data.holdings), [portfolios]);
+  const [expandedAC, setExpandedAC] = useState<Record<string, boolean>>({});
+  const [factsheet, setFactsheet] = useState<Holding | null>(null);
   const totalValue = useMemo(() => allHoldings.reduce((s, h) => s + h.value, 0), [allHoldings]);
 
   // Synthesize cashflows (deterministic from total)
@@ -812,18 +814,39 @@ function ReportView({ portfolios, title, mode, onBack }: {
                 {byAssetClass.map(a => {
                   const review1Y = a.ret * 0.6;
                   const alpha = a.ret - a.bench.ret;
+                  const open = !!expandedAC[a.name];
                   return (
-                    <tr key={a.name} className="border-b border-border/50">
-                      <td className="py-2.5 font-medium">{a.name}</td>
-                      <td className="py-2.5 text-right mono-num">{a.count}</td>
-                      <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
-                      <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
-                      <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
-                      <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
-                      <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
-                      <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
-                      <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
-                    </tr>
+                    <React.Fragment key={a.name}>
+                      <tr
+                        className="border-b border-border/50 cursor-pointer hover:bg-secondary/40"
+                        onClick={() => setExpandedAC(s => ({ ...s, [a.name]: !s[a.name] }))}
+                      >
+                        <td className="py-2.5 font-medium">
+                          <span className="inline-flex items-center gap-1.5">
+                            <ChevronRight className={`w-3 h-3 transition-transform ${open ? "rotate-90" : ""}`} />
+                            {a.name}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right mono-num">{a.count}</td>
+                        <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
+                        <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
+                        <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
+                        <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
+                        <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
+                      </tr>
+                      {open && (
+                        <tr className="border-b border-border/50 bg-secondary/20">
+                          <td colSpan={9} className="p-3">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                              Underlying securities — {a.name} ({a.count})
+                            </div>
+                            <SleeveHoldingsTable ac={a} onFactsheet={setFactsheet} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -888,40 +911,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       <Section id="products" title="5. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
         {byAssetClass.map(ac => (
           <Card key={ac.name} title={`${ac.name} — ${fmtINR(ac.value)} (${pct(ac.pct)})`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2">Scheme / Security</th>
-                    <th className="text-left py-2">ISIN</th>
-                    <th className="text-right py-2">Quantity</th>
-                    <th className="text-right py-2">Price</th>
-                    <th className="text-right py-2">Value</th>
-                    <th className="text-right py-2">% Sleeve</th>
-                    <th className="text-right py-2">Return</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ac.holdings.sort((a, b) => b.value - a.value).slice(0, 15).map(h => {
-                    const r = seedNum(h.isin, -8, 28);
-                    return (
-                      <tr key={h.isin} className="border-b border-border/50">
-                        <td className="py-2 max-w-[280px] whitespace-normal break-words leading-snug">{h.name}</td>
-                        <td className="py-2 mono-num text-muted-foreground whitespace-nowrap">{h.isin}</td>
-                        <td className="py-2 text-right mono-num">{h.quantity.toFixed(3)}</td>
-                        <td className="py-2 text-right mono-num">{h.price.toFixed(2)}</td>
-                        <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>
-                        <td className="py-2 text-right mono-num">{pct((h.value / ac.value) * 100)}</td>
-                        <td className={`py-2 text-right mono-num ${clsPct(r)}`}>{pct(r)}</td>
-                      </tr>
-                    );
-                  })}
-                  {ac.holdings.length > 15 && (
-                    <tr><td colSpan={7} className="py-2 text-center text-[10px] text-muted-foreground">+ {ac.holdings.length - 15} more</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <SleeveHoldingsTable ac={ac} onFactsheet={setFactsheet} />
           </Card>
         ))}
 
@@ -1111,6 +1101,212 @@ function ReportView({ portfolios, title, mode, onBack }: {
 
       <div className="text-[10px] text-muted-foreground text-center py-6 border-t border-border mt-8">
         Generated by mPower Wealth · This report uses analytics derived from imported eCAS holdings; benchmark and performance figures are illustrative model estimates.
+      </div>
+
+      {factsheet && <FactsheetModal holding={factsheet} onClose={() => setFactsheet(null)} />}
+    </div>
+  );
+}
+
+// ============================================================================
+// Sleeve holdings table (shared by Section 3 drilldown & Section 5)
+// ============================================================================
+
+function SleeveHoldingsTable({ ac, onFactsheet }: {
+  ac: { name: string; value: number; holdings: Holding[] };
+  onFactsheet: (h: Holding) => void;
+}) {
+  const rows = useMemo(() => [...ac.holdings].sort((a, b) => b.value - a.value), [ac.holdings]);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b border-border">
+            <th className="text-left py-2">Scheme / Security</th>
+            <th className="text-left py-2">ISIN</th>
+            <th className="text-right py-2">Quantity</th>
+            <th className="text-right py-2">Price</th>
+            <th className="text-right py-2">Value</th>
+            <th className="text-right py-2">% Sleeve</th>
+            <th className="text-right py-2">Return</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(h => {
+            const r = seedNum(h.isin, -8, 28);
+            const isMF = h.type === "Mutual Fund";
+            return (
+              <tr key={h.isin} className="border-b border-border/50">
+                <td className="py-2 max-w-[280px] whitespace-normal break-words leading-snug">
+                  {isMF ? (
+                    <button
+                      type="button"
+                      onClick={() => onFactsheet(h)}
+                      className="text-left underline decoration-dotted underline-offset-2 hover:text-primary"
+                      title="View fund factsheet"
+                    >
+                      {h.name}
+                    </button>
+                  ) : h.name}
+                </td>
+                <td className="py-2 mono-num text-muted-foreground whitespace-nowrap">{h.isin}</td>
+                <td className="py-2 text-right mono-num">{h.quantity.toFixed(3)}</td>
+                <td className="py-2 text-right mono-num">{h.price.toFixed(2)}</td>
+                <td className="py-2 text-right mono-num">{fmtINR(h.value)}</td>
+                <td className="py-2 text-right mono-num">{pct((h.value / (ac.value || 1)) * 100)}</td>
+                <td className={`py-2 text-right mono-num ${clsPct(r)}`}>{pct(r)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ============================================================================
+// Fund factsheet modal
+// ============================================================================
+
+function FactsheetModal({ holding, onClose }: { holding: Holding; onClose: () => void }) {
+  const h = holding;
+  const s = h.isin;
+  const cat = assetClass(h);
+  const amc = h.name.split(/\s+/).slice(0, 2).join(" ");
+  const nav = h.price;
+  const aum = seedNum(s + "aum", 800, 45000);
+  const expense = seedNum(s + "ter", 0.35, 1.95);
+  const sharpe = seedNum(s + "sh", 0.4, 1.8);
+  const beta = seedNum(s + "beta", 0.72, 1.18);
+  const sd = seedNum(s + "sd", 6, 19);
+  const alpha = seedNum(s + "al", -2.5, 5.5);
+  const dd = seedNum(s + "dd", -32, -8);
+  const inception = Math.round(seedNum(s + "inc", 2005, 2019));
+  const manager = ["Rahul Menon", "Priya Nair", "Anand Iyer", "S. Krishnan", "Meera Kapoor", "Vikram Shah"][Math.round(seedNum(s + "mgr", 0, 5))];
+  const returns = [
+    { p: "1M", v: seedNum(s + "1m", -4, 6) },
+    { p: "6M", v: seedNum(s + "6m", -6, 16) },
+    { p: "1Y", v: seedNum(s + "1y", -8, 28) },
+    { p: "3Y CAGR", v: seedNum(s + "3y", 4, 22) },
+    { p: "5Y CAGR", v: seedNum(s + "5y", 5, 19) },
+    { p: "Since Inception", v: seedNum(s + "si", 7, 16) },
+  ];
+  const bench = ASSET_BENCHMARKS[cat] || ASSET_BENCHMARKS["Other"];
+  const sectors = ["Financials", "IT", "Energy", "Consumer", "Healthcare", "Industrials"]
+    .map((n, i) => ({ n, w: seedNum(s + "sec" + i, 4, 26) }));
+  const secTotal = sectors.reduce((t, x) => t + x.w, 0);
+  const topHoldings = ["HDFC Bank", "Reliance Industries", "ICICI Bank", "Infosys", "TCS", "Larsen & Toubro", "Bharti Airtel", "ITC"]
+    .map((n, i) => ({ n, w: seedNum(s + "th" + i, 1.5, 8.5) }))
+    .sort((a, b) => b.w - a.w);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/70 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-md w-full max-w-3xl my-8 shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Fund Factsheet</div>
+            <h3 className="text-sm font-semibold leading-snug">{h.name}</h3>
+            <div className="text-[11px] text-muted-foreground mono-num">{h.isin} · {cat}</div>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-sm px-2">✕</button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { l: "NAV", v: nav.toFixed(2) },
+              { l: "Fund AUM", v: fmtINR(aum * 1e7) },
+              { l: "Expense Ratio", v: `${expense.toFixed(2)}%` },
+              { l: "Inception", v: String(inception) },
+              { l: "Fund Manager", v: manager },
+              { l: "AMC", v: amc },
+              { l: "Benchmark", v: bench.name },
+              { l: "Your Holding", v: fmtINR(h.value) },
+            ].map(x => (
+              <div key={x.l} className="border border-border rounded-sm p-2.5">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{x.l}</div>
+                <div className="text-xs font-semibold mt-0.5">{x.v}</div>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Performance</div>
+            <table className="w-full text-xs">
+              <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="text-left py-1.5">Period</th>
+                  <th className="text-right py-1.5">Fund</th>
+                  <th className="text-right py-1.5">Benchmark</th>
+                  <th className="text-right py-1.5">Excess</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returns.map(r => {
+                  const b = bench.ret * seedNum(s + r.p, 0.7, 1.15);
+                  return (
+                    <tr key={r.p} className="border-b border-border/50">
+                      <td className="py-1.5">{r.p}</td>
+                      <td className={`py-1.5 text-right mono-num ${clsPct(r.v)}`}>{pct(r.v)}</td>
+                      <td className="py-1.5 text-right mono-num text-muted-foreground">{pct(b)}</td>
+                      <td className={`py-1.5 text-right mono-num ${clsPct(r.v - b)}`}>{r.v - b >= 0 ? "+" : ""}{(r.v - b).toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Risk Metrics</div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { l: "Sharpe", v: sharpe.toFixed(2) },
+                { l: "Beta", v: beta.toFixed(2) },
+                { l: "Std Dev", v: `${sd.toFixed(1)}%` },
+                { l: "Alpha", v: `${alpha.toFixed(1)}%` },
+                { l: "Max Drawdown", v: `${dd.toFixed(1)}%` },
+              ].map(x => (
+                <div key={x.l} className="border border-border rounded-sm p-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{x.l}</div>
+                  <div className="text-xs font-semibold mono-num mt-0.5">{x.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Sector Allocation</div>
+              {sectors.map(x => (
+                <div key={x.n} className="flex items-center gap-2 mb-1.5">
+                  <span className="w-24 text-[11px]">{x.n}</span>
+                  <span className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <span className="block h-full bg-primary" style={{ width: `${(x.w / secTotal) * 100}%` }} />
+                  </span>
+                  <span className="text-[10px] mono-num text-muted-foreground w-10 text-right">{((x.w / secTotal) * 100).toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top Holdings</div>
+              <table className="w-full text-xs">
+                <tbody>
+                  {topHoldings.map(x => (
+                    <tr key={x.n} className="border-b border-border/50">
+                      <td className="py-1.5">{x.n}</td>
+                      <td className="py-1.5 text-right mono-num text-muted-foreground">{x.w.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground">
+            Factsheet figures are illustrative model estimates derived from the imported holding, not official AMC disclosures.
+          </div>
+        </div>
       </div>
     </div>
   );

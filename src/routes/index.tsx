@@ -1118,86 +1118,104 @@ function PMSRow({ p, visibleCols }: { p: PMS; visibleCols: Set<string> }) {
   );
 }
 
-function AIFRow({ p }: { p: AIF }) {
+function AIFRow({ p, visibleCols }: { p: AIF; visibleCols: Set<string> }) {
   const catTone = p.sebiCategory === "Category I" ? "bg-info/15 text-info"
     : p.sebiCategory === "Category II" ? "bg-warning/20 text-warning"
     : "bg-negative/15 text-negative";
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Commit ₹{p.commitments.toLocaleString("en-IN")} Cr / ₹{p.corpusTarget.toLocaleString("en-IN")} Cr</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
-      <td className="px-3 py-2.5">
-        <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${catTone}`}>{p.sebiCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-aif" />{p.subStrategy}</span>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.vintage}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.corpusTarget.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.tenureYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.drawdownStatus}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.targetIRR.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.netIRR)}`}>{p.netIRR > 0 ? "+" : ""}{p.netIRR.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.moic.toFixed(2)}x</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.hurdleRate.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.carry}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.managementFee.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.domicile}</td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Commit ₹{p.commitments.toLocaleString("en-IN")} Cr / ₹{p.corpusTarget.toLocaleString("en-IN")} Cr</div>
+        </td>
+      )}
+      {visibleCols.has("manager") && <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>}
+      {visibleCols.has("sebiCategory") && (
+        <td className="px-3 py-2.5">
+          <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${catTone}`}>{p.sebiCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("subStrategy") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-aif" />{p.subStrategy}</span>
+        </td>
+      )}
+      {visibleCols.has("structure") && <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>}
+      {visibleCols.has("vintage") && <td className="px-3 py-2.5 text-right mono-num">{p.vintage}</td>}
+      {visibleCols.has("corpusTarget") && <td className="px-3 py-2.5 text-right mono-num">{p.corpusTarget.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("tenureYears") && <td className="px-3 py-2.5 text-right mono-num">{p.tenureYears}</td>}
+      {visibleCols.has("drawdownStatus") && <td className="px-3 py-2.5 text-right mono-num">{p.drawdownStatus}%</td>}
+      {visibleCols.has("targetIRR") && <td className="px-3 py-2.5 text-right mono-num">{p.targetIRR.toFixed(2)}%</td>}
+      {visibleCols.has("netIRR") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.netIRR)}`}>{p.netIRR > 0 ? "+" : ""}{p.netIRR.toFixed(2)}%</td>}
+      {visibleCols.has("moic") && <td className="px-3 py-2.5 text-right mono-num">{p.moic.toFixed(2)}x</td>}
+      {visibleCols.has("hurdleRate") && <td className="px-3 py-2.5 text-right mono-num">{p.hurdleRate.toFixed(1)}%</td>}
+      {visibleCols.has("carry") && <td className="px-3 py-2.5 text-right mono-num">{p.carry}%</td>}
+      {visibleCols.has("managementFee") && <td className="px-3 py-2.5 text-right mono-num">{p.managementFee.toFixed(2)}%</td>}
+      {visibleCols.has("domicile") && <td className="px-3 py-2.5 text-[11px]">{p.domicile}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }
 
-function EQRow({ p }: { p: EquityStock }) {
+function EQRow({ p, visibleCols }: { p: EquityStock; visibleCols: Set<string> }) {
   const capTone = p.marketCap === "Large Cap" ? "bg-info/15 text-info" : p.marketCap === "Mid Cap" ? "bg-warning/20 text-warning" : "bg-negative/15 text-negative";
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.ticker}</div>
-        <div className="text-[10px] text-muted-foreground">{p.name}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-eq" />{p.sector}</span>
-      </td>
-      <td className="px-3 py-2.5"><span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span></td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.roe.toFixed(1)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.cagr3y)}`}>{p.cagr3y > 0 ? "+" : ""}{p.cagr3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.cagr5y)}`}>{p.cagr5y > 0 ? "+" : ""}{p.cagr5y.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num text-primary font-medium">{p.expectedReturn.toFixed(2)}%</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+      {visibleCols.has("ticker") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.ticker}</div>
+          <div className="text-[10px] text-muted-foreground whitespace-nowrap">{p.name}</div>
+        </td>
+      )}
+      {visibleCols.has("sector") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-eq" />{p.sector}</span>
+        </td>
+      )}
+      {visibleCols.has("marketCap") && (
+        <td className="px-3 py-2.5">
+          <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span>
+        </td>
+      )}
+      {visibleCols.has("price") && <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("pe") && <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>}
+      {visibleCols.has("pb") && <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>}
+      {visibleCols.has("dividendYield") && <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>}
+      {visibleCols.has("roe") && <td className="px-3 py-2.5 text-right mono-num">{p.roe.toFixed(1)}</td>}
+      {visibleCols.has("beta") && <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>}
+      {visibleCols.has("cagr3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.cagr3y)}`}>{p.cagr3y > 0 ? "+" : ""}{p.cagr3y.toFixed(2)}%</td>}
+      {visibleCols.has("cagr5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.cagr5y)}`}>{p.cagr5y > 0 ? "+" : ""}{p.cagr5y.toFixed(2)}%</td>}
+      {visibleCols.has("expectedReturn") && <td className="px-3 py-2.5 text-right mono-num text-primary font-medium">{p.expectedReturn.toFixed(2)}%</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
     </>
   );
 }
 
-function BONDRow({ p }: { p: Bond }) {
+function BONDRow({ p, visibleCols }: { p: Bond; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.issuer}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-bond" />{p.bondType}</span>
-      </td>
-      <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.couponRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num font-semibold text-bond">{p.ytm.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.residualTenorYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.faceValue.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.taxable ? <span className="text-muted-foreground">Taxable</span> : <span className="text-positive">Tax-Free</span>}</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id}</div>
+        </td>
+      )}
+      {visibleCols.has("issuer") && <td className="px-3 py-2.5 text-[11px]">{p.issuer}</td>}
+      {visibleCols.has("bondType") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-bond" />{p.bondType}</span>
+        </td>
+      )}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>}
+      {visibleCols.has("couponRate") && <td className="px-3 py-2.5 text-right mono-num">{p.couponRate.toFixed(2)}</td>}
+      {visibleCols.has("ytm") && <td className="px-3 py-2.5 text-right mono-num font-semibold text-bond">{p.ytm.toFixed(2)}</td>}
+      {visibleCols.has("residualTenorYears") && <td className="px-3 py-2.5 text-right mono-num">{p.residualTenorYears}</td>}
+      {visibleCols.has("faceValue") && <td className="px-3 py-2.5 text-right mono-num">{p.faceValue.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("payout") && <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>}
+      {visibleCols.has("taxable") && <td className="px-3 py-2.5 text-[11px]">{p.taxable ? <span className="text-muted-foreground">Taxable</span> : <span className="text-positive">Tax-Free</span>}</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
     </>
   );
 }

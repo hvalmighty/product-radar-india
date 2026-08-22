@@ -16,7 +16,7 @@ export function RegionSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-surface/80 backdrop-blur text-xs font-medium hover:border-foreground/40 hover:bg-surface transition-colors"
+          className="inline-flex w-full items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground text-xs font-medium hover:bg-sidebar-accent transition-colors"
           aria-label="Switch region"
         >
           <Globe className="w-3.5 h-3.5 opacity-70" />

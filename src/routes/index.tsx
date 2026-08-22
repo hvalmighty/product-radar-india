@@ -772,6 +772,7 @@ export function ResearchTerminal() {
               <button className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5">
                 <Download className="w-3 h-3" /> Export CSV
               </button>
+              <ColumnToggle cat={cat} visibleCols={visibleCols[cat]} onToggle={toggleCol} open={showColMenu} setOpen={setShowColMenu} />
             </div>
           </div>
 

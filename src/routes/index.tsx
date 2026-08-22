@@ -1086,30 +1086,34 @@ function INSRow({ p, visibleCols }: { p: Insurance; visibleCols: Set<string> }) 
   );
 }
 
-function PMSRow({ p }: { p: PMS }) {
+function PMSRow({ p, visibleCols }: { p: PMS; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Bench: {p.benchmark} · Since {p.inception}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-pms" />{p.strategy}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.fixedFee.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.performanceFee}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.minInvestment)}</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Bench: {p.benchmark} · Since {p.inception}</div>
+        </td>
+      )}
+      {visibleCols.has("manager") && <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>}
+      {visibleCols.has("structure") && <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>}
+      {visibleCols.has("strategy") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-pms" />{p.strategy}</span>
+        </td>
+      )}
+      {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
+      {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}
+      {visibleCols.has("returns5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>}
+      {visibleCols.has("alpha") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>}
+      {visibleCols.has("sharpe") && <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>}
+      {visibleCols.has("maxDrawdown") && <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>}
+      {visibleCols.has("fixedFee") && <td className="px-3 py-2.5 text-right mono-num">{p.fixedFee.toFixed(2)}%</td>}
+      {visibleCols.has("performanceFee") && <td className="px-3 py-2.5 text-[11px]">{p.performanceFee}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.minInvestment)}</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }

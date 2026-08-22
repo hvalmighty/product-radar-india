@@ -802,24 +802,24 @@ export function ResearchTerminal() {
                       <th className="w-8 px-3 py-2"></th>
                       {cat === "MF" && (
                         <>
-                          <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          {visibleCols[cat].has("name") && <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("subCategory") && <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("fundManager") && <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("aum") && <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("nav") && <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("ytdReturn") && <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns1y") && <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns3y") && <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns5y") && <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("expenseRatio") && <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("sharpe") && <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("sortino") && <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("alpha") && <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("beta") && <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("maxDrawdown") && <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("inceptionYear") && <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("risk") && <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("rating") && <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
                         </>
                       )}
                       {cat === "FD" && (

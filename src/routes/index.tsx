@@ -376,6 +376,15 @@ export function ResearchTerminal() {
     else { setSortKey(k); setSortDir("desc"); }
   };
 
+  const toggleCol = (k: string) => {
+    setVisibleCols(prev => {
+      const next = new Set(prev[cat]);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return { ...prev, [cat]: next };
+    });
+  };
+
   const groupOptions = cat === "MF"
     ? [["none", "No Grouping"], ["amc", "AMC"], ["subCategory", "Sub-Category"], ["assetClass", "Asset Class"], ["risk", "Risk"]]
     : cat === "FD"

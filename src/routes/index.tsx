@@ -173,6 +173,50 @@ function TopBarTicker() {
   );
 }
 
+function ColumnToggle({ cat, visibleCols, onToggle, open, setOpen }: {
+  cat: Category;
+  visibleCols: Set<string>;
+  onToggle: (k: string) => void;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open, setOpen]);
+  const cols = COLUMN_CONFIG[cat];
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5"
+      >
+        <Columns className="w-3 h-3" /> Columns ({visibleCols.size}/{cols.length})
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1.5 w-52 bg-background border border-border rounded-sm shadow-lg z-50 p-2 space-y-1 max-h-[70vh] overflow-y-auto">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b border-border">Choose columns</div>
+          {cols.map(c => (
+            <label key={c.key} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-secondary/60 rounded-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={visibleCols.has(c.key)}
+                onChange={() => onToggle(c.key)}
+                className="accent-primary cursor-pointer"
+              />
+              <span className="truncate">{c.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ResearchTerminal() {
   const { region, meta: regionMeta } = useRegion();
   // Reset selection across region switches so UI doesn't carry stale ids

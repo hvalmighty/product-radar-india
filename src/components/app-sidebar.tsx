@@ -108,17 +108,18 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border p-2 space-y-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2 space-y-2">
         <RegionSwitcher />
         <ThemeSwitcher />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Customer Portal">
-              <Link to="/customer/login" className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20">
+              <Link to="/customer/login" className="flex items-center gap-2 rounded-md border border-sidebar-primary/40 bg-sidebar-primary/15 text-sidebar-primary hover:bg-sidebar-primary/25">
                 <UserCircle2 className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="font-medium">Customer Portal</span>}
               </Link>
             </SidebarMenuButton>
+
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

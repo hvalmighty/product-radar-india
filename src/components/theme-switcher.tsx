@@ -39,7 +39,7 @@ export function ThemeSwitcher() {
       onClick={toggle}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label="Toggle theme"
-      className="flex w-full items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+      className="flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-1.5 text-xs font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
     >
       {isDark ? <Moon className="h-4 w-4 shrink-0" /> : <Sun className="h-4 w-4 shrink-0" />}
       {!collapsed && <span>{isDark ? "Dark" : "Light"} mode</span>}

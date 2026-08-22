@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, equityStocks, bonds, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type EquityStock, type Bond, type Category } from "@/lib/research-data";
 import { getTopBarIndices } from "@/lib/market-data.functions";
 import { useRegion, fmtMoney, aumScale } from "@/lib/region";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet, Columns } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -26,6 +26,120 @@ function fmtINR(n: number) { return fmtMoney(n); }
 function pctClass(v: number) {
   return v >= 0 ? "text-positive" : "text-negative";
 }
+
+const COLUMN_CONFIG: Record<Category, { key: string; label: string; default: boolean }[]> = {
+  MF: [
+    { key: "name", label: "Fund", default: true },
+    { key: "subCategory", label: "Category", default: true },
+    { key: "fundManager", label: "Manager", default: false },
+    { key: "aum", label: "AUM (Cr)", default: false },
+    { key: "nav", label: "NAV", default: false },
+    { key: "ytdReturn", label: "YTD", default: false },
+    { key: "returns1y", label: "1Y", default: true },
+    { key: "returns3y", label: "3Y", default: true },
+    { key: "returns5y", label: "5Y", default: true },
+    { key: "expenseRatio", label: "Exp", default: true },
+    { key: "sharpe", label: "Sharpe", default: false },
+    { key: "sortino", label: "Sortino", default: false },
+    { key: "alpha", label: "α", default: false },
+    { key: "beta", label: "β", default: false },
+    { key: "maxDrawdown", label: "Max DD", default: false },
+    { key: "inceptionYear", label: "Age", default: false },
+    { key: "risk", label: "Risk", default: true },
+    { key: "rating", label: "Rating", default: true },
+  ],
+  FD: [
+    { key: "name", label: "Scheme", default: true },
+    { key: "subCategory", label: "Issuer Type", default: true },
+    { key: "tenureMonths", label: "Tenure (M)", default: true },
+    { key: "interestRate", label: "Rate %", default: true },
+    { key: "seniorRate", label: "Senior %", default: false },
+    { key: "compounding", label: "Compounding", default: false },
+    { key: "minInvestment", label: "Min ₹", default: false },
+    { key: "rating", label: "Rating", default: true },
+    { key: "insuredDICGC", label: "DICGC", default: false },
+    { key: "payout", label: "Payout", default: false },
+  ],
+  INS: [
+    { key: "name", label: "Plan", default: true },
+    { key: "insurer", label: "Insurer", default: true },
+    { key: "subCategory", label: "Type", default: true },
+    { key: "sumAssured", label: "Sum Assured", default: false },
+    { key: "premiumAnnual", label: "Premium p.a.", default: true },
+    { key: "policyTermYears", label: "Term (Y)", default: false },
+    { key: "ppt", label: "PPT", default: false },
+    { key: "claimSettlement", label: "Claim %", default: true },
+    { key: "solvencyRatio", label: "Solv.", default: false },
+    { key: "irr", label: "IRR", default: false },
+    { key: "rating", label: "Rating", default: true },
+  ],
+  PMS: [
+    { key: "name", label: "Strategy", default: true },
+    { key: "manager", label: "Manager", default: true },
+    { key: "structure", label: "Structure", default: false },
+    { key: "strategy", label: "Category", default: true },
+    { key: "aum", label: "AUM (Cr)", default: false },
+    { key: "returns1y", label: "1Y", default: false },
+    { key: "returns3y", label: "3Y", default: true },
+    { key: "returns5y", label: "5Y", default: true },
+    { key: "alpha", label: "α", default: false },
+    { key: "sharpe", label: "Sharpe", default: false },
+    { key: "maxDrawdown", label: "Max DD", default: false },
+    { key: "fixedFee", label: "Fixed Fee", default: false },
+    { key: "performanceFee", label: "Perf Fee", default: false },
+    { key: "minInvestment", label: "Min ₹", default: false },
+    { key: "risk", label: "Risk", default: true },
+    { key: "rating", label: "Rating", default: true },
+  ],
+  AIF: [
+    { key: "name", label: "Fund", default: true },
+    { key: "manager", label: "Manager", default: true },
+    { key: "sebiCategory", label: "SEBI Cat", default: true },
+    { key: "subStrategy", label: "Sub-Strategy", default: false },
+    { key: "structure", label: "Structure", default: false },
+    { key: "vintage", label: "Vintage", default: false },
+    { key: "corpusTarget", label: "Corpus (Cr)", default: false },
+    { key: "tenureYears", label: "Tenure (Y)", default: false },
+    { key: "drawdownStatus", label: "Drawdown %", default: false },
+    { key: "targetIRR", label: "Target IRR", default: false },
+    { key: "netIRR", label: "Net IRR", default: true },
+    { key: "moic", label: "MOIC", default: false },
+    { key: "hurdleRate", label: "Hurdle", default: false },
+    { key: "carry", label: "Carry %", default: false },
+    { key: "managementFee", label: "Mgmt Fee", default: false },
+    { key: "domicile", label: "Domicile", default: false },
+    { key: "rating", label: "Rating", default: true },
+  ],
+  EQ: [
+    { key: "name", label: "Stock", default: true },
+    { key: "sector", label: "Sector", default: true },
+    { key: "marketCap", label: "Cap", default: true },
+    { key: "price", label: "LTP", default: true },
+    { key: "pe", label: "P/E", default: false },
+    { key: "pb", label: "P/B", default: false },
+    { key: "dividendYield", label: "Div Y%", default: false },
+    { key: "roe", label: "ROE %", default: false },
+    { key: "beta", label: "β", default: false },
+    { key: "cagr3y", label: "3Y CAGR", default: true },
+    { key: "cagr5y", label: "5Y CAGR", default: true },
+    { key: "expectedReturn", label: "Exp Rtn", default: false },
+    { key: "risk", label: "Risk", default: true },
+  ],
+  BOND: [
+    { key: "name", label: "Security", default: true },
+    { key: "issuer", label: "Issuer", default: true },
+    { key: "bondType", label: "Type", default: true },
+    { key: "rating", label: "Rating", default: true },
+    { key: "couponRate", label: "Coupon %", default: false },
+    { key: "ytm", label: "YTM %", default: true },
+    { key: "residualTenorYears", label: "Tenor (Y)", default: false },
+    { key: "faceValue", label: "Face ₹", default: false },
+    { key: "minInvestment", label: "Min ₹", default: false },
+    { key: "payout", label: "Payout", default: false },
+    { key: "taxable", label: "Taxable", default: false },
+    { key: "risk", label: "Risk", default: true },
+  ],
+};
 
 function TopBarTicker() {
   const { region } = useRegion();
@@ -59,6 +173,50 @@ function TopBarTicker() {
   );
 }
 
+function ColumnToggle({ cat, visibleCols, onToggle, open, setOpen }: {
+  cat: Category;
+  visibleCols: Set<string>;
+  onToggle: (k: string) => void;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open, setOpen]);
+  const cols = COLUMN_CONFIG[cat];
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5"
+      >
+        <Columns className="w-3 h-3" /> Columns ({visibleCols.size}/{cols.length})
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1.5 w-52 bg-background border border-border rounded-sm shadow-lg z-50 p-2 space-y-1 max-h-[70vh] overflow-y-auto">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1 border-b border-border">Choose columns</div>
+          {cols.map(c => (
+            <label key={c.key} className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-secondary/60 rounded-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={visibleCols.has(c.key)}
+                onChange={() => onToggle(c.key)}
+                className="accent-primary cursor-pointer"
+              />
+              <span className="truncate">{c.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ResearchTerminal() {
   const { region, meta: regionMeta } = useRegion();
   // Reset selection across region switches so UI doesn't carry stale ids
@@ -70,6 +228,14 @@ export function ResearchTerminal() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Record<Category, Set<string>>>(() => {
+    const init: Partial<Record<Category, Set<string>>> = {};
+    (Object.keys(COLUMN_CONFIG) as Category[]).forEach(c => {
+      init[c] = new Set(COLUMN_CONFIG[c].filter(col => col.default).map(col => col.key));
+    });
+    return init as Record<Category, Set<string>>;
+  });
+  const [showColMenu, setShowColMenu] = useState(false);
 
   const CATEGORIES = useMemo(() => [
     { key: "MF"   as Category, label: "Mutual Funds",  count: mutualFunds.length,   tone: "text-mf" },
@@ -252,6 +418,15 @@ export function ResearchTerminal() {
   const handleSort = (k: string) => {
     if (sortKey === k) setSortDir(d => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setSortDir("desc"); }
+  };
+
+  const toggleCol = (k: string) => {
+    setVisibleCols(prev => {
+      const next = new Set(prev[cat]);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return { ...prev, [cat]: next };
+    });
   };
 
   const groupOptions = cat === "MF"
@@ -597,6 +772,7 @@ export function ResearchTerminal() {
               <button className="text-[11px] px-2.5 py-1.5 rounded-sm border border-border hover:bg-secondary flex items-center gap-1.5">
                 <Download className="w-3 h-3" /> Export CSV
               </button>
+              <ColumnToggle cat={cat} visibleCols={visibleCols[cat]} onToggle={toggleCol} open={showColMenu} setOpen={setShowColMenu} />
             </div>
           </div>
 
@@ -626,24 +802,24 @@ export function ResearchTerminal() {
                       <th className="w-8 px-3 py-2"></th>
                       {cat === "MF" && (
                         <>
-                          <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                          <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
-                          <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />
+                          {visibleCols[cat].has("name") && <Th label="Fund" k="name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("subCategory") && <Th label="Category" k="subCategory" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("fundManager") && <Th label="Manager" k="fundManager" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("aum") && <Th label="AUM (Cr)" k="aum" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("nav") && <Th label="NAV" k="nav" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("ytdReturn") && <Th label="YTD" k="ytdReturn" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns1y") && <Th label="1Y" k="returns1y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns3y") && <Th label="3Y" k="returns3y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("returns5y") && <Th label="5Y" k="returns5y" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("expenseRatio") && <Th label="Exp" k="expenseRatio" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("sharpe") && <Th label="Sharpe" k="sharpe" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("sortino") && <Th label="Sortino" k="sortino" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("alpha") && <Th label="α" k="alpha" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("beta") && <Th label="β" k="beta" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("maxDrawdown") && <Th label="Max DD" k="maxDrawdown" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("inceptionYear") && <Th label="Age" k="inceptionYear" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />}
+                          {visibleCols[cat].has("risk") && <Th label="Risk" k="risk" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
+                          {visibleCols[cat].has("rating") && <Th label="Rating" k="rating" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} align="left" />}
                         </>
                       )}
                       {cat === "FD" && (
@@ -757,13 +933,13 @@ export function ResearchTerminal() {
                         <td className="px-3 py-2.5 text-center">
                           <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="accent-primary cursor-pointer" />
                         </td>
-                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} />}
-                        {cat === "FD" && <FDRow p={p as FixedDeposit} />}
-                        {cat === "INS" && <INSRow p={p as Insurance} />}
-                        {cat === "PMS" && <PMSRow p={p as PMS} />}
-                        {cat === "AIF" && <AIFRow p={p as AIF} />}
-                        {cat === "EQ" && <EQRow p={p as EquityStock} />}
-                        {cat === "BOND" && <BONDRow p={p as Bond} />}
+                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} />}
+                        {cat === "FD" && <FDRow p={p as FixedDeposit} visibleCols={visibleCols[cat]} />}
+                        {cat === "INS" && <INSRow p={p as Insurance} visibleCols={visibleCols[cat]} />}
+                        {cat === "PMS" && <PMSRow p={p as PMS} visibleCols={visibleCols[cat]} />}
+                        {cat === "AIF" && <AIFRow p={p as AIF} visibleCols={visibleCols[cat]} />}
+                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} />}
+                        {cat === "BOND" && <BONDRow p={p as Bond} visibleCols={visibleCols[cat]} />}
                       </tr>
                     ))}
                     {g.items.length === 0 && (
@@ -815,197 +991,231 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
   );
 }
 
-function MFRow({ p, idx }: { p: MutualFund; idx: number }) {
+function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCols: Set<string> }) {
   const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px] flex items-center gap-1.5">
-          {p.name}
-          {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
-        </div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
-      </td>
-      <td className="px-3 py-2.5">
-        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-          <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
-        </span>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[240px]">
+          <div className="font-medium text-[12.5px] flex items-center gap-1.5 whitespace-nowrap">
+            {p.name}
+            {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+          </div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
+        </td>
+      )}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5">
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+            <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
+          </span>
+          <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
+        </td>
+      )}
+      {visibleCols.has("fundManager") && <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>}
+      {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("nav") && <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>}
+      {visibleCols.has("ytdReturn") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>}
+      {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
+      {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}
+      {visibleCols.has("returns5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>}
+      {visibleCols.has("expenseRatio") && <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>}
+      {visibleCols.has("sharpe") && <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>}
+      {visibleCols.has("sortino") && <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>}
+      {visibleCols.has("alpha") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>}
+      {visibleCols.has("beta") && <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>}
+      {visibleCols.has("maxDrawdown") && <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>}
+      {visibleCols.has("inceptionYear") && <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }
 
 
-function FDRow({ p }: { p: FixedDeposit }) {
+function FDRow({ p, visibleCols }: { p: FixedDeposit; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.issuer}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-fd" />{p.subCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.tenureMonths}</td>
-      <td className="px-3 py-2.5 text-right mono-num font-semibold text-fd">{p.interestRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-positive">{p.seniorRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.compounding}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>
-      <td className="px-3 py-2.5 text-[11px]">{p.insuredDICGC ? <span className="text-positive">✓ Yes</span> : <span className="text-muted-foreground">No</span>}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.issuer}</div>
+        </td>
+      )}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-fd" />{p.subCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("tenureMonths") && <td className="px-3 py-2.5 text-right mono-num">{p.tenureMonths}</td>}
+      {visibleCols.has("interestRate") && <td className="px-3 py-2.5 text-right mono-num font-semibold text-fd">{p.interestRate.toFixed(2)}</td>}
+      {visibleCols.has("seniorRate") && <td className="px-3 py-2.5 text-right mono-num text-positive">{p.seniorRate.toFixed(2)}</td>}
+      {visibleCols.has("compounding") && <td className="px-3 py-2.5 text-[11px]">{p.compounding}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>}
+      {visibleCols.has("insuredDICGC") && <td className="px-3 py-2.5 text-[11px]">{p.insuredDICGC ? <span className="text-positive">✓ Yes</span> : <span className="text-muted-foreground">No</span>}</td>}
+      {visibleCols.has("payout") && <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>}
     </>
   );
 }
 
-function INSRow({ p }: { p: Insurance }) {
+function INSRow({ p, visibleCols }: { p: Insurance; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Riders: {p.riders.join(", ")}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.insurer}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-ins" />{p.subCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.sumAssured)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.premiumAnnual)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.policyTermYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.ppt}</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${p.claimSettlement >= 98 ? "text-positive" : ""}`}>{p.claimSettlement.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.solvencyRatio.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.irr ? `${p.irr.toFixed(2)}%` : "—"}</td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Riders: {p.riders.join(", ")}</div>
+        </td>
+      )}
+      {visibleCols.has("insurer") && <td className="px-3 py-2.5 text-[11px]">{p.insurer}</td>}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-ins" />{p.subCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("sumAssured") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.sumAssured)}</td>}
+      {visibleCols.has("premiumAnnual") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.premiumAnnual)}</td>}
+      {visibleCols.has("policyTermYears") && <td className="px-3 py-2.5 text-right mono-num">{p.policyTermYears}</td>}
+      {visibleCols.has("ppt") && <td className="px-3 py-2.5 text-right mono-num">{p.ppt}</td>}
+      {visibleCols.has("claimSettlement") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${p.claimSettlement >= 98 ? "text-positive" : ""}`}>{p.claimSettlement.toFixed(2)}%</td>}
+      {visibleCols.has("solvencyRatio") && <td className="px-3 py-2.5 text-right mono-num">{p.solvencyRatio.toFixed(2)}</td>}
+      {visibleCols.has("irr") && <td className="px-3 py-2.5 text-right mono-num">{p.irr ? `${p.irr.toFixed(2)}%` : "—"}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }
 
-function PMSRow({ p }: { p: PMS }) {
+function PMSRow({ p, visibleCols }: { p: PMS; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Bench: {p.benchmark} · Since {p.inception}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-pms" />{p.strategy}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.fixedFee.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.performanceFee}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.minInvestment)}</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Bench: {p.benchmark} · Since {p.inception}</div>
+        </td>
+      )}
+      {visibleCols.has("manager") && <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>}
+      {visibleCols.has("structure") && <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>}
+      {visibleCols.has("strategy") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-pms" />{p.strategy}</span>
+        </td>
+      )}
+      {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
+      {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}
+      {visibleCols.has("returns5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>}
+      {visibleCols.has("alpha") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>}
+      {visibleCols.has("sharpe") && <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>}
+      {visibleCols.has("maxDrawdown") && <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>}
+      {visibleCols.has("fixedFee") && <td className="px-3 py-2.5 text-right mono-num">{p.fixedFee.toFixed(2)}%</td>}
+      {visibleCols.has("performanceFee") && <td className="px-3 py-2.5 text-[11px]">{p.performanceFee}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.minInvestment)}</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }
 
-function AIFRow({ p }: { p: AIF }) {
+function AIFRow({ p, visibleCols }: { p: AIF; visibleCols: Set<string> }) {
   const catTone = p.sebiCategory === "Category I" ? "bg-info/15 text-info"
     : p.sebiCategory === "Category II" ? "bg-warning/20 text-warning"
     : "bg-negative/15 text-negative";
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Commit ₹{p.commitments.toLocaleString("en-IN")} Cr / ₹{p.corpusTarget.toLocaleString("en-IN")} Cr</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>
-      <td className="px-3 py-2.5">
-        <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${catTone}`}>{p.sebiCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-aif" />{p.subStrategy}</span>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.vintage}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.corpusTarget.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.tenureYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.drawdownStatus}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.targetIRR.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.netIRR)}`}>{p.netIRR > 0 ? "+" : ""}{p.netIRR.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.moic.toFixed(2)}x</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.hurdleRate.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.carry}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.managementFee.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.domicile}</td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Commit ₹{p.commitments.toLocaleString("en-IN")} Cr / ₹{p.corpusTarget.toLocaleString("en-IN")} Cr</div>
+        </td>
+      )}
+      {visibleCols.has("manager") && <td className="px-3 py-2.5 text-[11px]">{p.manager}</td>}
+      {visibleCols.has("sebiCategory") && (
+        <td className="px-3 py-2.5">
+          <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${catTone}`}>{p.sebiCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("subStrategy") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-aif" />{p.subStrategy}</span>
+        </td>
+      )}
+      {visibleCols.has("structure") && <td className="px-3 py-2.5 text-[11px]">{p.structure}</td>}
+      {visibleCols.has("vintage") && <td className="px-3 py-2.5 text-right mono-num">{p.vintage}</td>}
+      {visibleCols.has("corpusTarget") && <td className="px-3 py-2.5 text-right mono-num">{p.corpusTarget.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("tenureYears") && <td className="px-3 py-2.5 text-right mono-num">{p.tenureYears}</td>}
+      {visibleCols.has("drawdownStatus") && <td className="px-3 py-2.5 text-right mono-num">{p.drawdownStatus}%</td>}
+      {visibleCols.has("targetIRR") && <td className="px-3 py-2.5 text-right mono-num">{p.targetIRR.toFixed(2)}%</td>}
+      {visibleCols.has("netIRR") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.netIRR)}`}>{p.netIRR > 0 ? "+" : ""}{p.netIRR.toFixed(2)}%</td>}
+      {visibleCols.has("moic") && <td className="px-3 py-2.5 text-right mono-num">{p.moic.toFixed(2)}x</td>}
+      {visibleCols.has("hurdleRate") && <td className="px-3 py-2.5 text-right mono-num">{p.hurdleRate.toFixed(1)}%</td>}
+      {visibleCols.has("carry") && <td className="px-3 py-2.5 text-right mono-num">{p.carry}%</td>}
+      {visibleCols.has("managementFee") && <td className="px-3 py-2.5 text-right mono-num">{p.managementFee.toFixed(2)}%</td>}
+      {visibleCols.has("domicile") && <td className="px-3 py-2.5 text-[11px]">{p.domicile}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }
 
-function EQRow({ p }: { p: EquityStock }) {
+function EQRow({ p, visibleCols }: { p: EquityStock; visibleCols: Set<string> }) {
   const capTone = p.marketCap === "Large Cap" ? "bg-info/15 text-info" : p.marketCap === "Mid Cap" ? "bg-warning/20 text-warning" : "bg-negative/15 text-negative";
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.ticker}</div>
-        <div className="text-[10px] text-muted-foreground">{p.name}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-eq" />{p.sector}</span>
-      </td>
-      <td className="px-3 py-2.5"><span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span></td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.roe.toFixed(1)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.cagr3y)}`}>{p.cagr3y > 0 ? "+" : ""}{p.cagr3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.cagr5y)}`}>{p.cagr5y > 0 ? "+" : ""}{p.cagr5y.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num text-primary font-medium">{p.expectedReturn.toFixed(2)}%</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+      {visibleCols.has("ticker") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.ticker}</div>
+          <div className="text-[10px] text-muted-foreground whitespace-nowrap">{p.name}</div>
+        </td>
+      )}
+      {visibleCols.has("sector") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-eq" />{p.sector}</span>
+        </td>
+      )}
+      {visibleCols.has("marketCap") && (
+        <td className="px-3 py-2.5">
+          <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span>
+        </td>
+      )}
+      {visibleCols.has("price") && <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("pe") && <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>}
+      {visibleCols.has("pb") && <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>}
+      {visibleCols.has("dividendYield") && <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>}
+      {visibleCols.has("roe") && <td className="px-3 py-2.5 text-right mono-num">{p.roe.toFixed(1)}</td>}
+      {visibleCols.has("beta") && <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>}
+      {visibleCols.has("cagr3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.cagr3y)}`}>{p.cagr3y > 0 ? "+" : ""}{p.cagr3y.toFixed(2)}%</td>}
+      {visibleCols.has("cagr5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.cagr5y)}`}>{p.cagr5y > 0 ? "+" : ""}{p.cagr5y.toFixed(2)}%</td>}
+      {visibleCols.has("expectedReturn") && <td className="px-3 py-2.5 text-right mono-num text-primary font-medium">{p.expectedReturn.toFixed(2)}%</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
     </>
   );
 }
 
-function BONDRow({ p }: { p: Bond }) {
+function BONDRow({ p, visibleCols }: { p: Bond; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.issuer}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-bond" />{p.bondType}</span>
-      </td>
-      <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.couponRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num font-semibold text-bond">{p.ytm.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.residualTenorYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.faceValue.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.taxable ? <span className="text-muted-foreground">Taxable</span> : <span className="text-positive">Tax-Free</span>}</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id}</div>
+        </td>
+      )}
+      {visibleCols.has("issuer") && <td className="px-3 py-2.5 text-[11px]">{p.issuer}</td>}
+      {visibleCols.has("bondType") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-bond" />{p.bondType}</span>
+        </td>
+      )}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>}
+      {visibleCols.has("couponRate") && <td className="px-3 py-2.5 text-right mono-num">{p.couponRate.toFixed(2)}</td>}
+      {visibleCols.has("ytm") && <td className="px-3 py-2.5 text-right mono-num font-semibold text-bond">{p.ytm.toFixed(2)}</td>}
+      {visibleCols.has("residualTenorYears") && <td className="px-3 py-2.5 text-right mono-num">{p.residualTenorYears}</td>}
+      {visibleCols.has("faceValue") && <td className="px-3 py-2.5 text-right mono-num">{p.faceValue.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("payout") && <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>}
+      {visibleCols.has("taxable") && <td className="px-3 py-2.5 text-[11px]">{p.taxable ? <span className="text-muted-foreground">Taxable</span> : <span className="text-positive">Tax-Free</span>}</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
     </>
   );
 }

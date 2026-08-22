@@ -933,13 +933,13 @@ export function ResearchTerminal() {
                         <td className="px-3 py-2.5 text-center">
                           <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="accent-primary cursor-pointer" />
                         </td>
-                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} />}
-                        {cat === "FD" && <FDRow p={p as FixedDeposit} />}
-                        {cat === "INS" && <INSRow p={p as Insurance} />}
-                        {cat === "PMS" && <PMSRow p={p as PMS} />}
-                        {cat === "AIF" && <AIFRow p={p as AIF} />}
-                        {cat === "EQ" && <EQRow p={p as EquityStock} />}
-                        {cat === "BOND" && <BONDRow p={p as Bond} />}
+                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} />}
+                        {cat === "FD" && <FDRow p={p as FixedDeposit} visibleCols={visibleCols[cat]} />}
+                        {cat === "INS" && <INSRow p={p as Insurance} visibleCols={visibleCols[cat]} />}
+                        {cat === "PMS" && <PMSRow p={p as PMS} visibleCols={visibleCols[cat]} />}
+                        {cat === "AIF" && <AIFRow p={p as AIF} visibleCols={visibleCols[cat]} />}
+                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} />}
+                        {cat === "BOND" && <BONDRow p={p as Bond} visibleCols={visibleCols[cat]} />}
                       </tr>
                     ))}
                     {g.items.length === 0 && (

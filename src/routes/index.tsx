@@ -1059,25 +1059,29 @@ function FDRow({ p, visibleCols }: { p: FixedDeposit; visibleCols: Set<string> }
   );
 }
 
-function INSRow({ p }: { p: Insurance }) {
+function INSRow({ p, visibleCols }: { p: Insurance; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · Riders: {p.riders.join(", ")}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">{p.insurer}</td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-ins" />{p.subCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.sumAssured)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.premiumAnnual)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.policyTermYears}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.ppt}</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${p.claimSettlement >= 98 ? "text-positive" : ""}`}>{p.claimSettlement.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.solvencyRatio.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.irr ? `${p.irr.toFixed(2)}%` : "—"}</td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · Riders: {p.riders.join(", ")}</div>
+        </td>
+      )}
+      {visibleCols.has("insurer") && <td className="px-3 py-2.5 text-[11px]">{p.insurer}</td>}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-ins" />{p.subCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("sumAssured") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.sumAssured)}</td>}
+      {visibleCols.has("premiumAnnual") && <td className="px-3 py-2.5 text-right mono-num">{fmtINR(p.premiumAnnual)}</td>}
+      {visibleCols.has("policyTermYears") && <td className="px-3 py-2.5 text-right mono-num">{p.policyTermYears}</td>}
+      {visibleCols.has("ppt") && <td className="px-3 py-2.5 text-right mono-num">{p.ppt}</td>}
+      {visibleCols.has("claimSettlement") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${p.claimSettlement >= 98 ? "text-positive" : ""}`}>{p.claimSettlement.toFixed(2)}%</td>}
+      {visibleCols.has("solvencyRatio") && <td className="px-3 py-2.5 text-right mono-num">{p.solvencyRatio.toFixed(2)}</td>}
+      {visibleCols.has("irr") && <td className="px-3 py-2.5 text-right mono-num">{p.irr ? `${p.irr.toFixed(2)}%` : "—"}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }

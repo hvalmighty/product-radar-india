@@ -1033,24 +1033,28 @@ function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCol
 }
 
 
-function FDRow({ p }: { p: FixedDeposit }) {
+function FDRow({ p, visibleCols }: { p: FixedDeposit; visibleCols: Set<string> }) {
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px]">{p.name}</div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.issuer}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-fd" />{p.subCategory}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.tenureMonths}</td>
-      <td className="px-3 py-2.5 text-right mono-num font-semibold text-fd">{p.interestRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-positive">{p.seniorRate.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.compounding}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>
-      <td className="px-3 py-2.5 text-[11px]">{p.insuredDICGC ? <span className="text-positive">✓ Yes</span> : <span className="text-muted-foreground">No</span>}</td>
-      <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[200px]">
+          <div className="font-medium text-[12.5px] whitespace-nowrap">{p.name}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.issuer}</div>
+        </td>
+      )}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5 text-[11px]">
+          <span className="inline-flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-fd" />{p.subCategory}</span>
+        </td>
+      )}
+      {visibleCols.has("tenureMonths") && <td className="px-3 py-2.5 text-right mono-num">{p.tenureMonths}</td>}
+      {visibleCols.has("interestRate") && <td className="px-3 py-2.5 text-right mono-num font-semibold text-fd">{p.interestRate.toFixed(2)}</td>}
+      {visibleCols.has("seniorRate") && <td className="px-3 py-2.5 text-right mono-num text-positive">{p.seniorRate.toFixed(2)}</td>}
+      {visibleCols.has("compounding") && <td className="px-3 py-2.5 text-[11px]">{p.compounding}</td>}
+      {visibleCols.has("minInvestment") && <td className="px-3 py-2.5 text-right mono-num">{p.minInvestment.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><span className="px-1.5 py-0.5 rounded-sm bg-secondary text-[10px] font-medium mono-num">{p.rating}</span></td>}
+      {visibleCols.has("insuredDICGC") && <td className="px-3 py-2.5 text-[11px]">{p.insuredDICGC ? <span className="text-positive">✓ Yes</span> : <span className="text-muted-foreground">No</span>}</td>}
+      {visibleCols.has("payout") && <td className="px-3 py-2.5 text-[11px]">{p.payout}</td>}
     </>
   );
 }

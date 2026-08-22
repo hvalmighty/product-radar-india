@@ -991,39 +991,43 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
   );
 }
 
-function MFRow({ p, idx }: { p: MutualFund; idx: number }) {
+function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCols: Set<string> }) {
   const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
-      <td className="px-3 py-2.5">
-        <div className="font-medium text-[12.5px] flex items-center gap-1.5">
-          {p.name}
-          {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
-        </div>
-        <div className="text-[10px] text-muted-foreground mono-num">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
-      </td>
-      <td className="px-3 py-2.5">
-        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
-          <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
-        </span>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
-      </td>
-      <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>
-      <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>
-      <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>
-      <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>
-      <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>
-      <td className="px-3 py-2.5"><Stars n={p.rating} /></td>
+      {visibleCols.has("name") && (
+        <td className="px-3 py-2.5 min-w-[240px]">
+          <div className="font-medium text-[12.5px] flex items-center gap-1.5 whitespace-nowrap">
+            {p.name}
+            {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+          </div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
+        </td>
+      )}
+      {visibleCols.has("subCategory") && (
+        <td className="px-3 py-2.5">
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
+            <span className="w-1 h-1 rounded-full bg-mf" />{p.subCategory}
+          </span>
+          <div className="text-[10px] text-muted-foreground mt-0.5">{p.assetClass} · Tax: {p.taxation}</div>
+        </td>
+      )}
+      {visibleCols.has("fundManager") && <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>}
+      {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("nav") && <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>}
+      {visibleCols.has("ytdReturn") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>}
+      {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
+      {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}
+      {visibleCols.has("returns5y") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.returns5y)}`}>{p.returns5y > 0 ? "+" : ""}{p.returns5y.toFixed(2)}%</td>}
+      {visibleCols.has("expenseRatio") && <td className="px-3 py-2.5 text-right mono-num">{p.expenseRatio.toFixed(2)}</td>}
+      {visibleCols.has("sharpe") && <td className="px-3 py-2.5 text-right mono-num">{p.sharpe.toFixed(2)}</td>}
+      {visibleCols.has("sortino") && <td className="px-3 py-2.5 text-right mono-num">{p.sortino.toFixed(2)}</td>}
+      {visibleCols.has("alpha") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.alpha)}`}>{p.alpha.toFixed(2)}</td>}
+      {visibleCols.has("beta") && <td className="px-3 py-2.5 text-right mono-num">{p.beta.toFixed(2)}</td>}
+      {visibleCols.has("maxDrawdown") && <td className="px-3 py-2.5 text-right mono-num text-negative">{p.maxDrawdown.toFixed(1)}%</td>}
+      {visibleCols.has("inceptionYear") && <td className="px-3 py-2.5 text-right mono-num text-[11px]">{age}Y</td>}
+      {visibleCols.has("risk") && <td className="px-3 py-2.5"><RiskPill r={p.risk} /></td>}
+      {visibleCols.has("rating") && <td className="px-3 py-2.5"><Stars n={p.rating} /></td>}
     </>
   );
 }

@@ -184,6 +184,14 @@ export function ResearchTerminal() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Record<Category, Set<string>>>(() => {
+    const init: Partial<Record<Category, Set<string>>> = {};
+    (Object.keys(COLUMN_CONFIG) as Category[]).forEach(c => {
+      init[c] = new Set(COLUMN_CONFIG[c].filter(col => col.default).map(col => col.key));
+    });
+    return init as Record<Category, Set<string>>;
+  });
+  const [showColMenu, setShowColMenu] = useState(false);
 
   const CATEGORIES = useMemo(() => [
     { key: "MF"   as Category, label: "Mutual Funds",  count: mutualFunds.length,   tone: "text-mf" },

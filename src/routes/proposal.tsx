@@ -610,7 +610,7 @@ function ProposalPage() {
           </div>
         </header>
 
-        <main className="px-5 lg:px-8 py-6 max-w-[1680px] mx-auto space-y-6">
+        <main className="px-5 lg:px-8 py-6 max-w-[1680px] mx-auto space-y-6 bg-surface-elevated/25">
           <div className="flex items-end justify-between gap-4">
             <div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Build workspace</div>
@@ -625,7 +625,7 @@ function ProposalPage() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-[1.12fr_1.25fr_0.9fr] gap-4 items-start">
-            <section className="h-full border border-border rounded-md bg-surface shadow-card overflow-hidden">
+            <section className="border border-border rounded-md bg-surface shadow-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border bg-surface-elevated/45 flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-primary/10 text-primary inline-flex items-center justify-center"><FilePlus2 className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Client brief</div><div className="text-[10px] text-muted-foreground">Who is this proposal for?</div></div></div>
               <div className="p-4 grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Field label="Client name"><input value={prospect.name} onChange={e => setProspect({ ...prospect, name: e.target.value })} placeholder="Enter prospect name" className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs" /></Field></div>
@@ -636,7 +636,7 @@ function ProposalPage() {
               </div>
             </section>
 
-            <section className="h-full border border-border rounded-md bg-surface shadow-card overflow-hidden">
+            <section className="border border-border rounded-md bg-surface shadow-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border bg-surface-elevated/45 flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-secondary text-foreground inline-flex items-center justify-center"><Sparkles className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Construction engine</div><div className="text-[10px] text-muted-foreground">Capital, strategy and guardrails</div></div></div>
               <div className="p-4 grid grid-cols-2 gap-3">
                 <div className="col-span-2"><Field label={`Total corpus · ${fmtINR(totalCorpus)}`}><input type="number" value={totalCorpus} onChange={e => setTotalCorpus(Math.max(0, +e.target.value || 0))} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs mono-num" /></Field></div>
@@ -648,7 +648,7 @@ function ProposalPage() {
               </div>
             </section>
 
-            <section className="h-full border border-border rounded-md bg-surface shadow-card overflow-hidden">
+            <section className="border border-border rounded-md bg-surface shadow-card overflow-hidden">
               <div className="px-4 py-3 border-b border-border bg-surface-elevated/45 flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-secondary text-foreground inline-flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Proposal snapshot</div><div className="text-[10px] text-muted-foreground">Live portfolio health</div></div></div>
               <div className="p-4 space-y-3"><div className="flex items-end justify-between"><span className="text-[11px] text-muted-foreground">Allocated</span><span className="text-xl font-semibold mono-num">{fmtINR(totals.allocated)}</span></div><div className="h-1.5 bg-secondary rounded-sm overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, totalCorpus ? totals.allocated / totalCorpus * 100 : 0)}%` }} /></div><div className="grid grid-cols-2 gap-y-3 gap-x-2 pt-1"><SummaryRow label="Holdings" value={String(holdingsLive.length)} /><SummaryRow label="Unallocated" value={fmtINR(totals.unallocated)} tone={totals.unallocated < 0 ? "text-negative" : "text-muted-foreground"} /><SummaryRow label="Expected return" value={`${totals.weightedReturn.toFixed(2)}%`} tone="text-positive font-semibold" /><SummaryRow label="Portfolio risk" value={riskLabel} /></div><div className="border-t border-border pt-3"><SummaryRow label={`Projected FV · ${projection.horizon}Y`} value={fmtINR(projection.fv)} tone="font-semibold" /><SummaryRow label="Total gain" value={fmtINR(projection.gain)} tone="text-positive" /></div></div>
               {compliance.length > 0 && <div className="border-t border-border px-4 py-3"><div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><ShieldCheck className="w-3 h-3" /> Compliance <span className={`ml-auto normal-case tracking-normal ${breaches ? "text-destructive" : "text-positive"}`}>{breaches ? `${breaches} breach${breaches > 1 ? "es" : ""}` : "All checks pass"}</span></div></div>}

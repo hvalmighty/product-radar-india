@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles, Lightbulb, SlidersHorizontal, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles, Lightbulb, SlidersHorizontal, ShieldCheck, LoaderCircle } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -263,6 +263,15 @@ function ProposalPage() {
   const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
   const [constrained, setConstrained] = useState(true);
   const [constraints, setConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
+  const [creating, setCreating] = useState(false);
+  function handleAutoCreate() {
+    if (creating) return;
+    setCreating(true);
+    window.setTimeout(() => {
+      autoCreatePortfolio();
+      setCreating(false);
+    }, 8000);
+  }
   const setC = (k: keyof Omit<Constraints, "classCaps">, v: number) => setConstraints(p => ({ ...p, [k]: v }));
   const setClassCap = (k: AssetClassKey, v: number) => setConstraints(p => ({ ...p, classCaps: { ...p.classCaps, [k]: v } }));
   const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)
@@ -601,9 +610,10 @@ function ProposalPage() {
           </div>
         </header>
 
-        <main className="px-6 py-5 max-w-[1600px] mx-auto grid grid-cols-12 gap-5">
-          {/* LEFT: Prospect + Assumptions */}
-          <aside className="col-span-12 lg:col-span-3 space-y-4">
+        <main className="px-6 py-5 max-w-[1600px] mx-auto space-y-5">
+          {/* TOP ROW: Prospect · Assumptions · Constraints · Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+
             <section className="border border-border rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
                 <FilePlus2 className="w-3.5 h-3.5" /> Prospect
@@ -722,9 +732,9 @@ function ProposalPage() {
                     <option value="maxrisk">Max Risk (Aggressive)</option>
                   </select>
                 </Field>
-                <button onClick={autoCreatePortfolio}
-                  className="w-full text-xs px-2 py-1.5 border border-foreground/30 bg-foreground text-background rounded-sm hover:bg-foreground/90 font-medium inline-flex items-center justify-center gap-1.5">
-                  <Sparkles className="w-3 h-3" /> Auto Portfolio Creator
+                <button onClick={handleAutoCreate} disabled={creating}
+                  className="w-full text-xs px-2 py-1.5 border border-foreground/30 bg-foreground text-background rounded-sm hover:bg-foreground/90 disabled:opacity-60 font-medium inline-flex items-center justify-center gap-1.5">
+                  {creating ? <><LoaderCircle className="w-3 h-3 animate-spin" /> Creating portfolio…</> : <><Sparkles className="w-3 h-3" /> Auto Portfolio Creator</>}
                 </button>
                 <div className="text-[10px] text-muted-foreground -mt-1 leading-snug">
                   Builds a curated portfolio across asset classes tuned to the selected strategy and sizes each holding by the same weights.
@@ -832,11 +842,13 @@ function ProposalPage() {
               )}
             </section>
 
-          </aside>
+          </div>
 
-
+          {/* BOTTOM: Universe + Proposed Portfolio */}
+          <div className="grid grid-cols-12 gap-5">
           {/* CENTER: Catalog */}
-          <section className="col-span-12 lg:col-span-5 space-y-4">
+          <section className="col-span-12 lg:col-span-7 space-y-4">
+
             <div className="border border-border rounded-md bg-surface">
               <div className="border-b border-border flex flex-wrap">
                 {ASSET_CLASSES.map(c => (
@@ -1040,7 +1052,27 @@ function ProposalPage() {
               )}
             </div>
           </section>
+          </div>
+
+          {creating && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-4 px-8 py-7 rounded-md border border-border bg-surface shadow-lg">
+                <div className="relative w-12 h-12">
+                  <div className="absolute inset-0 rounded-full border-2 border-border" />
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+                  <Sparkles className="absolute inset-0 m-auto w-4 h-4 text-primary" />
+                </div>
+                <div className="text-sm font-medium">Your portfolio is being created.</div>
+                <div className="text-[11px] text-muted-foreground">Screening the universe and applying {constrained ? "exposure constraints" : "strategy weights"}…</div>
+                <div className="w-56 h-1 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full animate-[proposalProgress_8s_linear_forwards]" style={{ width: 0 }} />
+                </div>
+              </div>
+              <style>{`@keyframes proposalProgress{from{width:0%}to{width:100%}}`}</style>
+            </div>
+          )}
         </main>
+
       </div>
     </TooltipProvider>
   );

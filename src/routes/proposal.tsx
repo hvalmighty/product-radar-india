@@ -545,6 +545,13 @@ function ProposalPage() {
     return { allocated, weightedReturn, weightedRisk, unallocated: totalCorpus - allocated, byClass };
   }, [holdingsLive, totalCorpus]);
 
+  const compliance = useMemo(
+    () => holdingsLive.length ? checkConstraints(holdingsLive, holdingsLive.reduce((s, h) => s + h.amount, 0), constraints) : [],
+    [holdingsLive, constraints]
+  );
+  const breaches = compliance.filter(r => !r.ok).length;
+
+
   const riskLabel = totals.weightedRisk < 1.8 ? "Low" : totals.weightedRisk < 2.8 ? "Low-Moderate" : totals.weightedRisk < 3.8 ? "Moderate" : totals.weightedRisk < 4.6 ? "Mod-High" : totals.weightedRisk < 5.4 ? "High" : "Very High";
 
   const projection = useMemo(() => {

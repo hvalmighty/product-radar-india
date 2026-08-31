@@ -33,6 +33,8 @@ const ASSET_CLASSES: AssetClassDef[] = [
   { key: "CASH", label: "Cash", product: "Liquid / Savings", security: "Idle Cash", tone: "text-muted-foreground" },
 ];
 
+type Attrs = { sector: string; issuer: string; mcap: string; credit: string };
+
 type Holding = {
   uid: string;
   klass: AssetClassKey;
@@ -43,6 +45,10 @@ type Holding = {
   expectedReturn: number;
   irrBasis: string;
   risk: string;
+  sector: string;
+  issuer: string;
+  mcap: string;
+  credit: string;
 };
 
 const fmtINR = fmtMoney;
@@ -50,6 +56,137 @@ const fmtINR = fmtMoney;
 const RISK_SCORE: Record<string, number> = {
   "Low": 1, "Low-Mod": 2, "Moderate": 3, "Mod-High": 4, "High": 5, "Very High": 6,
 };
+
+// ---------------- Constraint framework ----------------
+export type Constraints = {
+  maxPerHolding: number;
+  maxPerSector: number;
+  maxPerIssuer: number;
+  classCaps: Record<AssetClassKey, number>;
+  maxSmallCap: number;
+  maxMidCap: number;
+  minHighCredit: number;   // AAA / AA+ share of the credit-rated (Debt + FD) sleeve
+  maxSubIG: number;        // below-A rated share of total portfolio
+};
+
+const DEFAULT_CONSTRAINTS: Constraints = {
+  maxPerHolding: 15,
+  maxPerSector: 25,
+  maxPerIssuer: 20,
+  classCaps: { MF: 60, EQ: 40, PMS: 25, AIF: 20, DEBT: 45, FD: 35, CASH: 10 },
+  maxSmallCap: 15,
+  maxMidCap: 25,
+  minHighCredit: 70,
+  maxSubIG: 5,
+};
+
+const CREDIT_ORDER = ["AAA", "AA+", "AA", "AA-", "A+", "A", "A-", "BBB+", "BBB", "BB", "B", "Unrated"];
+const isHighCredit = (c: string) => /^AAA|^AA\+/.test(c);
+const isSubIG = (c: string) => /^BB|^B$|^C/.test(c);
+const isRated = (c: string) => c !== "Unrated" && !!c;
+
+type CheckRow = { label: string; actual: number; limit: number; type: "max" | "min"; ok: boolean };
+
+/**
+ * Iterative cap-and-redistribute solver ("water filling"): repeatedly scales
+ * down any group breaching a maximum and scales up the high-credit sleeve if it
+ * is below its floor, renormalising to 100% after each pass.
+ */
+function solveConstrained(items: Array<Attrs & { klass: AssetClassKey }>, baseWeights: number[], c: Constraints): number[] {
+  const n = items.length;
+  if (n === 0) return [];
+  let w = baseWeights.map(x => Math.max(1e-6, x));
+  const norm = () => { const s = w.reduce((a, b) => a + b, 0) || 1; w = w.map(x => x / s); };
+  norm();
+
+  const groups: Array<{ idx: number[]; cap: number }> = [];
+  items.forEach((_, i) => groups.push({ idx: [i], cap: c.maxPerHolding / 100 }));
+  const byKey = (key: (a: Attrs & { klass: AssetClassKey }) => string, cap: number) => {
+    const m = new Map<string, number[]>();
+    items.forEach((it, i) => { const k = key(it); if (!k) return; m.set(k, [...(m.get(k) || []), i]); });
+    m.forEach(idx => groups.push({ idx, cap: cap / 100 }));
+  };
+  byKey(it => it.sector, c.maxPerSector);
+  byKey(it => it.issuer, c.maxPerIssuer);
+  items.forEach(() => {});
+  (Object.keys(c.classCaps) as AssetClassKey[]).forEach(k => {
+    const idx = items.map((it, i) => it.klass === k ? i : -1).filter(i => i >= 0);
+    if (idx.length) groups.push({ idx, cap: c.classCaps[k] / 100 });
+  });
+  const smallIdx = items.map((it, i) => it.mcap === "Small Cap" ? i : -1).filter(i => i >= 0);
+  if (smallIdx.length) groups.push({ idx: smallIdx, cap: c.maxSmallCap / 100 });
+  const midIdx = items.map((it, i) => it.mcap === "Mid Cap" ? i : -1).filter(i => i >= 0);
+  if (midIdx.length) groups.push({ idx: midIdx, cap: c.maxMidCap / 100 });
+  const subIgIdx = items.map((it, i) => isSubIG(it.credit) ? i : -1).filter(i => i >= 0);
+  if (subIgIdx.length) groups.push({ idx: subIgIdx, cap: c.maxSubIG / 100 });
+
+  const ratedIdx = items.map((it, i) => isRated(it.credit) ? i : -1).filter(i => i >= 0);
+  const hcIdx = ratedIdx.filter(i => isHighCredit(items[i].credit));
+
+  for (let pass = 0; pass < 400; pass++) {
+    let changed = false;
+    for (const g of groups) {
+      const tot = g.idx.reduce((s, i) => s + w[i], 0);
+      if (tot > g.cap + 1e-6 && tot > 0) {
+        const f = g.cap / tot;
+        g.idx.forEach(i => { w[i] *= f; });
+        changed = true;
+      }
+    }
+    if (hcIdx.length && ratedIdx.length) {
+      const ratedTot = ratedIdx.reduce((s, i) => s + w[i], 0);
+      const hcTot = hcIdx.reduce((s, i) => s + w[i], 0);
+      if (ratedTot > 0 && hcTot / ratedTot < c.minHighCredit / 100 - 1e-6) {
+        const target = (c.minHighCredit / 100) * ratedTot;
+        const f = Math.min(5, target / Math.max(1e-9, hcTot));
+        hcIdx.forEach(i => { w[i] *= f; });
+        changed = true;
+      }
+    }
+    norm();
+    if (!changed) break;
+  }
+  return w;
+}
+
+function checkConstraints(items: Array<Attrs & { klass: AssetClassKey; amount: number }>, total: number, c: Constraints): CheckRow[] {
+  const pct = (v: number) => total > 0 ? (v / total) * 100 : 0;
+  const rows: CheckRow[] = [];
+  const push = (label: string, actual: number, limit: number, type: "max" | "min" = "max") =>
+    rows.push({ label, actual, limit, type, ok: type === "max" ? actual <= limit + 0.05 : actual >= limit - 0.05 });
+
+  const maxOf = (key: (i: typeof items[number]) => string) => {
+    const m = new Map<string, number>();
+    items.forEach(i => { const k = key(i); if (k) m.set(k, (m.get(k) || 0) + i.amount); });
+    let top = ["—", 0] as [string, number];
+    m.forEach((v, k) => { if (v > top[1]) top = [k, v]; });
+    return top;
+  };
+
+  const topH = items.reduce((a, b) => (b.amount > (a?.amount ?? 0) ? b : a), items[0]);
+  push(`Single holding${topH ? ` (${topH.sector ? "" : ""}max)` : ""}`, pct(topH?.amount || 0), c.maxPerHolding);
+  const [sName, sVal] = maxOf(i => i.sector);
+  push(`Sector max — ${sName}`, pct(sVal), c.maxPerSector);
+  const [iName, iVal] = maxOf(i => i.issuer);
+  push(`Issuer max — ${iName}`, pct(iVal), c.maxPerIssuer);
+  (Object.keys(c.classCaps) as AssetClassKey[]).forEach(k => {
+    const v = items.filter(i => i.klass === k).reduce((s, i) => s + i.amount, 0);
+    if (v > 0) push(`${ASSET_CLASSES.find(a => a.key === k)!.label} cap`, pct(v), c.classCaps[k]);
+  });
+  const sc = items.filter(i => i.mcap === "Small Cap").reduce((s, i) => s + i.amount, 0);
+  if (sc > 0) push("Small-cap exposure", pct(sc), c.maxSmallCap);
+  const mc = items.filter(i => i.mcap === "Mid Cap").reduce((s, i) => s + i.amount, 0);
+  if (mc > 0) push("Mid-cap exposure", pct(mc), c.maxMidCap);
+  const rated = items.filter(i => isRated(i.credit)).reduce((s, i) => s + i.amount, 0);
+  if (rated > 0) {
+    const hc = items.filter(i => isHighCredit(i.credit)).reduce((s, i) => s + i.amount, 0);
+    push("AAA/AA+ share of rated sleeve", (hc / rated) * 100, c.minHighCredit, "min");
+  }
+  const sub = items.filter(i => isSubIG(i.credit)).reduce((s, i) => s + i.amount, 0);
+  push("Sub-investment-grade", pct(sub), c.maxSubIG);
+  return rows;
+}
+
 
 function irrBasisFor(klass: AssetClassKey, name: string): string {
   switch (klass) {

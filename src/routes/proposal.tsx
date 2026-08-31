@@ -845,20 +845,20 @@ function ProposalPage() {
           </div>
 
           {/* BOTTOM: Universe + Proposed Portfolio */}
-          <div className="grid grid-cols-12 gap-5">
-          {/* CENTER: Catalog */}
+          <div className="grid grid-cols-12 gap-5 items-start">
+          {/* LEFT: Catalog */}
           <section className="col-span-12 lg:col-span-7 space-y-4">
 
-            <div className="border border-border rounded-md bg-surface">
-              <div className="border-b border-border flex flex-wrap">
+            <div className="border border-border rounded-md bg-surface overflow-hidden">
+              <div className="border-b border-border flex flex-wrap bg-background/40">
                 {ASSET_CLASSES.map(c => (
                   <button key={c.key} onClick={() => { setActiveClass(c.key); setSearch(""); }}
-                    className={`px-3 py-2 text-[11px] font-medium tracking-wide border-b-2 -mb-px ${activeClass === c.key ? `border-foreground text-foreground` : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+                    className={`px-3 py-2 text-[11px] font-medium tracking-wide border-b-2 -mb-px ${activeClass === c.key ? `border-primary text-foreground bg-surface` : "border-transparent text-muted-foreground hover:text-foreground"}`}>
                     {c.label}
                   </button>
                 ))}
               </div>
-              <div className="px-3 py-2 border-b border-border bg-background/40 flex items-center gap-3">
+              <div className="px-3 py-2 border-b border-border flex items-center gap-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   <span className="text-foreground">{ASSET_CLASSES.find(a => a.key === activeClass)?.product}</span> → {ASSET_CLASSES.find(a => a.key === activeClass)?.security}
                 </div>
@@ -868,9 +868,9 @@ function ProposalPage() {
                     className="bg-background border border-border rounded-sm px-2 py-1 text-xs w-48" />
                 </div>
               </div>
-              <div className="max-h-[calc(100vh-280px)] overflow-auto">
+              <div className="max-h-[560px] overflow-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-surface border-b border-border">
+                  <thead className="sticky top-0 bg-surface border-b border-border z-10">
                     <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                       <th className="px-3 py-2">Security</th>
                       <th className="px-2 py-2 text-right">Exp. Return</th>
@@ -902,61 +902,8 @@ function ProposalPage() {
                 </table>
               </div>
             </div>
-            {thesis && (
-              <div className="border border-border rounded-md bg-surface">
-                <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
-                  <Lightbulb className="w-3.5 h-3.5" /> Portfolio Thesis
-                  <button
-                    onClick={() => setThesis(null)}
-                    className="ml-auto text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground"
-                  >
-                    dismiss
-                  </button>
-                </div>
-                <div className="p-3 space-y-3 text-[11px] leading-relaxed">
-                  <div className="text-foreground">{thesis.headline}</div>
-
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">How it was constructed</div>
-                    <ul className="space-y-1.5">
-                      {thesis.bullets.map((b, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="mt-1.5 w-1 h-1 rounded-full bg-foreground/60 shrink-0" />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {thesis.classNotes.length > 0 && (
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Why each sleeve is in the mix</div>
-                      <ul className="space-y-1.5">
-                        {thesis.classNotes.map(c => (
-                          <li key={c.klass} className="flex gap-2">
-                            <span className="mono-num text-muted-foreground shrink-0 w-11">{c.pct.toFixed(1)}%</span>
-                            <span><span className="font-medium text-foreground">{c.label}:</span> {c.note}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Caveats</div>
-                    <ul className="space-y-1 text-muted-foreground">
-                      {thesis.caveats.map((c, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="mt-1.5 w-1 h-1 rounded-full bg-muted-foreground/60 shrink-0" />
-                          <span>{c}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
           </section>
+
 
           {/* RIGHT: Selected Holdings */}
           <section className="col-span-12 lg:col-span-4">

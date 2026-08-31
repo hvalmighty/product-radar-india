@@ -506,7 +506,11 @@ function ProposalPage() {
     bullets.push(`From that universe, top candidates were ranked ${allocStrategy === "sharpe" ? "by Sharpe score" : allocStrategy === "maxret" || allocStrategy === "equal" ? "by expected return" : "by risk-weighted score"} within each asset class — ${policy.mfN} MF · ${policy.eqN} Equity · ${policy.pmsN} PMS · ${policy.aifN} AIF · ${policy.dbtN} Debt · ${policy.fdN} FD${policy.cash ? " · +Cash sleeve" : ""}.`);
     bullets.push(`Rupee weights were then set by the ${meta.label} rule, which ${meta.how}.`);
     bullets.push(`A profile tilt was layered on top — growthBoost=${policy.growthBoost.toFixed(1)} lifts higher-risk holdings, defBoost=${policy.defBoost.toFixed(1)} lifts lower-risk holdings — to keep the final mix aligned to a ${profile} investor.`);
+    bullets.push(constrained
+      ? `Weights were then passed through the constraint engine (max ${constraints.maxPerHolding}% per holding, ${constraints.maxPerSector}% per sector, ${constraints.maxPerIssuer}% per issuer, asset-class caps, small-cap ≤ ${constraints.maxSmallCap}%, AAA/AA+ ≥ ${constraints.minHighCredit}% of the rated sleeve, sub-IG ≤ ${constraints.maxSubIG}%) — breaching groups are trimmed and the excess redistributed until every limit holds.`
+      : `No exposure constraints were applied — this is an unconstrained portfolio, so sector, issuer, market-cap and credit exposures can be concentrated.`);
     bullets.push(`Resulting portfolio: ${newHoldings.length} holdings, weighted expected IRR ${wR.toFixed(2)}%, portfolio risk ${wRiskLabel}, projected FV in ${horizon}Y ≈ ${fmtINR(fv)}.`);
+
 
     const caveats: string[] = [
       "Expected returns are point estimates from research inputs (3Y CAGR, YTM, net IRR, forward earnings) — not guarantees; realised returns will vary with markets, credit events and manager skill.",

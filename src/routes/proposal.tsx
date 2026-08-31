@@ -263,6 +263,15 @@ function ProposalPage() {
   const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
   const [constrained, setConstrained] = useState(true);
   const [constraints, setConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
+  const [creating, setCreating] = useState(false);
+  function handleAutoCreate() {
+    if (creating) return;
+    setCreating(true);
+    window.setTimeout(() => {
+      autoCreatePortfolio();
+      setCreating(false);
+    }, 8000);
+  }
   const setC = (k: keyof Omit<Constraints, "classCaps">, v: number) => setConstraints(p => ({ ...p, [k]: v }));
   const setClassCap = (k: AssetClassKey, v: number) => setConstraints(p => ({ ...p, classCaps: { ...p.classCaps, [k]: v } }));
   const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)

@@ -328,14 +328,15 @@ function ProposalPage() {
   // Auto Portfolio Creator — picks a curated set of holdings across asset classes
   // tuned to the selected optimisation strategy, then sizes them via the same strategy weights.
   function autoCreatePortfolio() {
-    type Cand = { klass: AssetClassKey; id: string; name: string; sub: string; ret: number; risk: string };
-    const mf: Cand[]  = mutualFunds.map(m => ({ klass: "MF", id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk }));
-    const eq: Cand[]  = equityStocks.map(s => ({ klass: "EQ", id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk }));
-    const pms: Cand[] = pmsSchemes.map(p => ({ klass: "PMS", id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk }));
-    const aif: Cand[] = aifSchemes.map(a => ({ klass: "AIF", id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk }));
-    const dbt: Cand[] = bonds.map(b => ({ klass: "DEBT", id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk }));
-    const fd: Cand[]  = fixedDeposits.map(f => ({ klass: "FD", id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod" }));
-    const cash: Cand  = { klass: "CASH", id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low" };
+    type Cand = Attrs & { klass: AssetClassKey; id: string; name: string; sub: string; ret: number; risk: string };
+    const mf: Cand[]  = mutualFunds.map(m => ({ klass: "MF", id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, sector: `MF · ${m.assetClass}`, issuer: m.amc, mcap: /Small Cap|Mid Cap|Large Cap/.exec(m.subCategory)?.[0] ?? "—", credit: "Unrated" }));
+    const eq: Cand[]  = equityStocks.map(s => ({ klass: "EQ", id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, sector: s.sector, issuer: s.name, mcap: s.marketCap, credit: "Unrated" }));
+    const pms: Cand[] = pmsSchemes.map(p => ({ klass: "PMS", id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, sector: `PMS · ${p.strategy}`, issuer: p.manager, mcap: /Small Cap|Large Cap/.exec(p.strategy)?.[0] ?? "—", credit: "Unrated" }));
+    const aif: Cand[] = aifSchemes.map(a => ({ klass: "AIF", id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, sector: `AIF · ${a.subStrategy}`, issuer: a.manager, mcap: "—", credit: "Unrated" }));
+    const dbt: Cand[] = bonds.map(b => ({ klass: "DEBT", id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, sector: b.bondType, issuer: b.issuer, mcap: "—", credit: b.rating }));
+    const fd: Cand[]  = fixedDeposits.map(f => ({ klass: "FD", id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", sector: `FD · ${f.subCategory}`, issuer: f.issuer, mcap: "—", credit: f.rating }));
+    const cash: Cand  = { klass: "CASH", id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", sector: "Cash", issuer: "Cash", mcap: "—", credit: "AAA" };
+
 
     const topBy = <T,>(arr: T[], n: number, score: (x: T) => number) =>
       [...arr].sort((a, b) => score(b) - score(a)).slice(0, n);

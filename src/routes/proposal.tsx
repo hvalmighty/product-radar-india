@@ -842,11 +842,13 @@ function ProposalPage() {
               )}
             </section>
 
-          </aside>
+          </div>
 
-
+          {/* BOTTOM: Universe + Proposed Portfolio */}
+          <div className="grid grid-cols-12 gap-5">
           {/* CENTER: Catalog */}
-          <section className="col-span-12 lg:col-span-5 space-y-4">
+          <section className="col-span-12 lg:col-span-7 space-y-4">
+
             <div className="border border-border rounded-md bg-surface">
               <div className="border-b border-border flex flex-wrap">
                 {ASSET_CLASSES.map(c => (

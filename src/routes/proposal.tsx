@@ -736,6 +736,75 @@ function ProposalPage() {
               </div>
             </section>
 
+            {/* Constraints */}
+            <section className="border border-border rounded-md bg-surface">
+              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
+                <SlidersHorizontal className="w-3.5 h-3.5" /> Exposure Constraints
+              </div>
+              <div className="p-3 space-y-3">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={constrained} onChange={e => setConstrained(e.target.checked)}
+                    className="accent-primary mt-0.5" />
+                  <span className="text-xs">
+                    <span className="font-medium">Constrained portfolio</span>
+                    <span className="block text-[10px] text-muted-foreground leading-snug">
+                      {constrained
+                        ? "Allocation is trimmed and redistributed until every exposure limit below is met."
+                        : "Unconstrained — weights come purely from the optimisation strategy."}
+                    </span>
+                  </span>
+                </label>
+
+                {constrained && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <NumField label="Max / Holding %" value={constraints.maxPerHolding} onChange={v => setC("maxPerHolding", v)} />
+                      <NumField label="Max / Sector %" value={constraints.maxPerSector} onChange={v => setC("maxPerSector", v)} />
+                      <NumField label="Max / Issuer %" value={constraints.maxPerIssuer} onChange={v => setC("maxPerIssuer", v)} />
+                      <NumField label="Max Small Cap %" value={constraints.maxSmallCap} onChange={v => setC("maxSmallCap", v)} />
+                      <NumField label="Max Mid Cap %" value={constraints.maxMidCap} onChange={v => setC("maxMidCap", v)} />
+                      <NumField label="Max Sub-IG %" value={constraints.maxSubIG} onChange={v => setC("maxSubIG", v)} />
+                      <NumField label="Min AAA/AA+ % (rated)" value={constraints.minHighCredit} onChange={v => setC("minHighCredit", v)} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Asset Class Caps (%)</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {ASSET_CLASSES.map(c => (
+                          <NumField key={c.key} label={c.label} value={constraints.classCaps[c.key]} onChange={v => setClassCap(c.key, v)} />
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={() => setConstraints(DEFAULT_CONSTRAINTS)}
+                      className="w-full text-[11px] px-2 py-1.5 border border-border rounded-sm hover:bg-secondary">
+                      Reset to house policy
+                    </button>
+                  </div>
+                )}
+              </div>
+              {compliance.length > 0 && (
+                <div className="border-t border-border p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3 h-3" /> Compliance
+                    <span className={`ml-auto normal-case tracking-normal ${breaches ? "text-destructive" : "text-positive"}`}>
+                      {breaches ? `${breaches} breach${breaches > 1 ? "es" : ""}` : "All checks pass"}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {compliance.map((r, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
+                        <span className="truncate text-muted-foreground">{r.label}</span>
+                        <span className={`mono-num shrink-0 ${r.ok ? "text-positive" : "text-destructive"}`}>
+                          {r.actual.toFixed(1)}% / {r.type === "max" ? "≤" : "≥"} {r.limit}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+
+
             <section className="border border-border rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Proposal Summary</div>
               <div className="p-3 space-y-2 text-xs">

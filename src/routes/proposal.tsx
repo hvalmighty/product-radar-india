@@ -226,13 +226,13 @@ function ProposalPage() {
     const q = search.toLowerCase();
     const filt = <T extends { name: string }>(arr: T[]) => q ? arr.filter(x => x.name.toLowerCase().includes(q)) : arr;
     switch (activeClass) {
-      case "MF": return filt(mutualFunds).map(m => ({ id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, extra: `3Y · 5★ ${m.rating}`, _raw: m as MutualFund }));
-      case "EQ": return filt(equityStocks).map(s => ({ id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, extra: `P/E ${s.pe.toFixed(1)} · ROE ${s.roe.toFixed(1)}%`, _raw: s as EquityStock }));
-      case "PMS": return filt(pmsSchemes).map(p => ({ id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, extra: `Alpha ${p.alpha.toFixed(1)} · Fee ${p.fixedFee.toFixed(2)}%`, _raw: p as PMS }));
-      case "AIF": return filt(aifSchemes).map(a => ({ id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, extra: `Vintage ${a.vintage} · MOIC ${a.moic.toFixed(2)}x`, _raw: a as AIF }));
-      case "DEBT": return filt(bonds).map(b => ({ id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, extra: `Coupon ${b.couponRate}% · ${b.residualTenorYears}Y`, _raw: b as Bond }));
-      case "FD": return filt(fixedDeposits).slice(0, 40).map(f => ({ id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", extra: `${f.rating} · ${f.payout}`, _raw: f as FixedDeposit }));
-      case "CASH": return [{ id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", extra: "Editable rate above", _raw: null as any }];
+      case "MF": return filt(mutualFunds).map(m => ({ id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, extra: `3Y · 5★ ${m.rating}`, attrs: { sector: `MF · ${m.assetClass}`, issuer: m.amc, mcap: /Small Cap|Mid Cap|Large Cap/.exec(m.subCategory)?.[0] ?? "—", credit: "Unrated" } as Attrs, _raw: m as MutualFund }));
+      case "EQ": return filt(equityStocks).map(s => ({ id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, extra: `P/E ${s.pe.toFixed(1)} · ROE ${s.roe.toFixed(1)}%`, attrs: { sector: s.sector, issuer: s.name, mcap: s.marketCap, credit: "Unrated" } as Attrs, _raw: s as EquityStock }));
+      case "PMS": return filt(pmsSchemes).map(p => ({ id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, extra: `Alpha ${p.alpha.toFixed(1)} · Fee ${p.fixedFee.toFixed(2)}%`, attrs: { sector: `PMS · ${p.strategy}`, issuer: p.manager, mcap: /Small Cap|Mid & Small Cap|Large Cap/.exec(p.strategy)?.[0] ?? "—", credit: "Unrated" } as Attrs, _raw: p as PMS }));
+      case "AIF": return filt(aifSchemes).map(a => ({ id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, extra: `Vintage ${a.vintage} · MOIC ${a.moic.toFixed(2)}x`, attrs: { sector: `AIF · ${a.subStrategy}`, issuer: a.manager, mcap: "—", credit: "Unrated" } as Attrs, _raw: a as AIF }));
+      case "DEBT": return filt(bonds).map(b => ({ id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, extra: `Coupon ${b.couponRate}% · ${b.residualTenorYears}Y`, attrs: { sector: b.bondType, issuer: b.issuer, mcap: "—", credit: b.rating } as Attrs, _raw: b as Bond }));
+      case "FD": return filt(fixedDeposits).slice(0, 40).map(f => ({ id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", extra: `${f.rating} · ${f.payout}`, attrs: { sector: `FD · ${f.subCategory}`, issuer: f.issuer, mcap: "—", credit: f.rating } as Attrs, _raw: f as FixedDeposit }));
+      case "CASH": return [{ id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", extra: "Editable rate above", attrs: { sector: "Cash", issuer: "Cash", mcap: "—", credit: "AAA" } as Attrs, _raw: null as any }];
     }
   }, [activeClass, search, cashRate]);
 
@@ -248,7 +248,8 @@ function ProposalPage() {
       expectedReturn: activeClass === "CASH" ? cashRate : item.ret,
       irrBasis: irrBasisFor(activeClass, item.name),
       risk: item.risk,
-    }]);
+      ...item.attrs,
+
   }
 
   function updateAmount(uid: string, amount: number) {

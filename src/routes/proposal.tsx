@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles, Lightbulb } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, FilePlus2, Download, Search, Sparkles, Lightbulb, SlidersHorizontal, ShieldCheck } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -33,6 +33,8 @@ const ASSET_CLASSES: AssetClassDef[] = [
   { key: "CASH", label: "Cash", product: "Liquid / Savings", security: "Idle Cash", tone: "text-muted-foreground" },
 ];
 
+type Attrs = { sector: string; issuer: string; mcap: string; credit: string };
+
 type Holding = {
   uid: string;
   klass: AssetClassKey;
@@ -43,6 +45,10 @@ type Holding = {
   expectedReturn: number;
   irrBasis: string;
   risk: string;
+  sector: string;
+  issuer: string;
+  mcap: string;
+  credit: string;
 };
 
 const fmtINR = fmtMoney;
@@ -50,6 +56,137 @@ const fmtINR = fmtMoney;
 const RISK_SCORE: Record<string, number> = {
   "Low": 1, "Low-Mod": 2, "Moderate": 3, "Mod-High": 4, "High": 5, "Very High": 6,
 };
+
+// ---------------- Constraint framework ----------------
+export type Constraints = {
+  maxPerHolding: number;
+  maxPerSector: number;
+  maxPerIssuer: number;
+  classCaps: Record<AssetClassKey, number>;
+  maxSmallCap: number;
+  maxMidCap: number;
+  minHighCredit: number;   // AAA / AA+ share of the credit-rated (Debt + FD) sleeve
+  maxSubIG: number;        // below-A rated share of total portfolio
+};
+
+const DEFAULT_CONSTRAINTS: Constraints = {
+  maxPerHolding: 15,
+  maxPerSector: 25,
+  maxPerIssuer: 20,
+  classCaps: { MF: 60, EQ: 40, PMS: 25, AIF: 20, DEBT: 45, FD: 35, CASH: 10 },
+  maxSmallCap: 15,
+  maxMidCap: 25,
+  minHighCredit: 70,
+  maxSubIG: 5,
+};
+
+const CREDIT_ORDER = ["AAA", "AA+", "AA", "AA-", "A+", "A", "A-", "BBB+", "BBB", "BB", "B", "Unrated"];
+const isHighCredit = (c: string) => /^AAA|^AA\+/.test(c);
+const isSubIG = (c: string) => /^BB|^B$|^C/.test(c);
+const isRated = (c: string) => c !== "Unrated" && !!c;
+
+type CheckRow = { label: string; actual: number; limit: number; type: "max" | "min"; ok: boolean };
+
+/**
+ * Iterative cap-and-redistribute solver ("water filling"): repeatedly scales
+ * down any group breaching a maximum and scales up the high-credit sleeve if it
+ * is below its floor, renormalising to 100% after each pass.
+ */
+function solveConstrained(items: Array<Attrs & { klass: AssetClassKey }>, baseWeights: number[], c: Constraints): number[] {
+  const n = items.length;
+  if (n === 0) return [];
+  let w = baseWeights.map(x => Math.max(1e-6, x));
+  const norm = () => { const s = w.reduce((a, b) => a + b, 0) || 1; w = w.map(x => x / s); };
+  norm();
+
+  const groups: Array<{ idx: number[]; cap: number }> = [];
+  items.forEach((_, i) => groups.push({ idx: [i], cap: c.maxPerHolding / 100 }));
+  const byKey = (key: (a: Attrs & { klass: AssetClassKey }) => string, cap: number) => {
+    const m = new Map<string, number[]>();
+    items.forEach((it, i) => { const k = key(it); if (!k) return; m.set(k, [...(m.get(k) || []), i]); });
+    m.forEach(idx => groups.push({ idx, cap: cap / 100 }));
+  };
+  byKey(it => it.sector, c.maxPerSector);
+  byKey(it => it.issuer, c.maxPerIssuer);
+  items.forEach(() => {});
+  (Object.keys(c.classCaps) as AssetClassKey[]).forEach(k => {
+    const idx = items.map((it, i) => it.klass === k ? i : -1).filter(i => i >= 0);
+    if (idx.length) groups.push({ idx, cap: c.classCaps[k] / 100 });
+  });
+  const smallIdx = items.map((it, i) => it.mcap === "Small Cap" ? i : -1).filter(i => i >= 0);
+  if (smallIdx.length) groups.push({ idx: smallIdx, cap: c.maxSmallCap / 100 });
+  const midIdx = items.map((it, i) => it.mcap === "Mid Cap" ? i : -1).filter(i => i >= 0);
+  if (midIdx.length) groups.push({ idx: midIdx, cap: c.maxMidCap / 100 });
+  const subIgIdx = items.map((it, i) => isSubIG(it.credit) ? i : -1).filter(i => i >= 0);
+  if (subIgIdx.length) groups.push({ idx: subIgIdx, cap: c.maxSubIG / 100 });
+
+  const ratedIdx = items.map((it, i) => isRated(it.credit) ? i : -1).filter(i => i >= 0);
+  const hcIdx = ratedIdx.filter(i => isHighCredit(items[i].credit));
+
+  for (let pass = 0; pass < 400; pass++) {
+    let changed = false;
+    for (const g of groups) {
+      const tot = g.idx.reduce((s, i) => s + w[i], 0);
+      if (tot > g.cap + 1e-6 && tot > 0) {
+        const f = g.cap / tot;
+        g.idx.forEach(i => { w[i] *= f; });
+        changed = true;
+      }
+    }
+    if (hcIdx.length && ratedIdx.length) {
+      const ratedTot = ratedIdx.reduce((s, i) => s + w[i], 0);
+      const hcTot = hcIdx.reduce((s, i) => s + w[i], 0);
+      if (ratedTot > 0 && hcTot / ratedTot < c.minHighCredit / 100 - 1e-6) {
+        const target = (c.minHighCredit / 100) * ratedTot;
+        const f = Math.min(5, target / Math.max(1e-9, hcTot));
+        hcIdx.forEach(i => { w[i] *= f; });
+        changed = true;
+      }
+    }
+    norm();
+    if (!changed) break;
+  }
+  return w;
+}
+
+function checkConstraints(items: Array<Attrs & { klass: AssetClassKey; amount: number }>, total: number, c: Constraints): CheckRow[] {
+  const pct = (v: number) => total > 0 ? (v / total) * 100 : 0;
+  const rows: CheckRow[] = [];
+  const push = (label: string, actual: number, limit: number, type: "max" | "min" = "max") =>
+    rows.push({ label, actual, limit, type, ok: type === "max" ? actual <= limit + 0.05 : actual >= limit - 0.05 });
+
+  const maxOf = (key: (i: typeof items[number]) => string) => {
+    const m = new Map<string, number>();
+    items.forEach(i => { const k = key(i); if (k) m.set(k, (m.get(k) || 0) + i.amount); });
+    let top = ["—", 0] as [string, number];
+    m.forEach((v, k) => { if (v > top[1]) top = [k, v]; });
+    return top;
+  };
+
+  const topH = items.reduce((a, b) => (b.amount > (a?.amount ?? 0) ? b : a), items[0]);
+  push(`Single holding${topH ? ` (${topH.sector ? "" : ""}max)` : ""}`, pct(topH?.amount || 0), c.maxPerHolding);
+  const [sName, sVal] = maxOf(i => i.sector);
+  push(`Sector max — ${sName}`, pct(sVal), c.maxPerSector);
+  const [iName, iVal] = maxOf(i => i.issuer);
+  push(`Issuer max — ${iName}`, pct(iVal), c.maxPerIssuer);
+  (Object.keys(c.classCaps) as AssetClassKey[]).forEach(k => {
+    const v = items.filter(i => i.klass === k).reduce((s, i) => s + i.amount, 0);
+    if (v > 0) push(`${ASSET_CLASSES.find(a => a.key === k)!.label} cap`, pct(v), c.classCaps[k]);
+  });
+  const sc = items.filter(i => i.mcap === "Small Cap").reduce((s, i) => s + i.amount, 0);
+  if (sc > 0) push("Small-cap exposure", pct(sc), c.maxSmallCap);
+  const mc = items.filter(i => i.mcap === "Mid Cap").reduce((s, i) => s + i.amount, 0);
+  if (mc > 0) push("Mid-cap exposure", pct(mc), c.maxMidCap);
+  const rated = items.filter(i => isRated(i.credit)).reduce((s, i) => s + i.amount, 0);
+  if (rated > 0) {
+    const hc = items.filter(i => isHighCredit(i.credit)).reduce((s, i) => s + i.amount, 0);
+    push("AAA/AA+ share of rated sleeve", (hc / rated) * 100, c.minHighCredit, "min");
+  }
+  const sub = items.filter(i => isSubIG(i.credit)).reduce((s, i) => s + i.amount, 0);
+  push("Sub-investment-grade", pct(sub), c.maxSubIG);
+  return rows;
+}
+
 
 function irrBasisFor(klass: AssetClassKey, name: string): string {
   switch (klass) {
@@ -89,13 +226,13 @@ function ProposalPage() {
     const q = search.toLowerCase();
     const filt = <T extends { name: string }>(arr: T[]) => q ? arr.filter(x => x.name.toLowerCase().includes(q)) : arr;
     switch (activeClass) {
-      case "MF": return filt(mutualFunds).map(m => ({ id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, extra: `3Y · 5★ ${m.rating}`, _raw: m as MutualFund }));
-      case "EQ": return filt(equityStocks).map(s => ({ id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, extra: `P/E ${s.pe.toFixed(1)} · ROE ${s.roe.toFixed(1)}%`, _raw: s as EquityStock }));
-      case "PMS": return filt(pmsSchemes).map(p => ({ id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, extra: `Alpha ${p.alpha.toFixed(1)} · Fee ${p.fixedFee.toFixed(2)}%`, _raw: p as PMS }));
-      case "AIF": return filt(aifSchemes).map(a => ({ id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, extra: `Vintage ${a.vintage} · MOIC ${a.moic.toFixed(2)}x`, _raw: a as AIF }));
-      case "DEBT": return filt(bonds).map(b => ({ id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, extra: `Coupon ${b.couponRate}% · ${b.residualTenorYears}Y`, _raw: b as Bond }));
-      case "FD": return filt(fixedDeposits).slice(0, 40).map(f => ({ id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", extra: `${f.rating} · ${f.payout}`, _raw: f as FixedDeposit }));
-      case "CASH": return [{ id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", extra: "Editable rate above", _raw: null as any }];
+      case "MF": return filt(mutualFunds).map(m => ({ id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, extra: `3Y · 5★ ${m.rating}`, attrs: { sector: `MF · ${m.assetClass}`, issuer: m.amc, mcap: /Small Cap|Mid Cap|Large Cap/.exec(m.subCategory)?.[0] ?? "—", credit: "Unrated" } as Attrs, _raw: m as MutualFund }));
+      case "EQ": return filt(equityStocks).map(s => ({ id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, extra: `P/E ${s.pe.toFixed(1)} · ROE ${s.roe.toFixed(1)}%`, attrs: { sector: s.sector, issuer: s.name, mcap: s.marketCap, credit: "Unrated" } as Attrs, _raw: s as EquityStock }));
+      case "PMS": return filt(pmsSchemes).map(p => ({ id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, extra: `Alpha ${p.alpha.toFixed(1)} · Fee ${p.fixedFee.toFixed(2)}%`, attrs: { sector: `PMS · ${p.strategy}`, issuer: p.manager, mcap: /Small Cap|Mid & Small Cap|Large Cap/.exec(p.strategy)?.[0] ?? "—", credit: "Unrated" } as Attrs, _raw: p as PMS }));
+      case "AIF": return filt(aifSchemes).map(a => ({ id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, extra: `Vintage ${a.vintage} · MOIC ${a.moic.toFixed(2)}x`, attrs: { sector: `AIF · ${a.subStrategy}`, issuer: a.manager, mcap: "—", credit: "Unrated" } as Attrs, _raw: a as AIF }));
+      case "DEBT": return filt(bonds).map(b => ({ id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, extra: `Coupon ${b.couponRate}% · ${b.residualTenorYears}Y`, attrs: { sector: b.bondType, issuer: b.issuer, mcap: "—", credit: b.rating } as Attrs, _raw: b as Bond }));
+      case "FD": return filt(fixedDeposits).slice(0, 40).map(f => ({ id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", extra: `${f.rating} · ${f.payout}`, attrs: { sector: `FD · ${f.subCategory}`, issuer: f.issuer, mcap: "—", credit: f.rating } as Attrs, _raw: f as FixedDeposit }));
+      case "CASH": return [{ id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", extra: "Editable rate above", attrs: { sector: "Cash", issuer: "Cash", mcap: "—", credit: "AAA" } as Attrs, _raw: null as any }];
     }
   }, [activeClass, search, cashRate]);
 
@@ -111,8 +248,10 @@ function ProposalPage() {
       expectedReturn: activeClass === "CASH" ? cashRate : item.ret,
       irrBasis: irrBasisFor(activeClass, item.name),
       risk: item.risk,
+      ...item.attrs,
     }]);
   }
+
 
   function updateAmount(uid: string, amount: number) {
     setHoldings(prev => prev.map(h => h.uid === uid ? { ...h, amount: Math.max(0, amount) } : h));
@@ -122,26 +261,39 @@ function ProposalPage() {
   }
   type AllocStrategy = "equal" | "sharpe" | "maxret" | "maxrisk" | "minrisk";
   const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
+  const [constrained, setConstrained] = useState(true);
+  const [constraints, setConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
+  const setC = (k: keyof Omit<Constraints, "classCaps">, v: number) => setConstraints(p => ({ ...p, [k]: v }));
+  const setClassCap = (k: AssetClassKey, v: number) => setConstraints(p => ({ ...p, classCaps: { ...p.classCaps, [k]: v } }));
   const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)
+
+  function finalWeights(items: Array<Attrs & { klass: AssetClassKey }>, base: number[]) {
+    if (!constrained) {
+      const s = base.reduce((a, b) => a + b, 0) || 1;
+      return base.map(w => w / s);
+    }
+    return solveConstrained(items, base, constraints);
+  }
 
   function allocByWeights(weights: number[]) {
     const sum = weights.reduce((s, w) => s + w, 0);
     if (sum <= 0) return;
-    setHoldings(prev => prev.map((h, i) => ({
-      ...h,
-      amount: Math.floor((weights[i] / sum) * totalCorpus),
-    })));
+    setHoldings(prev => {
+      const w = finalWeights(prev, weights);
+      return prev.map((h, i) => ({ ...h, amount: Math.floor((w[i] ?? 0) * totalCorpus) }));
+    });
   }
+
 
   function autoAllocate(strategy: AllocStrategy = allocStrategy) {
     if (holdings.length === 0) return;
     const live = holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h);
     switch (strategy) {
       case "equal": {
-        const each = Math.floor(totalCorpus / holdings.length);
-        setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+        allocByWeights(live.map(() => 1));
         return;
       }
+
       case "maxret": {
         // Tilt heavily to higher expected returns (cubic emphasis)
         const w = live.map(h => Math.pow(Math.max(0.01, h.expectedReturn), 3));
@@ -176,14 +328,15 @@ function ProposalPage() {
   // Auto Portfolio Creator — picks a curated set of holdings across asset classes
   // tuned to the selected optimisation strategy, then sizes them via the same strategy weights.
   function autoCreatePortfolio() {
-    type Cand = { klass: AssetClassKey; id: string; name: string; sub: string; ret: number; risk: string };
-    const mf: Cand[]  = mutualFunds.map(m => ({ klass: "MF", id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk }));
-    const eq: Cand[]  = equityStocks.map(s => ({ klass: "EQ", id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk }));
-    const pms: Cand[] = pmsSchemes.map(p => ({ klass: "PMS", id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk }));
-    const aif: Cand[] = aifSchemes.map(a => ({ klass: "AIF", id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk }));
-    const dbt: Cand[] = bonds.map(b => ({ klass: "DEBT", id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk }));
-    const fd: Cand[]  = fixedDeposits.map(f => ({ klass: "FD", id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod" }));
-    const cash: Cand  = { klass: "CASH", id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low" };
+    type Cand = Attrs & { klass: AssetClassKey; id: string; name: string; sub: string; ret: number; risk: string };
+    const mf: Cand[]  = mutualFunds.map(m => ({ klass: "MF", id: m.id, name: m.name, sub: `${m.subCategory} · ${m.amc}`, ret: m.returns3y, risk: m.risk, sector: `MF · ${m.assetClass}`, issuer: m.amc, mcap: /Small Cap|Mid Cap|Large Cap/.exec(m.subCategory)?.[0] ?? "—", credit: "Unrated" }));
+    const eq: Cand[]  = equityStocks.map(s => ({ klass: "EQ", id: s.id, name: s.name, sub: `${s.ticker} · ${s.sector} · ${s.marketCap}`, ret: s.expectedReturn, risk: s.risk, sector: s.sector, issuer: s.name, mcap: s.marketCap, credit: "Unrated" }));
+    const pms: Cand[] = pmsSchemes.map(p => ({ klass: "PMS", id: p.id, name: p.name, sub: `${p.strategy} · ${p.manager}`, ret: p.returns3y, risk: p.risk, sector: `PMS · ${p.strategy}`, issuer: p.manager, mcap: /Small Cap|Large Cap/.exec(p.strategy)?.[0] ?? "—", credit: "Unrated" }));
+    const aif: Cand[] = aifSchemes.map(a => ({ klass: "AIF", id: a.id, name: a.name, sub: `${a.sebiCategory} · ${a.subStrategy}`, ret: a.netIRR, risk: a.risk, sector: `AIF · ${a.subStrategy}`, issuer: a.manager, mcap: "—", credit: "Unrated" }));
+    const dbt: Cand[] = bonds.map(b => ({ klass: "DEBT", id: b.id, name: b.name, sub: `${b.bondType} · ${b.rating}`, ret: b.ytm, risk: b.risk, sector: b.bondType, issuer: b.issuer, mcap: "—", credit: b.rating }));
+    const fd: Cand[]  = fixedDeposits.map(f => ({ klass: "FD", id: f.id, name: f.name, sub: `${f.subCategory} · ${f.tenureMonths}M`, ret: f.interestRate, risk: "Low-Mod", sector: `FD · ${f.subCategory}`, issuer: f.issuer, mcap: "—", credit: f.rating }));
+    const cash: Cand  = { klass: "CASH", id: "CASH-LIQ", name: "Liquid / Savings Sweep", sub: "User-defined cash assumption", ret: cashRate, risk: "Low", sector: "Cash", issuer: "Cash", mcap: "—", credit: "AAA" };
+
 
     const topBy = <T,>(arr: T[], n: number, score: (x: T) => number) =>
       [...arr].sort((a, b) => score(b) - score(a)).slice(0, n);
@@ -283,7 +436,7 @@ function ProposalPage() {
       const defTilt    = Math.pow(3 / score, policy.defBoost - 1);
       return w * growthTilt * defTilt;
     });
-    const wSum = weights!.reduce((s, w) => s + w, 0) || 1;
+    const solved = finalWeights(picks, weights!);
 
     const stamp = Date.now();
     const newHoldings: Holding[] = picks.map((p, i) => ({
@@ -292,11 +445,16 @@ function ProposalPage() {
       id: p.id,
       name: p.name,
       sub: p.sub,
-      amount: Math.floor((weights![i] / wSum) * totalCorpus),
+      amount: Math.floor((solved[i] ?? 0) * totalCorpus),
       expectedReturn: p.klass === "CASH" ? cashRate : p.ret,
       irrBasis: irrBasisFor(p.klass, p.name),
       risk: p.risk,
+      sector: p.sector,
+      issuer: p.issuer,
+      mcap: p.mcap,
+      credit: p.credit,
     }));
+
     setHoldings(newHoldings);
 
     // ---- Build commentary / investment thesis ----
@@ -348,7 +506,11 @@ function ProposalPage() {
     bullets.push(`From that universe, top candidates were ranked ${allocStrategy === "sharpe" ? "by Sharpe score" : allocStrategy === "maxret" || allocStrategy === "equal" ? "by expected return" : "by risk-weighted score"} within each asset class — ${policy.mfN} MF · ${policy.eqN} Equity · ${policy.pmsN} PMS · ${policy.aifN} AIF · ${policy.dbtN} Debt · ${policy.fdN} FD${policy.cash ? " · +Cash sleeve" : ""}.`);
     bullets.push(`Rupee weights were then set by the ${meta.label} rule, which ${meta.how}.`);
     bullets.push(`A profile tilt was layered on top — growthBoost=${policy.growthBoost.toFixed(1)} lifts higher-risk holdings, defBoost=${policy.defBoost.toFixed(1)} lifts lower-risk holdings — to keep the final mix aligned to a ${profile} investor.`);
+    bullets.push(constrained
+      ? `Weights were then passed through the constraint engine (max ${constraints.maxPerHolding}% per holding, ${constraints.maxPerSector}% per sector, ${constraints.maxPerIssuer}% per issuer, asset-class caps, small-cap ≤ ${constraints.maxSmallCap}%, AAA/AA+ ≥ ${constraints.minHighCredit}% of the rated sleeve, sub-IG ≤ ${constraints.maxSubIG}%) — breaching groups are trimmed and the excess redistributed until every limit holds.`
+      : `No exposure constraints were applied — this is an unconstrained portfolio, so sector, issuer, market-cap and credit exposures can be concentrated.`);
     bullets.push(`Resulting portfolio: ${newHoldings.length} holdings, weighted expected IRR ${wR.toFixed(2)}%, portfolio risk ${wRiskLabel}, projected FV in ${horizon}Y ≈ ${fmtINR(fv)}.`);
+
 
     const caveats: string[] = [
       "Expected returns are point estimates from research inputs (3Y CAGR, YTM, net IRR, forward earnings) — not guarantees; realised returns will vary with markets, credit events and manager skill.",
@@ -382,6 +544,13 @@ function ProposalPage() {
     }).filter(x => x.value > 0);
     return { allocated, weightedReturn, weightedRisk, unallocated: totalCorpus - allocated, byClass };
   }, [holdingsLive, totalCorpus]);
+
+  const compliance = useMemo(
+    () => holdingsLive.length ? checkConstraints(holdingsLive, holdingsLive.reduce((s, h) => s + h.amount, 0), constraints) : [],
+    [holdingsLive, constraints]
+  );
+  const breaches = compliance.filter(r => !r.ok).length;
+
 
   const riskLabel = totals.weightedRisk < 1.8 ? "Low" : totals.weightedRisk < 2.8 ? "Low-Moderate" : totals.weightedRisk < 3.8 ? "Moderate" : totals.weightedRisk < 4.6 ? "Mod-High" : totals.weightedRisk < 5.4 ? "High" : "Very High";
 
@@ -566,6 +735,75 @@ function ProposalPage() {
                 </button>
               </div>
             </section>
+
+            {/* Constraints */}
+            <section className="border border-border rounded-md bg-surface">
+              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
+                <SlidersHorizontal className="w-3.5 h-3.5" /> Exposure Constraints
+              </div>
+              <div className="p-3 space-y-3">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={constrained} onChange={e => setConstrained(e.target.checked)}
+                    className="accent-primary mt-0.5" />
+                  <span className="text-xs">
+                    <span className="font-medium">Constrained portfolio</span>
+                    <span className="block text-[10px] text-muted-foreground leading-snug">
+                      {constrained
+                        ? "Allocation is trimmed and redistributed until every exposure limit below is met."
+                        : "Unconstrained — weights come purely from the optimisation strategy."}
+                    </span>
+                  </span>
+                </label>
+
+                {constrained && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <NumField label="Max / Holding %" value={constraints.maxPerHolding} onChange={v => setC("maxPerHolding", v)} />
+                      <NumField label="Max / Sector %" value={constraints.maxPerSector} onChange={v => setC("maxPerSector", v)} />
+                      <NumField label="Max / Issuer %" value={constraints.maxPerIssuer} onChange={v => setC("maxPerIssuer", v)} />
+                      <NumField label="Max Small Cap %" value={constraints.maxSmallCap} onChange={v => setC("maxSmallCap", v)} />
+                      <NumField label="Max Mid Cap %" value={constraints.maxMidCap} onChange={v => setC("maxMidCap", v)} />
+                      <NumField label="Max Sub-IG %" value={constraints.maxSubIG} onChange={v => setC("maxSubIG", v)} />
+                      <NumField label="Min AAA/AA+ % (rated)" value={constraints.minHighCredit} onChange={v => setC("minHighCredit", v)} />
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Asset Class Caps (%)</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {ASSET_CLASSES.map(c => (
+                          <NumField key={c.key} label={c.label} value={constraints.classCaps[c.key]} onChange={v => setClassCap(c.key, v)} />
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={() => setConstraints(DEFAULT_CONSTRAINTS)}
+                      className="w-full text-[11px] px-2 py-1.5 border border-border rounded-sm hover:bg-secondary">
+                      Reset to house policy
+                    </button>
+                  </div>
+                )}
+              </div>
+              {compliance.length > 0 && (
+                <div className="border-t border-border p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3 h-3" /> Compliance
+                    <span className={`ml-auto normal-case tracking-normal ${breaches ? "text-destructive" : "text-positive"}`}>
+                      {breaches ? `${breaches} breach${breaches > 1 ? "es" : ""}` : "All checks pass"}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {compliance.map((r, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
+                        <span className="truncate text-muted-foreground">{r.label}</span>
+                        <span className={`mono-num shrink-0 ${r.ok ? "text-positive" : "text-destructive"}`}>
+                          {r.actual.toFixed(1)}% / {r.type === "max" ? "≤" : "≥"} {r.limit}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+
 
             <section className="border border-border rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Proposal Summary</div>
@@ -816,6 +1054,20 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
     </label>
   );
 }
+
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="block">
+      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5 truncate">{label}</div>
+      <input
+        type="number" min={0} max={100} value={value}
+        onChange={e => onChange(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+        className="w-full text-xs px-2 py-1 border border-border rounded-sm bg-background mono-num"
+      />
+    </label>
+  );
+}
+
 
 function SummaryRow({ label, value, tone = "text-foreground" }: { label: string; value: string; tone?: string }) {
   return (

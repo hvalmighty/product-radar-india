@@ -610,239 +610,52 @@ function ProposalPage() {
           </div>
         </header>
 
-        <main className="px-6 py-5 max-w-[1600px] mx-auto space-y-5">
-          {/* TOP ROW: Prospect · Assumptions · Constraints · Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
-
-            <section className="border border-border rounded-md bg-surface">
-              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
-                <FilePlus2 className="w-3.5 h-3.5" /> Prospect
-              </div>
-              <div className="p-3 space-y-2.5">
-                <Field label="Name">
-                  <input value={prospect.name} onChange={e => setProspect({ ...prospect, name: e.target.value })}
-                    placeholder="Client name" className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs" />
-                </Field>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="Age">
-                    <input type="number" value={prospect.age} onChange={e => setProspect({ ...prospect, age: e.target.value })}
-                      className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs mono-num" />
-                  </Field>
-                  <Field label="Horizon (Y)">
-                    <input type="number" value={prospect.horizonYears} onChange={e => setProspect({ ...prospect, horizonYears: e.target.value })}
-                      className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs mono-num" />
-                  </Field>
-                </div>
-                <Field label="Risk Profile">
-                  <select value={prospect.riskProfile} onChange={e => setProspect({ ...prospect, riskProfile: e.target.value })}
-                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs">
-                    {["Conservative", "Moderate", "Aggressive", "Very Aggressive"].map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </Field>
-                <Field label="Goal">
-                  <select value={prospect.goal} onChange={e => setProspect({ ...prospect, goal: e.target.value })}
-                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs">
-                    {["Wealth Creation", "Retirement", "Child Education", "Tax Saving", "Income"].map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </Field>
-              </div>
-            </section>
-
-            <section className="border border-border rounded-md bg-surface">
-              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Assumptions</div>
-              <div className="p-3 space-y-2.5">
-                <Field label={`Total Corpus (${fmtINR(totalCorpus)})`}>
-                  <input type="number" value={totalCorpus} onChange={e => setTotalCorpus(Math.max(0, +e.target.value || 0))}
-                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs mono-num" />
-                </Field>
-                <Field label={
-                  <span className="inline-flex items-center gap-1">
-                    Cash / Idle Return Rate (%)
-                    <Tooltip>
-                      <TooltipTrigger asChild><Info className="w-3 h-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-[11px]">
-                        Rate used for the Cash holding in the proposal. Default 6.5% reflects typical liquid-fund yields. Override to match the client's actual savings sweep, overnight fund, or T-bill yield.
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                }>
-                  <input type="number" step="0.1" value={cashRate} onChange={e => setCashRate(+e.target.value || 0)}
-                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs mono-num" />
-                </Field>
-                <Field label={
-                  <span className="inline-flex items-center gap-1">
-                    Optimisation Strategy
-                    <Tooltip>
-                      <TooltipTrigger asChild><Info className="w-3 h-3 text-muted-foreground cursor-help" /></TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-sm text-[11px] leading-relaxed space-y-2.5 p-3">
-                        <div className="font-semibold text-foreground">How allocation strategies work</div>
-                        <div className="text-muted-foreground">
-                          Each strategy uses the <b>Expected Return</b> and <b>Risk Score</b> of every holding you have selected. These are the same numbers shown in the Proposed Holdings table. The system converts them into weights and then scales each weight to the Total Corpus.
-                        </div>
-                        <div className="space-y-1.5">
-                          <div><b className="text-foreground">1. Equal Weight (1/N)</b></div>
-                          <div className="text-muted-foreground pl-3 border-l border-border">
-                            <b>Method:</b> Divide the Total Corpus equally across every holding.<br />
-                            <b>Formula:</b> amountᵢ = Corpus / N<br />
-                            <b>Data used:</b> None — this is a naive benchmark independent of return or risk.<br />
-                            <b>Best for:</b> Quick baseline or when you have no strong view on relative attractiveness.
-                          </div>
-                          <div><b className="text-foreground">2. Max Sharpe Ratio</b></div>
-                          <div className="text-muted-foreground pl-3 border-l border-border">
-                            <b>Method:</b> Reward per unit of risk. Higher weight to holdings that give the most return for the risk they take.<br />
-                            <b>Formula:</b> weightᵢ = max(0.001, (Returnᵢ − 6.5%) / RiskScoreᵢ)<br />
-                            <b>Data used:</b> Expected Return of each holding, mapped Risk Score (Low=1 … Very High=6), and a fixed 6.5% risk-free rate (10Y G-Sec proxy).<br />
-                            <b>Best for:</b> Clients who want the most efficient risk-adjusted portfolio.
-                          </div>
-                          <div><b className="text-foreground">3. Max Return</b></div>
-                          <div className="text-muted-foreground pl-3 border-l border-border">
-                            <b>Method:</b> Aggressively tilt toward the highest expected-return holdings using cubic emphasis so leaders dominate.<br />
-                            <b>Formula:</b> weightᵢ = (Returnᵢ)³<br />
-                            <b>Data used:</b> Expected Return only.<br />
-                            <b>Best for:</b> Growth-oriented clients with high risk tolerance and long horizons.
-                          </div>
-                          <div><b className="text-foreground">4. Min Risk (Defensive)</b></div>
-                          <div className="text-muted-foreground pl-3 border-l border-border">
-                            <b>Method:</b> Inverse-risk weighting — the safer the holding, the larger its share.<br />
-                            <b>Formula:</b> weightᵢ = 1 / (RiskScoreᵢ)²<br />
-                            <b>Data used:</b> Risk Score only.<br />
-                            <b>Best for:</b> Conservative clients, retirees, or portfolios where capital preservation matters more than upside.
-                          </div>
-                          <div><b className="text-foreground">5. Max Risk (Aggressive)</b></div>
-                          <div className="text-muted-foreground pl-3 border-l border-border">
-                            <b>Method:</b> Concentrate capital in the highest-risk holdings (risk³ weighting) to maximise growth potential.<br />
-                            <b>Formula:</b> weightᵢ = (RiskScoreᵢ)³<br />
-                            <b>Data used:</b> Risk Score only.<br />
-                            <b>Best for:</b> Very aggressive clients seeking maximum capital appreciation and willing to accept higher volatility.
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground border-t border-border pt-1.5">
-                          After weights are computed they are normalised so the sum equals 100%, then multiplied by the Total Corpus to get each holding’s ₹ allocation.
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                }>
-                  <select value={allocStrategy} onChange={e => setAllocStrategy(e.target.value as AllocStrategy)}
-                    className="w-full bg-background border border-border rounded-sm px-2 py-1.5 text-xs">
-                    <option value="equal">Equal Weight (1/N)</option>
-                    <option value="sharpe">Max Sharpe Ratio</option>
-                    <option value="maxret">Max Return</option>
-                    <option value="minrisk">Min Risk (Defensive)</option>
-                    <option value="maxrisk">Max Risk (Aggressive)</option>
-                  </select>
-                </Field>
-                <button onClick={handleAutoCreate} disabled={creating}
-                  className="w-full text-xs px-2 py-1.5 border border-foreground/30 bg-foreground text-background rounded-sm hover:bg-foreground/90 disabled:opacity-60 font-medium inline-flex items-center justify-center gap-1.5">
-                  {creating ? <><LoaderCircle className="w-3 h-3 animate-spin" /> Creating portfolio…</> : <><Sparkles className="w-3 h-3" /> Auto Portfolio Creator</>}
-                </button>
-                <div className="text-[10px] text-muted-foreground -mt-1 leading-snug">
-                  Builds a curated portfolio across asset classes tuned to the selected strategy and sizes each holding by the same weights.
-                </div>
-                <button onClick={() => autoAllocate()} disabled={holdings.length === 0}
-                  className="w-full text-xs px-2 py-1.5 border border-border rounded-sm hover:bg-secondary disabled:opacity-40 font-medium">
-                  Apply Allocation (re-weight current holdings)
-                </button>
-              </div>
-            </section>
-
-            {/* Constraints */}
-            <section className="border border-border rounded-md bg-surface">
-              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5" /> Exposure Constraints
-              </div>
-              <div className="p-3 space-y-3">
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input type="checkbox" checked={constrained} onChange={e => setConstrained(e.target.checked)}
-                    className="accent-primary mt-0.5" />
-                  <span className="text-xs">
-                    <span className="font-medium">Constrained portfolio</span>
-                    <span className="block text-[10px] text-muted-foreground leading-snug">
-                      {constrained
-                        ? "Allocation is trimmed and redistributed until every exposure limit below is met."
-                        : "Unconstrained — weights come purely from the optimisation strategy."}
-                    </span>
-                  </span>
-                </label>
-
-                {constrained && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <NumField label="Max / Holding %" value={constraints.maxPerHolding} onChange={v => setC("maxPerHolding", v)} />
-                      <NumField label="Max / Sector %" value={constraints.maxPerSector} onChange={v => setC("maxPerSector", v)} />
-                      <NumField label="Max / Issuer %" value={constraints.maxPerIssuer} onChange={v => setC("maxPerIssuer", v)} />
-                      <NumField label="Max Small Cap %" value={constraints.maxSmallCap} onChange={v => setC("maxSmallCap", v)} />
-                      <NumField label="Max Mid Cap %" value={constraints.maxMidCap} onChange={v => setC("maxMidCap", v)} />
-                      <NumField label="Max Sub-IG %" value={constraints.maxSubIG} onChange={v => setC("maxSubIG", v)} />
-                      <NumField label="Min AAA/AA+ % (rated)" value={constraints.minHighCredit} onChange={v => setC("minHighCredit", v)} />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Asset Class Caps (%)</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {ASSET_CLASSES.map(c => (
-                          <NumField key={c.key} label={c.label} value={constraints.classCaps[c.key]} onChange={v => setClassCap(c.key, v)} />
-                        ))}
-                      </div>
-                    </div>
-                    <button onClick={() => setConstraints(DEFAULT_CONSTRAINTS)}
-                      className="w-full text-[11px] px-2 py-1.5 border border-border rounded-sm hover:bg-secondary">
-                      Reset to house policy
-                    </button>
-                  </div>
-                )}
-              </div>
-              {compliance.length > 0 && (
-                <div className="border-t border-border p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3 h-3" /> Compliance
-                    <span className={`ml-auto normal-case tracking-normal ${breaches ? "text-destructive" : "text-positive"}`}>
-                      {breaches ? `${breaches} breach${breaches > 1 ? "es" : ""}` : "All checks pass"}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {compliance.map((r, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2 text-[10px]">
-                        <span className="truncate text-muted-foreground">{r.label}</span>
-                        <span className={`mono-num shrink-0 ${r.ok ? "text-positive" : "text-destructive"}`}>
-                          {r.actual.toFixed(1)}% / {r.type === "max" ? "≤" : "≥"} {r.limit}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-
-
-
-            <section className="border border-border rounded-md bg-surface">
-              <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Proposal Summary</div>
-              <div className="p-3 space-y-2 text-xs">
-                <SummaryRow label="Allocated" value={fmtINR(totals.allocated)} />
-                <SummaryRow label="Unallocated" value={fmtINR(totals.unallocated)} tone={totals.unallocated < 0 ? "text-negative" : "text-muted-foreground"} />
-                <div className="h-px bg-border my-1" />
-                <SummaryRow label="Weighted Expected Return" value={`${totals.weightedReturn.toFixed(2)}%`} tone="text-positive font-semibold" />
-                <SummaryRow label="Portfolio Risk" value={riskLabel} />
-                <div className="h-px bg-border my-1" />
-                <SummaryRow label={`Projected FV (${projection.horizon}Y)`} value={fmtINR(projection.fv)} tone="text-foreground font-semibold" />
-                <SummaryRow label="Total Gain" value={fmtINR(projection.gain)} tone="text-positive" />
-              </div>
-              {totals.byClass.length > 0 && (
-                <div className="border-t border-border p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Asset Allocation</div>
-                  <div className="space-y-1.5">
-                    {totals.byClass.map(b => (
-                      <div key={b.key}>
-                        <div className="flex justify-between text-[11px]"><span>{b.label}</span><span className="mono-num">{b.pct.toFixed(1)}%</span></div>
-                        <div className="h-1.5 bg-secondary rounded-sm overflow-hidden"><div className="h-full bg-foreground/70" style={{ width: `${b.pct}%` }} /></div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-
+        <main className="px-5 lg:px-8 py-6 max-w-[1680px] mx-auto space-y-6">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-primary font-semibold mb-1">Build workspace</div>
+              <h2 className="text-xl font-semibold tracking-tight">Shape the recommendation</h2>
+              <p className="text-xs text-muted-foreground mt-1">Set the client brief, choose a construction style, then curate the investable universe.</p>
+            </div>
+            <div className="hidden md:flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground inline-flex items-center justify-center font-semibold">1</span> Configure <span className="w-8 h-px bg-border" />
+              <span className="w-5 h-5 rounded-full border border-border inline-flex items-center justify-center">2</span> Curate <span className="w-8 h-px bg-border" />
+              <span className="w-5 h-5 rounded-full border border-border inline-flex items-center justify-center">3</span> Review
+            </div>
           </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.12fr_1.25fr_0.9fr] gap-4 items-start">
+            <section className="border border-border rounded-md bg-surface overflow-hidden">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-primary/10 text-primary inline-flex items-center justify-center"><FilePlus2 className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Client brief</div><div className="text-[10px] text-muted-foreground">Who is this proposal for?</div></div></div>
+              <div className="p-4 grid grid-cols-2 gap-3">
+                <div className="col-span-2"><Field label="Client name"><input value={prospect.name} onChange={e => setProspect({ ...prospect, name: e.target.value })} placeholder="Enter prospect name" className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs" /></Field></div>
+                <Field label="Age"><input type="number" value={prospect.age} onChange={e => setProspect({ ...prospect, age: e.target.value })} placeholder="—" className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs mono-num" /></Field>
+                <Field label="Horizon (years)"><input type="number" value={prospect.horizonYears} onChange={e => setProspect({ ...prospect, horizonYears: e.target.value })} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs mono-num" /></Field>
+                <Field label="Risk profile"><select value={prospect.riskProfile} onChange={e => setProspect({ ...prospect, riskProfile: e.target.value })} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs">{["Conservative", "Moderate", "Aggressive", "Very Aggressive"].map(o => <option key={o}>{o}</option>)}</select></Field>
+                <Field label="Primary goal"><select value={prospect.goal} onChange={e => setProspect({ ...prospect, goal: e.target.value })} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs">{["Wealth Creation", "Retirement", "Child Education", "Tax Saving", "Income"].map(o => <option key={o}>{o}</option>)}</select></Field>
+              </div>
+            </section>
+
+            <section className="border border-border rounded-md bg-surface overflow-hidden">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-secondary text-foreground inline-flex items-center justify-center"><Sparkles className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Construction engine</div><div className="text-[10px] text-muted-foreground">Capital, strategy and guardrails</div></div></div>
+              <div className="p-4 grid grid-cols-2 gap-3">
+                <div className="col-span-2"><Field label={`Total corpus · ${fmtINR(totalCorpus)}`}><input type="number" value={totalCorpus} onChange={e => setTotalCorpus(Math.max(0, +e.target.value || 0))} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs mono-num" /></Field></div>
+                <Field label="Cash / idle return (%)"><input type="number" step="0.1" value={cashRate} onChange={e => setCashRate(+e.target.value || 0)} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs mono-num" /></Field>
+                <Field label="Optimisation strategy"><select value={allocStrategy} onChange={e => setAllocStrategy(e.target.value as AllocStrategy)} className="w-full bg-background border border-border rounded-sm px-2.5 py-2 text-xs"><option value="equal">Equal Weight (1/N)</option><option value="sharpe">Max Sharpe Ratio</option><option value="maxret">Max Return</option><option value="minrisk">Min Risk (Defensive)</option><option value="maxrisk">Max Risk (Aggressive)</option></select></Field>
+                <div className="col-span-2 flex items-center justify-between gap-3 rounded-sm border border-border bg-background px-3 py-2.5"><div><div className="text-xs font-medium">Constrained portfolio</div><div className="text-[10px] text-muted-foreground">Apply house limits to each exposure</div></div><input type="checkbox" checked={constrained} onChange={e => setConstrained(e.target.checked)} className="accent-primary w-4 h-4" /></div>
+                <button onClick={handleAutoCreate} disabled={creating} className="col-span-2 text-xs px-3 py-2.5 border border-primary/30 bg-primary text-primary-foreground rounded-sm hover:opacity-90 disabled:opacity-60 font-semibold inline-flex items-center justify-center gap-2">{creating ? <><LoaderCircle className="w-3.5 h-3.5 animate-spin" /> Creating portfolio…</> : <><Sparkles className="w-3.5 h-3.5" /> Auto-create portfolio</>}</button>
+                <button onClick={() => autoAllocate()} disabled={holdings.length === 0} className="col-span-2 text-[11px] px-3 py-2 border border-border rounded-sm hover:bg-secondary disabled:opacity-40 font-medium">Apply allocation to current holdings</button>
+              </div>
+            </section>
+
+            <section className="border border-border rounded-md bg-surface overflow-hidden">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2"><span className="w-7 h-7 rounded-sm bg-secondary text-foreground inline-flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5" /></span><div><div className="text-xs font-semibold">Proposal snapshot</div><div className="text-[10px] text-muted-foreground">Live portfolio health</div></div></div>
+              <div className="p-4 space-y-3"><div className="flex items-end justify-between"><span className="text-[11px] text-muted-foreground">Allocated</span><span className="text-xl font-semibold mono-num">{fmtINR(totals.allocated)}</span></div><div className="h-1.5 bg-secondary rounded-sm overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, totalCorpus ? totals.allocated / totalCorpus * 100 : 0)}%` }} /></div><div className="grid grid-cols-2 gap-y-3 gap-x-2 pt-1"><SummaryRow label="Holdings" value={String(holdingsLive.length)} /><SummaryRow label="Unallocated" value={fmtINR(totals.unallocated)} tone={totals.unallocated < 0 ? "text-negative" : "text-muted-foreground"} /><SummaryRow label="Expected return" value={`${totals.weightedReturn.toFixed(2)}%`} tone="text-positive font-semibold" /><SummaryRow label="Portfolio risk" value={riskLabel} /></div><div className="border-t border-border pt-3"><SummaryRow label={`Projected FV · ${projection.horizon}Y`} value={fmtINR(projection.fv)} tone="font-semibold" /><SummaryRow label="Total gain" value={fmtINR(projection.gain)} tone="text-positive" /></div></div>
+              {compliance.length > 0 && <div className="border-t border-border px-4 py-3"><div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground"><ShieldCheck className="w-3 h-3" /> Compliance <span className={`ml-auto normal-case tracking-normal ${breaches ? "text-destructive" : "text-positive"}`}>{breaches ? `${breaches} breach${breaches > 1 ? "es" : ""}` : "All checks pass"}</span></div></div>}
+            </section>
+          </div>
+
+          {constrained && <section className="border border-border rounded-md bg-surface px-4 py-3"><div className="flex items-center gap-2 mb-3"><SlidersHorizontal className="w-3.5 h-3.5 text-primary" /><span className="text-xs font-semibold">Exposure guardrails</span><span className="text-[10px] text-muted-foreground">Allocation is trimmed and redistributed until limits are met.</span><button onClick={() => setConstraints(DEFAULT_CONSTRAINTS)} className="ml-auto text-[10px] text-muted-foreground hover:text-foreground">Reset house policy</button></div><div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">{[<NumField label="Max / holding %" value={constraints.maxPerHolding} onChange={v => setC("maxPerHolding", v)} />, <NumField label="Max / sector %" value={constraints.maxPerSector} onChange={v => setC("maxPerSector", v)} />, <NumField label="Max / issuer %" value={constraints.maxPerIssuer} onChange={v => setC("maxPerIssuer", v)} />, <NumField label="Small cap max %" value={constraints.maxSmallCap} onChange={v => setC("maxSmallCap", v)} />, <NumField label="Mid cap max %" value={constraints.maxMidCap} onChange={v => setC("maxMidCap", v)} />, <NumField label="Sub-IG max %" value={constraints.maxSubIG} onChange={v => setC("maxSubIG", v)} />, <NumField label="AAA / AA+ min %" value={constraints.minHighCredit} onChange={v => setC("minHighCredit", v)} />]}</div><div className="mt-3 pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">{ASSET_CLASSES.map(c => <NumField key={c.key} label={`${c.label} cap %`} value={constraints.classCaps[c.key]} onChange={v => setClassCap(c.key, v)} />)}</div></section>}
 
           {/* BOTTOM: Universe + Proposed Portfolio */}
           <div className="grid grid-cols-12 gap-5 items-start">

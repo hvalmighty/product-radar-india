@@ -725,10 +725,8 @@ function ProposalPage() {
                  <div><div className="text-xs font-semibold">Proposed portfolio</div><div className="text-[10px] text-muted-foreground mt-0.5">Review, size and refine your holdings</div></div>
                  <div className="text-[10px] text-muted-foreground mono-num">{fmtINR(totals.allocated)} / {fmtINR(totalCorpus)}</div>
                </div>
-              {holdingsLive.length === 0 ? (
-                <div className="p-8 text-center text-xs text-muted-foreground">
-                  Pick securities from the catalog to start building the proposal.
-                </div>
+               {holdingsLive.length === 0 ? (
+                 <div className="p-10 text-center bg-background/30"><div className="w-10 h-10 mx-auto mb-3 rounded-full border border-dashed border-border flex items-center justify-center"><Plus className="w-4 h-4 text-muted-foreground" /></div><div className="text-xs font-medium text-foreground">Your portfolio is empty</div><div className="text-[11px] text-muted-foreground mt-1 max-w-[220px] mx-auto">Select the plus icon beside a security to add it to this recommendation.</div></div>
               ) : (
                 <div className="max-h-[calc(100vh-220px)] overflow-auto">
                   <table className="w-full text-xs">

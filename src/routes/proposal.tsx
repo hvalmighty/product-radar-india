@@ -1052,7 +1052,27 @@ function ProposalPage() {
               )}
             </div>
           </section>
+          </div>
+
+          {creating && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-4 px-8 py-7 rounded-md border border-border bg-surface shadow-lg">
+                <div className="relative w-12 h-12">
+                  <div className="absolute inset-0 rounded-full border-2 border-border" />
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-primary animate-spin" />
+                  <Sparkles className="absolute inset-0 m-auto w-4 h-4 text-primary" />
+                </div>
+                <div className="text-sm font-medium">Your portfolio is being created.</div>
+                <div className="text-[11px] text-muted-foreground">Screening the universe and applying {constrained ? "exposure constraints" : "strategy weights"}…</div>
+                <div className="w-56 h-1 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full animate-[proposalProgress_8s_linear_forwards]" style={{ width: 0 }} />
+                </div>
+              </div>
+              <style>{`@keyframes proposalProgress{from{width:0%}to{width:100%}}`}</style>
+            </div>
+          )}
         </main>
+
       </div>
     </TooltipProvider>
   );

@@ -261,16 +261,29 @@ function ProposalPage() {
   }
   type AllocStrategy = "equal" | "sharpe" | "maxret" | "maxrisk" | "minrisk";
   const [allocStrategy, setAllocStrategy] = useState<AllocStrategy>("equal");
+  const [constrained, setConstrained] = useState(true);
+  const [constraints, setConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
+  const setC = (k: keyof Omit<Constraints, "classCaps">, v: number) => setConstraints(p => ({ ...p, [k]: v }));
+  const setClassCap = (k: AssetClassKey, v: number) => setConstraints(p => ({ ...p, classCaps: { ...p.classCaps, [k]: v } }));
   const RF = 6.5; // risk-free proxy for Sharpe (10Y G-Sec)
+
+  function finalWeights(items: Array<Attrs & { klass: AssetClassKey }>, base: number[]) {
+    if (!constrained) {
+      const s = base.reduce((a, b) => a + b, 0) || 1;
+      return base.map(w => w / s);
+    }
+    return solveConstrained(items, base, constraints);
+  }
 
   function allocByWeights(weights: number[]) {
     const sum = weights.reduce((s, w) => s + w, 0);
     if (sum <= 0) return;
-    setHoldings(prev => prev.map((h, i) => ({
-      ...h,
-      amount: Math.floor((weights[i] / sum) * totalCorpus),
-    })));
+    setHoldings(prev => {
+      const w = finalWeights(prev, weights);
+      return prev.map((h, i) => ({ ...h, amount: Math.floor((w[i] ?? 0) * totalCorpus) }));
+    });
   }
+
 
   function autoAllocate(strategy: AllocStrategy = allocStrategy) {
     if (holdings.length === 0) return;

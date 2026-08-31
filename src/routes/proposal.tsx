@@ -719,7 +719,7 @@ function ProposalPage() {
 
 
           {/* RIGHT: Selected Holdings */}
-          <section className="col-span-12 lg:col-span-4">
+          <section className="col-span-12 lg:col-span-5 lg:sticky lg:top-[92px]">
             <div className="border border-border rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-border flex items-center justify-between">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Proposed Holdings ({holdingsLive.length})</div>

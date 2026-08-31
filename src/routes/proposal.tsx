@@ -610,9 +610,10 @@ function ProposalPage() {
           </div>
         </header>
 
-        <main className="px-6 py-5 max-w-[1600px] mx-auto grid grid-cols-12 gap-5">
-          {/* LEFT: Prospect + Assumptions */}
-          <aside className="col-span-12 lg:col-span-3 space-y-4">
+        <main className="px-6 py-5 max-w-[1600px] mx-auto space-y-5">
+          {/* TOP ROW: Prospect · Assumptions · Constraints · Summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+
             <section className="border border-border rounded-md bg-surface">
               <div className="px-3 py-2 border-b border-border text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-2">
                 <FilePlus2 className="w-3.5 h-3.5" /> Prospect

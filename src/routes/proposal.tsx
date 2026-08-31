@@ -290,10 +290,10 @@ function ProposalPage() {
     const live = holdings.map(h => h.klass === "CASH" ? { ...h, expectedReturn: cashRate } : h);
     switch (strategy) {
       case "equal": {
-        const each = Math.floor(totalCorpus / holdings.length);
-        setHoldings(prev => prev.map(h => ({ ...h, amount: each })));
+        allocByWeights(live.map(() => 1));
         return;
       }
+
       case "maxret": {
         // Tilt heavily to higher expected returns (cubic emphasis)
         const w = live.map(h => Math.pow(Math.max(0.01, h.expectedReturn), 3));

@@ -436,7 +436,7 @@ function ProposalPage() {
       const defTilt    = Math.pow(3 / score, policy.defBoost - 1);
       return w * growthTilt * defTilt;
     });
-    const wSum = weights!.reduce((s, w) => s + w, 0) || 1;
+    const solved = finalWeights(picks, weights!);
 
     const stamp = Date.now();
     const newHoldings: Holding[] = picks.map((p, i) => ({
@@ -445,11 +445,16 @@ function ProposalPage() {
       id: p.id,
       name: p.name,
       sub: p.sub,
-      amount: Math.floor((weights![i] / wSum) * totalCorpus),
+      amount: Math.floor((solved[i] ?? 0) * totalCorpus),
       expectedReturn: p.klass === "CASH" ? cashRate : p.ret,
       irrBasis: irrBasisFor(p.klass, p.name),
       risk: p.risk,
+      sector: p.sector,
+      issuer: p.issuer,
+      mcap: p.mcap,
+      credit: p.credit,
     }));
+
     setHoldings(newHoldings);
 
     // ---- Build commentary / investment thesis ----

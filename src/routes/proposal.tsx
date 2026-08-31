@@ -848,6 +848,57 @@ function ProposalPage() {
           </section>
           </div>
 
+          {thesis && (
+            <section className="mt-4 rounded-md border border-border bg-surface">
+              <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                <div>
+                  <div className="text-sm font-semibold">Portfolio Thesis</div>
+                  <div className="text-[11px] text-muted-foreground">How this portfolio was constructed · {thesis.strategyLabel} · {thesis.profile}</div>
+                </div>
+              </div>
+              <div className="p-4 space-y-4">
+                <p className="text-sm leading-relaxed">{thesis.headline}</p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Construction Logic</div>
+                    <ol className="space-y-1.5 list-decimal pl-4">
+                      {thesis.bullets.map((b, i) => (
+                        <li key={i} className="text-[12px] leading-relaxed text-muted-foreground">{b}</li>
+                      ))}
+                    </ol>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Why each asset class</div>
+                    <div className="space-y-2">
+                      {thesis.classNotes.map((c) => (
+                        <div key={c.klass} className="flex gap-3">
+                          <div className="mono-num text-[12px] font-semibold w-14 shrink-0 text-right">{c.pct.toFixed(1)}%</div>
+                          <div>
+                            <div className="text-[12px] font-medium leading-tight">{c.label}</div>
+                            <div className="text-[11px] text-muted-foreground leading-relaxed">{c.note}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-border">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Caveats &amp; assumptions</div>
+                  <ul className="space-y-1 list-disc pl-4">
+                    {thesis.caveats.map((c, i) => (
+                      <li key={i} className="text-[11px] leading-relaxed text-muted-foreground">{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          )}
+
+
+
           {creating && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-4 px-8 py-7 rounded-md border border-border bg-surface shadow-lg">

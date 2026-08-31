@@ -1055,6 +1055,20 @@ function Field({ label, children }: { label: React.ReactNode; children: React.Re
   );
 }
 
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="block">
+      <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-0.5 truncate">{label}</div>
+      <input
+        type="number" min={0} max={100} value={value}
+        onChange={e => onChange(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+        className="w-full text-xs px-2 py-1 border border-border rounded-sm bg-background mono-num"
+      />
+    </label>
+  );
+}
+
+
 function SummaryRow({ label, value, tone = "text-foreground" }: { label: string; value: string; tone?: string }) {
   return (
     <div className="flex justify-between items-baseline">

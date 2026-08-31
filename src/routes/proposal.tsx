@@ -719,12 +719,12 @@ function ProposalPage() {
 
 
           {/* RIGHT: Selected Holdings */}
-          <section className="col-span-12 lg:col-span-5 lg:sticky lg:top-[92px]">
-            <div className="border border-border rounded-md bg-surface">
-              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Proposed Holdings ({holdingsLive.length})</div>
-                <div className="text-[10px] text-muted-foreground mono-num">{fmtINR(totals.allocated)} / {fmtINR(totalCorpus)}</div>
-              </div>
+           <section className="col-span-12 lg:col-span-5 lg:sticky lg:top-[92px]">
+             <div className="border border-border rounded-md bg-surface overflow-hidden">
+               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                 <div><div className="text-xs font-semibold">Proposed portfolio</div><div className="text-[10px] text-muted-foreground mt-0.5">Review, size and refine your holdings</div></div>
+                 <div className="text-[10px] text-muted-foreground mono-num">{fmtINR(totals.allocated)} / {fmtINR(totalCorpus)}</div>
+               </div>
               {holdingsLive.length === 0 ? (
                 <div className="p-8 text-center text-xs text-muted-foreground">
                   Pick securities from the catalog to start building the proposal.

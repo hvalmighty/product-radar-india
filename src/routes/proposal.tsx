@@ -249,8 +249,9 @@ function ProposalPage() {
       irrBasis: irrBasisFor(activeClass, item.name),
       risk: item.risk,
       ...item.attrs,
-
+    }]);
   }
+
 
   function updateAmount(uid: string, amount: number) {
     setHoldings(prev => prev.map(h => h.uid === uid ? { ...h, amount: Math.max(0, amount) } : h));

@@ -598,15 +598,15 @@ function ProposalPage() {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="min-h-screen text-foreground">
-        <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-30">
-          <div className="pl-12 pr-6 py-3 flex items-center gap-4">
-            <div>
-              <h1 className="text-sm font-semibold leading-tight">Proposal Builder</h1>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Construct an ad-hoc model portfolio for a prospect</p>
+        <header className="border-b border-border bg-surface/90 backdrop-blur sticky top-0 z-30">
+          <div className="pl-12 pr-5 lg:pr-8 py-3 flex items-center gap-4">
+            <Link to="/" className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"><ArrowLeft className="w-3.5 h-3.5" /> Back to screener</Link>
+            <span className="h-4 w-px bg-border" />
+            <div className="text-[11px] text-muted-foreground"><span className="text-foreground font-medium">New proposal</span><span className="mx-1.5">/</span>{region}</div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] text-muted-foreground border border-border rounded-sm px-2 py-1"><span className="w-1.5 h-1.5 rounded-full bg-positive" /> Draft</span>
+              <button onClick={exportProposal} className="text-xs inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-sm hover:bg-secondary"><Download className="w-3.5 h-3.5" /> Export CSV</button>
             </div>
-            <button onClick={exportProposal} className="ml-auto text-xs inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-sm hover:bg-secondary">
-              <Download className="w-3.5 h-3.5" /> Export CSV
-            </button>
           </div>
         </header>
 

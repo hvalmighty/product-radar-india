@@ -88,16 +88,19 @@ const isRated = (c: string) => c !== "Unrated" && !!c;
 type CheckRow = { label: string; actual: number; limit: number; type: "max" | "min"; ok: boolean };
 
 /**
- * Iterative cap-and-redistribute solver ("water filling"): repeatedly scales
- * down any group breaching a maximum and scales up the high-credit sleeve if it
- * is below its floor, renormalising to 100% after each pass.
+ * Feasible water-filling solver. Caps are enforced *hard*: any group over its
+ * cap is scaled back, and the freed weight is redistributed ONLY to holdings
+ * that still have headroom in every group they belong to (so a capped group is
+ * never re-inflated by a global renormalisation). Runs until every limit holds
+ * or no headroom is left (infeasible policy).
  */
 function solveConstrained(items: Array<Attrs & { klass: AssetClassKey }>, baseWeights: number[], c: Constraints): number[] {
   const n = items.length;
   if (n === 0) return [];
-  let w = baseWeights.map(x => Math.max(1e-6, x));
-  const norm = () => { const s = w.reduce((a, b) => a + b, 0) || 1; w = w.map(x => x / s); };
-  norm();
+  let w = baseWeights.map(x => Math.max(1e-9, x));
+  const sum = (idx: number[]) => idx.reduce((s, i) => s + w[i], 0);
+  const total = () => w.reduce((a, b) => a + b, 0);
+  { const s = total(); w = w.map(x => x / s); }
 
   const groups: Array<{ idx: number[]; cap: number }> = [];
   items.forEach((_, i) => groups.push({ idx: [i], cap: c.maxPerHolding / 100 }));
@@ -108,7 +111,6 @@ function solveConstrained(items: Array<Attrs & { klass: AssetClassKey }>, baseWe
   };
   byKey(it => it.sector, c.maxPerSector);
   byKey(it => it.issuer, c.maxPerIssuer);
-  items.forEach(() => {});
   (Object.keys(c.classCaps) as AssetClassKey[]).forEach(k => {
     const idx = items.map((it, i) => it.klass === k ? i : -1).filter(i => i >= 0);
     if (idx.length) groups.push({ idx, cap: c.classCaps[k] / 100 });
@@ -122,32 +124,69 @@ function solveConstrained(items: Array<Attrs & { klass: AssetClassKey }>, baseWe
 
   const ratedIdx = items.map((it, i) => isRated(it.credit) ? i : -1).filter(i => i >= 0);
   const hcIdx = ratedIdx.filter(i => isHighCredit(items[i].credit));
+  const lowCreditIdx = ratedIdx.filter(i => !isHighCredit(items[i].credit));
+  const EPS = 1e-7;
 
-  for (let pass = 0; pass < 400; pass++) {
-    let changed = false;
+  for (let pass = 0; pass < 800; pass++) {
+    // 1) enforce the minimum high-credit floor by trimming the low-credit sleeve
+    if (hcIdx.length && lowCreditIdx.length) {
+      const ratedTot = sum(ratedIdx);
+      const hcTot = sum(hcIdx);
+      if (ratedTot > 0 && hcTot / ratedTot < c.minHighCredit / 100 - EPS) {
+        // max low-credit allowed given current high-credit weight
+        const allowedLow = hcTot * (100 - c.minHighCredit) / Math.max(1e-9, c.minHighCredit);
+        const lowTot = sum(lowCreditIdx);
+        if (lowTot > allowedLow) {
+          const f = allowedLow / lowTot;
+          lowCreditIdx.forEach(i => { w[i] *= f; });
+        }
+      }
+    }
+
+    // 2) enforce every maximum
+    let over = false;
     for (const g of groups) {
-      const tot = g.idx.reduce((s, i) => s + w[i], 0);
-      if (tot > g.cap + 1e-6 && tot > 0) {
+      const tot = sum(g.idx);
+      if (tot > g.cap + EPS && tot > 0) {
         const f = g.cap / tot;
         g.idx.forEach(i => { w[i] *= f; });
-        changed = true;
+        over = true;
       }
     }
-    if (hcIdx.length && ratedIdx.length) {
-      const ratedTot = ratedIdx.reduce((s, i) => s + w[i], 0);
-      const hcTot = hcIdx.reduce((s, i) => s + w[i], 0);
-      if (ratedTot > 0 && hcTot / ratedTot < c.minHighCredit / 100 - 1e-6) {
-        const target = (c.minHighCredit / 100) * ratedTot;
-        const f = Math.min(5, target / Math.max(1e-9, hcTot));
-        hcIdx.forEach(i => { w[i] *= f; });
-        changed = true;
+
+    // 3) redistribute the shortfall only to holdings with headroom everywhere
+    const t = total();
+    const gap = 1 - t;
+    if (Math.abs(gap) < 1e-9 && !over) break;
+    if (gap > 1e-9) {
+      const binding = new Set<number>();
+      for (const g of groups) if (sum(g.idx) >= g.cap - EPS) g.idx.forEach(i => binding.add(i));
+      // low-credit names must not grow past the high-credit floor
+      if (hcIdx.length) {
+        const ratedTot = sum(ratedIdx);
+        if (ratedTot > 0 && sum(hcIdx) / ratedTot <= c.minHighCredit / 100 + EPS) lowCreditIdx.forEach(i => binding.add(i));
       }
+      const free = w.map((_, i) => i).filter(i => !binding.has(i));
+      if (!free.length) break; // policy infeasible with this universe — leave under-allocated rather than breach
+      const freeTot = sum(free) || free.length;
+      free.forEach(i => { w[i] += gap * ((w[i] || 1 / free.length) / freeTot); });
+    } else if (gap < -1e-9) {
+      const f = 1 / t;
+      w = w.map(x => x * f);
     }
-    norm();
-    if (!changed) break;
+  }
+  // final safety pass: never return a set that breaches a maximum
+  for (let k = 0; k < 50; k++) {
+    let fixed = false;
+    for (const g of groups) {
+      const tot = sum(g.idx);
+      if (tot > g.cap + EPS && tot > 0) { const f = g.cap / tot; g.idx.forEach(i => { w[i] *= f; }); fixed = true; }
+    }
+    if (!fixed) break;
   }
   return w;
 }
+
 
 function checkConstraints(items: Array<Attrs & { klass: AssetClassKey; amount: number }>, total: number, c: Constraints): CheckRow[] {
   const pct = (v: number) => total > 0 ? (v / total) * 100 : 0;

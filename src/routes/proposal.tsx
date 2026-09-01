@@ -594,10 +594,19 @@ function ProposalPage() {
   }, [holdingsLive, totalCorpus]);
 
   const compliance = useMemo(
-    () => holdingsLive.length ? checkConstraints(holdingsLive, holdingsLive.reduce((s, h) => s + h.amount, 0), constraints) : [],
-    [holdingsLive, constraints]
+    () => {
+      if (!holdingsLive.length) return [];
+      const allocated = holdingsLive.reduce((s, h) => s + h.amount, 0);
+      // Un-allocated corpus counts as cash, so exposures are measured against the
+      // full corpus — that keeps a deliberately under-allocated (feasible) solution
+      // from being re-scaled into an artificial breach.
+      const base = constrained ? Math.max(allocated, totalCorpus) : allocated;
+      return checkConstraints(holdingsLive, base, constraints);
+    },
+    [holdingsLive, constraints, constrained, totalCorpus]
   );
   const breaches = compliance.filter(r => !r.ok).length;
+
   const [showCompliance, setShowCompliance] = useState(false);
 
 

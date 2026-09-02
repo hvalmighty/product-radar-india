@@ -260,3 +260,21 @@
 @utility gradient-primary {
   background-image: var(--gradient-primary);
 }
+
+/* ---------------------------------------------------------------------------
+   Recharts theming
+   SVG *presentation attributes* (stroke="var(--x)") are not CSS and Chrome
+   does not resolve custom properties there — the value is invalid and the
+   element renders with stroke:none (invisible lines). Drive chart colours
+   from real CSS rules instead, which also keeps dark mode working.
+--------------------------------------------------------------------------- */
+.recharts-cartesian-grid line { stroke: var(--border); }
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line { stroke: var(--border); }
+.recharts-cartesian-axis-tick-value { fill: var(--muted-foreground); }
+.recharts-legend-item-text { color: var(--muted-foreground); }
+
+.chart-line-primary .recharts-curve { stroke: var(--primary); }
+.chart-line-muted .recharts-curve { stroke: var(--muted-foreground); }
+.chart-line-info .recharts-curve { stroke: var(--info); }
+.chart-pie-sep .recharts-sector { stroke: var(--background); }

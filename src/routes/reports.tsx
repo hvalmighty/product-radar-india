@@ -878,7 +878,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       <Section id="asset" visible={activeTab === "performance"} title="3. Performance & Attribution" icon={<TrendingUp className="w-4 h-4" />}>
         <Card title={`Portfolio vs ${benchmarkMode === "blended" ? "Blended Benchmark" : "Asset Benchmarks"} · ${period}`}>
           <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground mb-2"><span><i className="inline-block w-2 h-2 rounded-full bg-primary mr-1" />Portfolio growth (indexed)</span><span><i className="inline-block w-2 h-2 rounded-full bg-muted-foreground mr-1" />Benchmark growth (indexed)</span><span className="ml-auto">Starting base: 100</span></div>
-          <div className="h-64"><ResponsiveContainer key={`perf-${activeTab}-${period}-${benchmarkMode}`} width="100%" height={256}><LineChart data={performanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} /><XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={period === "1Y" ? 1 : period === "3Y" ? 5 : 11} /><YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} domain={["dataMin - 3", "dataMax + 3"]} /><Tooltip content={<NiceTooltip formatter={(v: number) => v.toFixed(1)} />} /><Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="var(--primary)" strokeWidth={2.5} dot={false} isAnimationActive={false} /><Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>
+          <div className="h-64"><ResponsiveContainer key={`perf-${activeTab}-${period}-${benchmarkMode}`} width="100%" height={256}><LineChart data={performanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} /><XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={period === "1Y" ? 1 : period === "3Y" ? 5 : 11} /><YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} domain={["dataMin - 3", "dataMax + 3"]} /><Tooltip content={<NiceTooltip formatter={(v: number) => v.toFixed(1)} />} /><Line className="chart-line-primary" type="monotone" dataKey="portfolio" name="Portfolio" stroke="var(--primary)" strokeWidth={2.5} dot={false} isAnimationActive={false} /><Line className="chart-line-muted" type="monotone" dataKey="benchmark" name="Benchmark" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>
         </Card>
         <div className="grid md:grid-cols-3 gap-3 mt-4"><Stat label="Annualised portfolio return" value={pct(blendedReturn)} hint={`${period} review period`} /><Stat label="Annualised benchmark" value={pct(benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)} hint={benchmarkMode === "blended" ? "Asset-weighted" : "Reference asset set"} /><Stat label="Active return / alpha" value={`${blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5) >= 0 ? "+" : ""}${(blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)).toFixed(1)}%`} hint="Before fees and taxes" /></div>
         <Card title="Asset Class Holdings & Performance">
@@ -952,7 +952,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={liquidity} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} paddingAngle={2} stroke="var(--background)" strokeWidth={2}
+                  <Pie data={liquidity} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} paddingAngle={2} className="chart-pie-sep" strokeWidth={2}
                     label={(e: any) => e.pct >= 6 ? `${pct(e.pct, 0)}` : ""} labelLine={false}>
                     {liquidity.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
@@ -1062,7 +1062,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={bySector} dataKey="value" nameKey="name" innerRadius={48} outerRadius={92} paddingAngle={1.5} stroke="var(--background)" strokeWidth={2}
+                  <Pie data={bySector} dataKey="value" nameKey="name" innerRadius={48} outerRadius={92} paddingAngle={1.5} className="chart-pie-sep" strokeWidth={2}
                     label={(e: any) => e.pct > 6 ? e.name : ""} labelLine={false}>
                     {bySector.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
@@ -1077,7 +1077,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={byMarketCap} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={2} stroke="var(--background)" strokeWidth={2}
+                  <Pie data={byMarketCap} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={2} className="chart-pie-sep" strokeWidth={2}
                     label={(e: any) => `${pct(e.pct, 0)}`} labelLine={false}>
                     {byMarketCap.map((_, i) => <Cell key={i} fill={rgrad(i + 2)} />)}
                   </Pie>

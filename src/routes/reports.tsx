@@ -1499,8 +1499,11 @@ function FixedIncomeMFAnalysis({ holdings }: { holdings: Holding[] }) {
 // ============================================================================
 
 function Section({ id, title, icon, children, visible = true }: { id: string; title: string; icon: React.ReactNode; children: React.ReactNode; visible?: boolean }) {
+  // Charts must never be mounted inside a display:none container — Recharts
+  // measures 0x0 and renders nothing. Only mount the active section.
+  if (!visible) return null;
   return (
-    <section id={id} aria-hidden={!visible} className={`mb-10 scroll-mt-20 ${visible ? "" : "hidden print:block"}`}>
+    <section id={id} className="mb-10 scroll-mt-20">
       <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
         <div className="text-foreground">{icon}</div>
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
@@ -1509,6 +1512,7 @@ function Section({ id, title, icon, children, visible = true }: { id: string; ti
     </section>
   );
 }
+
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (

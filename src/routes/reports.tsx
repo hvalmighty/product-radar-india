@@ -4,7 +4,8 @@ import type { Holding, PortfolioParseResult } from "@/lib/ecas-parser";
 import {
   ArrowLeft, FileText, Users, User, Printer, Download, ChevronRight,
   TrendingUp, TrendingDown, Droplet, Layers, Building2, Shield, PieChart as PieIcon,
-  MessageSquare, AlertTriangle, CheckCircle2, Info,
+  MessageSquare, AlertTriangle, CheckCircle2, Info, CalendarRange, SlidersHorizontal,
+  Table2, BarChart3, Landmark, WalletCards, FileSpreadsheet, X,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
@@ -15,12 +16,18 @@ import { SAMPLE_FAMILIES, SAMPLE_PORTFOLIOS, seedSamplePortfolios, removeSampleP
 import { Sparkles, Trash, Presentation } from "lucide-react";
 import { useRegion, fmtMoney } from "@/lib/region";
 import { exportReportToPptx } from "@/lib/report-pptx";
+import { buildTaxLots, buildRealisedLots, estimateTax, periodLabel, periodStart, summarise, TAX_RULES, type TaxLot, type RealisedLot } from "@/lib/capital-gains";
+import { CapitalGainsSection } from "@/components/report-capital-gains";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
     meta: [
-      { title: "Portfolio Analytics Report · mPower Wealth" },
-      { name: "description", content: "Generate consolidated portfolio analytics reports across customers and families with allocation, performance, risk and liquidity views." },
+      { title: "Client Reporting & Capital Gains · mPower Wealth" },
+      { name: "description", content: "Create detailed client portfolio reports with performance, allocation, cashflow, holdings and region-aware capital gains analytics." },
+      { property: "og:title", content: "Client Reporting & Capital Gains · mPower Wealth" },
+      { property: "og:description", content: "Detailed client portfolio reporting with interactive analytics, holdings drill-downs and capital gains intelligence." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ReportsPage,
@@ -363,7 +370,17 @@ function ReportView({ portfolios, title, mode, onBack }: {
   const allHoldings = useMemo(() => portfolios.flatMap(p => p.data.holdings), [portfolios]);
   const [expandedAC, setExpandedAC] = useState<Record<string, boolean>>({});
   const [factsheet, setFactsheet] = useState<Holding | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [period, setPeriod] = useState("1Y");
+  const [benchmarkMode, setBenchmarkMode] = useState<"blended" | "asset">("blended");
+  const [search, setSearch] = useState("");
   const totalValue = useMemo(() => allHoldings.reduce((s, h) => s + h.value, 0), [allHoldings]);
+  const { region, meta } = useRegion();
+  const gainLots = useMemo(() => buildTaxLots(allHoldings, region), [allHoldings, region]);
+  const realisedLots = useMemo(() => buildRealisedLots(allHoldings, region, periodStart(region)), [allHoldings, region]);
+  const gainSummary = useMemo(() => summarise(realisedLots), [realisedLots]);
+  const taxEstimate = useMemo(() => estimateTax(gainSummary, region), [gainSummary, region]);
+  const gainPeriod = periodLabel(region);
 
   // Synthesize cashflows (deterministic from total)
   const contribution = totalValue * 0.78;
@@ -515,13 +532,39 @@ function ReportView({ portfolios, title, mode, onBack }: {
     });
   }, [riskProfile, byAssetClass]);
 
+  const blendedReturn = byAssetClass.reduce((s, a) => s + a.ret * (a.pct / 100), 0);
+  const blendedBenchmark = byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0);
+  // Performance time series — deterministic monthly path for a consistent client report.
+  const performanceSeries = useMemo(() => {
+    const months = period === "5Y" ? 60 : period === "3Y" ? 36 : 12;
+    const start = new Date();
+    return Array.from({ length: months }, (_, i) => {
+      const month = new Date(start.getFullYear(), start.getMonth() - (months - 1 - i), 1);
+      const progress = i / Math.max(1, months - 1);
+      const volatility = seedNum(`${title}-${i}-${period}`, -1.4, 1.4);
+      const portfolio = 100 * (1 + (blendedReturn / 100) * progress + volatility / 100);
+      const benchmark = 100 * (1 + (benchmarkMode === "blended" ? blendedBenchmark : 12.5) / 100 * progress);
+      return { label: month.toLocaleDateString("en-US", { month: "short", year: "2-digit" }), portfolio, benchmark, alpha: portfolio - benchmark };
+    });
+  }, [period, benchmarkMode, blendedBenchmark, blendedReturn, title]);
+
   // Bonds for annexure
   const bondHoldings = allHoldings.filter(h => h.type === "Bond" || /Debt/.test(assetClass(h)));
 
+  const tabs = [
+    { id: "overview", label: "Overview", icon: PieIcon },
+    { id: "performance", label: "Performance", icon: TrendingUp },
+    { id: "allocation", label: "Allocation", icon: Layers },
+    { id: "income", label: "Income & Cashflow", icon: WalletCards },
+    { id: "gains", label: "Capital Gains", icon: Landmark },
+    { id: "holdings", label: "Holdings", icon: Table2 },
+    { id: "commentary", label: "Commentary", icon: MessageSquare },
+    { id: "annex", label: "Annexures", icon: Shield },
+  ];
   const sections = [
     { id: "exec", label: "1. Executive Summary" },
     { id: "commentary", label: "2. Portfolio Commentary" },
-    { id: "asset", label: "3. Asset Class Performance" },
+    { id: "asset", label: "3. Performance & Attribution" },
     { id: "liquidity", label: "4. Liquidity & Cashflows" },
     { id: "products", label: "5. Product Holdings" },
     { id: "drilldown", label: "6. Portfolio Drilldown" },
@@ -632,6 +675,8 @@ function ReportView({ portfolios, title, mode, onBack }: {
       fixedIncomeMF,
       bondHoldings: bondHoldings.map(h => ({ isin: h.isin, name: h.name, rating: ratingOf(h.name), quantity: h.quantity, value: h.value })),
       benchmarks: Object.entries(ASSET_BENCHMARKS).map(([k, v]) => ({ assetClass: k, benchmark: v.name, ret: v.ret })),
+       performanceSeries: performanceSeries.map(({ label, portfolio, benchmark }) => ({ label, portfolio, benchmark })),
+      capitalGains: { period: gainPeriod, realised: gainSummary.total, stcg: gainSummary.stcg, ltcg: gainSummary.ltcg, unrealised: gainLots.reduce((s, l) => s + l.unrealised, 0), indicativeTax: taxEstimate.total, lotCount: gainLots.length + realisedLots.length },
       commentary: {
         blendedReturn, blendedBench, alpha, riskBand, riskScore,
         top5Concentration: top5, advisorSummary,
@@ -648,15 +693,25 @@ function ReportView({ portfolios, title, mode, onBack }: {
           references resolve to nothing → invisible bars/slices). */}
       <ChartDefs />
       {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border print:hidden">
+      <div className="flex flex-wrap items-center gap-3 mb-5 pb-4 border-b border-border print:hidden">
         <button onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to selection
         </button>
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => exportReportToPptx(buildPptPayload())}
-            className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
-            <Presentation className="w-3.5 h-3.5" /> Export to PPT
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border rounded-sm px-2 py-1.5 bg-surface">
+            <CalendarRange className="w-3.5 h-3.5" />
+            <select value={period} onChange={e => setPeriod(e.target.value)} className="bg-transparent text-foreground focus:outline-none">
+              <option value="1Y">Review period · 1 year</option><option value="3Y">Review period · 3 years</option><option value="5Y">Review period · 5 years</option>
+            </select>
+          </label>
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground border border-border rounded-sm px-2 py-1.5 bg-surface">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <select value={benchmarkMode} onChange={e => setBenchmarkMode(e.target.value as "blended" | "asset")} className="bg-transparent text-foreground focus:outline-none">
+              <option value="blended">Blended benchmark</option><option value="asset">Asset benchmarks</option>
+            </select>
+          </label>
+          <button onClick={() => exportReportToPptx(buildPptPayload())} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
+            <Presentation className="w-3.5 h-3.5" /> Export PPT
           </button>
           <button onClick={() => window.print()} className="px-3 py-1.5 text-xs border border-border rounded-sm hover:bg-secondary inline-flex items-center gap-1.5">
             <Printer className="w-3.5 h-3.5" /> Print / PDF
@@ -681,15 +736,25 @@ function ReportView({ portfolios, title, mode, onBack }: {
         )}
       </div>
 
-      {/* Section nav */}
-      <nav className="flex flex-wrap gap-1 mb-8 text-xs border-y border-border py-2 print:hidden">
-        {sections.map(s => (
-          <a key={s.id} href={`#${s.id}`} className="px-2.5 py-1 rounded-sm hover:bg-secondary text-muted-foreground hover:text-foreground">{s.label}</a>
-        ))}
-      </nav>
+      {/* Report workspace navigation */}
+      <div className="mb-8 print:hidden">
+        <div className="flex items-end justify-between gap-4 mb-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Client reporting workspace</div>
+            <div className="text-sm font-semibold mt-1">{gainPeriod} · {meta.label} · {period} review</div>
+          </div>
+          <div className="hidden md:flex items-center gap-1.5 text-[10px] text-muted-foreground"><span className="w-1.5 h-1.5 rounded-full bg-positive" /> Indicative data · updated today</div>
+        </div>
+        <nav className="flex overflow-x-auto gap-1 border-y border-border py-2" aria-label="Report tabs">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`shrink-0 px-3 py-2 rounded-sm text-[11px] inline-flex items-center gap-1.5 transition-colors ${activeTab === tab.id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}><Icon className="w-3.5 h-3.5" />{tab.label}</button>;
+          })}
+        </nav>
+      </div>
 
       {/* SECTION 1: Executive Summary */}
-      <Section id="exec" title="1. Executive Summary" icon={<PieIcon className="w-4 h-4" />}>
+      <Section id="exec" visible={activeTab === "overview"} title="1. Executive Summary" icon={<PieIcon className="w-4 h-4" />}>
         <div className="grid md:grid-cols-4 gap-3 mb-6">
           <Stat label="Portfolio Value" value={fmtINR(totalValue)} hint="Closing" />
           <Stat label="Portfolio P/E" value={portfolioPE.toFixed(1)} hint="Weighted equity" />
@@ -774,6 +839,11 @@ function ReportView({ portfolios, title, mode, onBack }: {
             </div>
           </Card>
         </div>
+        <div className="grid md:grid-cols-3 gap-4 mt-4">
+          <Card title="Fees & cost drag"><div className="space-y-2 text-xs"><div className="flex justify-between"><span className="text-muted-foreground">Estimated management & product fees</span><span className="mono-num">{fmtINR(totalValue * 0.009)}</span></div><div className="flex justify-between"><span className="text-muted-foreground">Estimated transaction / tax drag</span><span className="mono-num">{fmtINR(totalValue * 0.003)}</span></div><div className="flex justify-between border-t border-border pt-2 font-semibold"><span>Estimated annual drag</span><span className="mono-num text-negative">{fmtINR(totalValue * 0.012)}</span></div></div></Card>
+          <Card title="Risk snapshot"><div className="grid grid-cols-2 gap-3"><Stat label="Equity beta" value={(0.78 + equityShare * 0.32).toFixed(2)} hint="Modelled" /><Stat label="Volatility" value={`${(7.2 + equityShare * 12.4).toFixed(1)}%`} hint="Annualised" /></div></Card>
+          <Card title="Report controls"><div className="text-[11px] text-muted-foreground leading-relaxed">Use the period and benchmark controls above to align this report to the review conversation. Figures are before personal tax unless labelled otherwise.</div></Card>
+        </div>
       </Section>
 
       {/* SECTION 2: Portfolio Commentary */}
@@ -790,10 +860,16 @@ function ReportView({ portfolios, title, mode, onBack }: {
         debtShare={debtShare}
         portfolioCount={portfolios.length}
         holdingsCount={allHoldings.length}
+        visible={activeTab === "commentary"}
       />
 
       {/* SECTION 3: Asset Class Performance */}
-      <Section id="asset" title="3. Asset Class Performance" icon={<Layers className="w-4 h-4" />}>
+      <Section id="asset" visible={activeTab === "performance"} title="3. Performance & Attribution" icon={<TrendingUp className="w-4 h-4" />}>
+        <Card title={`Portfolio vs ${benchmarkMode === "blended" ? "Blended Benchmark" : "Asset Benchmarks"} · ${period}`}>
+          <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground mb-2"><span><i className="inline-block w-2 h-2 rounded-full bg-primary mr-1" />Portfolio growth (indexed)</span><span><i className="inline-block w-2 h-2 rounded-full bg-muted-foreground mr-1" />Benchmark growth (indexed)</span><span className="ml-auto">Starting base: 100</span></div>
+          <div className="h-64"><ResponsiveContainer width="100%" height="100%"><LineChart data={performanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} /><XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={period === "1Y" ? 1 : period === "3Y" ? 5 : 11} /><YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} domain={["dataMin - 3", "dataMax + 3"]} /><Tooltip content={<NiceTooltip formatter={(v: number) => v.toFixed(1)} />} /><Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} /><Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="5 4" dot={false} /></LineChart></ResponsiveContainer></div>
+        </Card>
+        <div className="grid md:grid-cols-3 gap-3 mt-4"><Stat label="Annualised portfolio return" value={pct(blendedReturn)} hint={`${period} review period`} /><Stat label="Annualised benchmark" value={pct(benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)} hint={benchmarkMode === "blended" ? "Asset-weighted" : "Reference asset set"} /><Stat label="Active return / alpha" value={`${blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5) >= 0 ? "+" : ""}${(blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)).toFixed(1)}%`} hint="Before fees and taxes" /></div>
         <Card title="Asset Class Holdings & Performance">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -804,16 +880,18 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <th className="text-right py-2">Value</th>
                   <th className="text-right py-2">% Alloc</th>
                   <th className="text-right py-2">Since Inception</th>
-                  <th className="text-right py-2">Review Period (1Y)</th>
+                  <th className="text-right py-2">Review Period ({period})</th>
                   <th className="text-left py-2 pl-4">Benchmark</th>
-                  <th className="text-right py-2">Benchmark Ret</th>
+                  <th className="text-right py-2">Benchmark ({period})</th>
                   <th className="text-right py-2">Alpha</th>
                 </tr>
               </thead>
               <tbody>
                 {byAssetClass.map(a => {
-                  const review1Y = a.ret * 0.6;
-                  const alpha = a.ret - a.bench.ret;
+                  const periodFactor = period === "1Y" ? 0.6 : period === "3Y" ? 0.85 : 1;
+                  const reviewReturn = a.ret * periodFactor;
+                  const benchmarkReturn = a.bench.ret * periodFactor;
+                  const alpha = reviewReturn - benchmarkReturn;
                   const open = !!expandedAC[a.name];
                   return (
                     <React.Fragment key={a.name}>
@@ -831,9 +909,9 @@ function ReportView({ portfolios, title, mode, onBack }: {
                         <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
                         <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
                         <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
-                        <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(review1Y)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(reviewReturn)}</td>
                         <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
-                        <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(a.bench.ret)}</td>
+                        <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(benchmarkReturn)}</td>
                         <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>
                       </tr>
                       {open && (
@@ -856,7 +934,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       </Section>
 
       {/* SECTION 4: Liquidity & Cashflows */}
-      <Section id="liquidity" title="4. Portfolio Liquidity & Upcoming Cashflows (180 days)" icon={<Droplet className="w-4 h-4" />}>
+      <Section id="liquidity" visible={activeTab === "income"} title="4. Portfolio Liquidity & Upcoming Cashflows (180 days)" icon={<Droplet className="w-4 h-4" />}>
         <div className="grid md:grid-cols-2 gap-4">
           <Card title="Liquidity Profile">
             <div className="h-64">
@@ -908,7 +986,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       </Section>
 
       {/* SECTION 5: Product Holdings */}
-      <Section id="products" title="5. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
+      <Section id="products" visible={activeTab === "holdings"} title="5. Product Wise Holdings" icon={<Building2 className="w-4 h-4" />}>
         {byAssetClass.map(ac => (
           <Card key={ac.name} title={`${ac.name} — ${fmtINR(ac.value)} (${pct(ac.pct)})`}>
             <SleeveHoldingsTable ac={ac} onFactsheet={setFactsheet} />
@@ -949,7 +1027,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       </Section>
 
       {/* SECTION 6: Drilldown */}
-      <Section id="drilldown" title="6. Portfolio Drilldown" icon={<TrendingUp className="w-4 h-4" />}>
+      <Section id="drilldown" visible={activeTab === "allocation"} title="6. Portfolio Drilldown" icon={<TrendingUp className="w-4 h-4" />}>
         <div className="grid md:grid-cols-2 gap-4">
           <Card title="Top 10 Issuers">
             <div className="h-64">
@@ -1038,14 +1116,17 @@ function ReportView({ portfolios, title, mode, onBack }: {
         </Card>
       </Section>
 
-      {/* SECTION 7: MF Drilldown */}
-      <Section id="mf" title="7. Mutual Fund Drilldown" icon={<Layers className="w-4 h-4" />}>
+      {/* SECTION 7: Capital Gains */}
+      <CapitalGainsSection visible={activeTab === "gains"} lots={gainLots} realisedLots={realisedLots} summary={gainSummary} tax={taxEstimate} rules={TAX_RULES[region]} search={search} setSearch={setSearch} periodLabel={gainPeriod} currency={meta.currency} />
+
+      {/* SECTION 8: MF Drilldown */}
+      <Section id="mf" visible={activeTab === "holdings"} title="7. Mutual Fund Drilldown" icon={<Layers className="w-4 h-4" />}>
         <MFOverlap holdings={allHoldings} />
         <FixedIncomeMFAnalysis holdings={allHoldings} />
       </Section>
 
-      {/* SECTION 8: Annexures */}
-      <Section id="annex" title="8. Annexures" icon={<Shield className="w-4 h-4" />}>
+      {/* SECTION 9: Annexures */}
+      <Section id="annex" visible={activeTab === "annex"} title="8. Annexures" icon={<Shield className="w-4 h-4" />}>
         <Card title="Annexure A — Asset Class & Benchmark Mapping">
           <table className="w-full text-xs">
             <thead className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1417,9 +1498,9 @@ function FixedIncomeMFAnalysis({ holdings }: { holdings: Holding[] }) {
 // UI helpers
 // ============================================================================
 
-function Section({ id, title, icon, children }: { id: string; title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({ id, title, icon, children, visible = true }: { id: string; title: string; icon: React.ReactNode; children: React.ReactNode; visible?: boolean }) {
   return (
-    <section id={id} className="mb-10 scroll-mt-20">
+    <section id={id} aria-hidden={!visible} className={`mb-10 scroll-mt-20 ${visible ? "" : "hidden print:block"}`}>
       <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border">
         <div className="text-foreground">{icon}</div>
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
@@ -1477,10 +1558,10 @@ type CommentaryProps = {
   holdingsCount: number;
 };
 
-function CommentarySection(p: CommentaryProps) {
+function CommentarySection(p: CommentaryProps & { visible?: boolean }) {
   const {
     totalValue, byAssetClass, byIssuer, bySector, byMarketCap, byRating,
-    liquidity, riskProfile, equityShare, debtShare, portfolioCount, holdingsCount,
+    liquidity, riskProfile, equityShare, debtShare, portfolioCount, holdingsCount, visible = true,
   } = p;
 
   // ---- Performance ----
@@ -1591,7 +1672,7 @@ function CommentarySection(p: CommentaryProps) {
   ];
 
   return (
-    <Section id="commentary" title="2. Portfolio Commentary" icon={<MessageSquare className="w-4 h-4" />}>
+    <Section id="commentary" visible={visible} title="2. Portfolio Commentary" icon={<MessageSquare className="w-4 h-4" />}>
       <div className="grid md:grid-cols-4 gap-3">
         <Stat label="Blended Return" value={pct(weightedReturn)} hint={`vs ${pct(weightedBench)} bench`} />
         <Stat label="Portfolio Alpha" value={`${alpha >= 0 ? "+" : ""}${alpha.toFixed(1)}%`} hint="asset-weighted" />

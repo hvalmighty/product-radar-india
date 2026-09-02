@@ -188,8 +188,8 @@ function NiceTooltip({ active, payload, label, formatter }: any) {
   );
 }
 
-const AXIS_TICK = { fontSize: 10, fill: "hsl(var(--muted-foreground))" } as const;
-const GRID_STROKE = "hsl(var(--border))";
+const AXIS_TICK = { fontSize: 10, fill: "var(--muted-foreground)" } as const;
+const GRID_STROKE = "var(--border)";
 
 // Deterministic pseudo-random for synthesized returns based on ISIN
 function seedNum(seed: string, min: number, max: number): number {
@@ -794,7 +794,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
                 <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => `${(v / 1e7).toFixed(1)}Cr`} tick={AXIS_TICK} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.3 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
                 <Bar dataKey="v" radius={[8, 8, 0, 0]} maxBarSize={64}>
                   {[0,1,2,3,4].map((idx) => {
                     const d = [contribution, distribution, realizedGL, unrealizedGL, totalValue][idx];
@@ -824,7 +824,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
                   <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
                   <YAxis dataKey="name" type="category" tick={{ ...AXIS_TICK, fontSize: 10 }} width={130} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
+                  <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
                   <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
                   <Bar dataKey="target" name="Target" fill={grad(9)} radius={[0, 4, 4, 0]} barSize={10} />
                   <Bar dataKey="current" name="Current" fill={grad(0)} radius={[0, 4, 4, 0]} barSize={10} />
@@ -841,7 +841,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
                   <XAxis dataKey="name" tick={{ ...AXIS_TICK, fontSize: 9 }} angle={-18} textAnchor="end" height={64} axisLine={false} tickLine={false} interval={0} />
                   <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${v.toFixed(0)}%`} />
-                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
+                  <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => pct(v)} />} />
                   <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
                   <Bar dataKey="portfolio" name="Portfolio" fill={grad(1)} radius={[6, 6, 0, 0]} maxBarSize={28} />
                   <Bar dataKey="benchmark" name="Benchmark" fill={grad(9)} radius={[6, 6, 0, 0]} maxBarSize={28} />
@@ -878,7 +878,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
       <Section id="asset" visible={activeTab === "performance"} title="3. Performance & Attribution" icon={<TrendingUp className="w-4 h-4" />}>
         <Card title={`Portfolio vs ${benchmarkMode === "blended" ? "Blended Benchmark" : "Asset Benchmarks"} · ${period}`}>
           <div className="flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground mb-2"><span><i className="inline-block w-2 h-2 rounded-full bg-primary mr-1" />Portfolio growth (indexed)</span><span><i className="inline-block w-2 h-2 rounded-full bg-muted-foreground mr-1" />Benchmark growth (indexed)</span><span className="ml-auto">Starting base: 100</span></div>
-          <div className="h-64"><ResponsiveContainer key={`perf-${activeTab}-${period}-${benchmarkMode}`} width="100%" height={256}><LineChart data={performanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} /><XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={period === "1Y" ? 1 : period === "3Y" ? 5 : 11} /><YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} domain={["dataMin - 3", "dataMax + 3"]} /><Tooltip content={<NiceTooltip formatter={(v: number) => v.toFixed(1)} />} /><Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} isAnimationActive={false} /><Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>
+          <div className="h-64"><ResponsiveContainer key={`perf-${activeTab}-${period}-${benchmarkMode}`} width="100%" height={256}><LineChart data={performanceSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} /><XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={period === "1Y" ? 1 : period === "3Y" ? 5 : 11} /><YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} domain={["dataMin - 3", "dataMax + 3"]} /><Tooltip content={<NiceTooltip formatter={(v: number) => v.toFixed(1)} />} /><Line type="monotone" dataKey="portfolio" name="Portfolio" stroke="var(--primary)" strokeWidth={2.5} dot={false} isAnimationActive={false} /><Line type="monotone" dataKey="benchmark" name="Benchmark" stroke="var(--muted-foreground)" strokeWidth={1.5} strokeDasharray="5 4" dot={false} isAnimationActive={false} /></LineChart></ResponsiveContainer></div>
         </Card>
         <div className="grid md:grid-cols-3 gap-3 mt-4"><Stat label="Annualised portfolio return" value={pct(blendedReturn)} hint={`${period} review period`} /><Stat label="Annualised benchmark" value={pct(benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)} hint={benchmarkMode === "blended" ? "Asset-weighted" : "Reference asset set"} /><Stat label="Active return / alpha" value={`${blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5) >= 0 ? "+" : ""}${(blendedReturn - (benchmarkMode === "blended" ? byAssetClass.reduce((s, a) => s + a.bench.ret * (a.pct / 100), 0) : 12.5)).toFixed(1)}%`} hint="Before fees and taxes" /></div>
         <Card title="Asset Class Holdings & Performance">
@@ -952,7 +952,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={liquidity} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} paddingAngle={2} stroke="hsl(var(--background))" strokeWidth={2}
+                  <Pie data={liquidity} dataKey="value" nameKey="name" innerRadius={50} outerRadius={92} paddingAngle={2} stroke="var(--background)" strokeWidth={2}
                     label={(e: any) => e.pct >= 6 ? `${pct(e.pct, 0)}` : ""} labelLine={false}>
                     {liquidity.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
@@ -982,7 +982,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
                   <XAxis dataKey="bucket" tick={{ ...AXIS_TICK, fontSize: 9 }} axisLine={false} tickLine={false} />
                   <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
-                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
                   <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="circle" />
                   <Bar dataKey="coupon" name="Coupon" stackId="a" fill={grad(1)} maxBarSize={36} />
                   <Bar dataKey="maturity" name="Maturity" stackId="a" fill={grad(2)} radius={[6, 6, 0, 0]} maxBarSize={36} />
@@ -1048,7 +1048,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
                   <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
                   <YAxis dataKey="name" type="category" tick={{ ...AXIS_TICK, fontSize: 10 }} width={120} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
                   <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={14}>
                     {byIssuer.slice(0, 10).map((_, i) => <Cell key={i} fill={grad(i)} />)}
                   </Bar>
@@ -1062,7 +1062,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={bySector} dataKey="value" nameKey="name" innerRadius={48} outerRadius={92} paddingAngle={1.5} stroke="hsl(var(--background))" strokeWidth={2}
+                  <Pie data={bySector} dataKey="value" nameKey="name" innerRadius={48} outerRadius={92} paddingAngle={1.5} stroke="var(--background)" strokeWidth={2}
                     label={(e: any) => e.pct > 6 ? e.name : ""} labelLine={false}>
                     {bySector.map((_, i) => <Cell key={i} fill={rgrad(i)} />)}
                   </Pie>
@@ -1077,7 +1077,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <ChartDefs />
-                  <Pie data={byMarketCap} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={2} stroke="hsl(var(--background))" strokeWidth={2}
+                  <Pie data={byMarketCap} dataKey="value" nameKey="name" innerRadius={42} outerRadius={82} paddingAngle={2} stroke="var(--background)" strokeWidth={2}
                     label={(e: any) => `${pct(e.pct, 0)}`} labelLine={false}>
                     {byMarketCap.map((_, i) => <Cell key={i} fill={rgrad(i + 2)} />)}
                   </Pie>
@@ -1096,7 +1096,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
                   <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
                   <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1e5).toFixed(0)}L`} />
-                  <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
+                  <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.25 }} content={<NiceTooltip formatter={(v: number) => fmtINR(v)} />} />
                   <Bar dataKey="value" radius={[8, 8, 0, 0]} maxBarSize={48}>
                     {byRating.map((_, i) => <Cell key={i} fill={grad(i + 1)} />)}
                   </Bar>

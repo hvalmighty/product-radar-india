@@ -310,28 +310,28 @@ function BusinessAnalytics() {
           <ResponsiveContainer width="100%" height={300}>
             {chartType === "line" ? (
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {pivot.cols.map((c, i) => <Line key={c} type="monotone" dataKey={c} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />)}
               </LineChart>
             ) : chartType === "area" ? (
               <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {pivot.cols.map((c, i) => <Area key={c} type="monotone" dataKey={c} stackId="1" stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.4} />)}
               </AreaChart>
             ) : (
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {pivot.cols.map((c, i) => <Bar key={c} dataKey={c} stackId={chartType === "stacked" ? "a" : undefined} fill={COLORS[i % COLORS.length]} />)}
               </BarChart>
@@ -390,10 +390,10 @@ function BusinessAnalytics() {
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
               <Area type="monotone" dataKey="AUM" stroke="#6366f1" strokeWidth={2} fill="url(#aumG)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -426,10 +426,10 @@ function BusinessAnalytics() {
             return (
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={data} stackOffset="expand">
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }}
                     formatter={(v: number, k) => [`${(+v).toFixed(1)}%`, k as string]} />
                   <Legend wrapperStyle={{ fontSize: 10 }} />
                   {PRODUCTS.map((p, i) => (
@@ -454,7 +454,7 @@ function BusinessAnalytics() {
             return (
               <ResponsiveContainer width="100%" height={280}>
                 <ScatterChart margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis type="number" dataKey="x" name="AUM" tick={{ fontSize: 10 }} />
                   <YAxis type="number" dataKey="y" name="NNM" tick={{ fontSize: 10 }} />
                   <ZAxis type="number" dataKey="z" range={[80, 480]} />
@@ -492,10 +492,10 @@ function BusinessAnalytics() {
             return (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} unit="%" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="AUM Share %" fill="#6366f1" />
                   <Bar dataKey="Revenue Share %" fill="#f59e0b" />
@@ -518,10 +518,10 @@ function BusinessAnalytics() {
             return (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="name" tick={{ fontSize: 9 }} />
                   <YAxis tick={{ fontSize: 10 }} unit="%" />
-                  <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                  <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="Yield %" fill="#10b981" />
                   <Bar dataKey="Growth %" fill="#6366f1" />
@@ -843,10 +843,10 @@ function HoldingsPivot() {
       <div className="border border-border rounded-lg p-3 mb-3">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={chartData} layout="vertical" margin={{ left: 80 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis type="number" tick={{ fontSize: 10 }} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={140} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
             {pivot.cols.map((c, i) => <Bar key={c} dataKey={c} stackId="a" fill={COLORS[i % COLORS.length]} />)}
           </BarChart>
@@ -1422,10 +1422,10 @@ function FeeLeakageView() {
       <Panel title="Actual vs Benchmark Fee — by Portfolio" subtitle="Weighted average fee (%) compared to product-mix benchmark median">
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chart}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-20} textAnchor="end" height={60} />
             <YAxis tick={{ fontSize: 10 }} unit="%" />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="Actual Fee" fill="#ef4444" />
             <Bar dataKey="Benchmark Fee" fill="#10b981" />
@@ -1500,10 +1500,10 @@ function LiquidityLadderView() {
       <Panel title="Liquidity Ladder by Portfolio" subtitle="Share of AUM redeemable in each settlement bucket (stacked, 100%)">
         <ResponsiveContainer width="100%" height={340}>
           <BarChart data={chart} layout="vertical" margin={{ left: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis type="number" tick={{ fontSize: 10 }} unit="%" domain={[0, 100]} />
             <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={140} />
-            <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+            <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             {(["T+1","T+3","T+30","Locked"] as const).map(k => <Bar key={k} dataKey={k} stackId="a" fill={LCOLORS[k]} />)}
           </BarChart>
@@ -1637,11 +1637,11 @@ function RiskExposureView() {
       <Panel title="Risk-Return Map" subtitle="Portfolio YTD return vs annualised volatility. Bubble size = AUM.">
         <ResponsiveContainer width="100%" height={320}>
           <ScatterChart margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis type="number" dataKey="x" name="Volatility" unit="%" tick={{ fontSize: 10 }} label={{ value: "Volatility (ann.)", position: "insideBottom", offset: -5, style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" } }} />
-            <YAxis type="number" dataKey="y" name="YTD Return" unit="%" tick={{ fontSize: 10 }} label={{ value: "YTD Return", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" } }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis type="number" dataKey="x" name="Volatility" unit="%" tick={{ fontSize: 10 }} label={{ value: "Volatility (ann.)", position: "insideBottom", offset: -5, style: { fontSize: 10, fill: "var(--muted-foreground)" } }} />
+            <YAxis type="number" dataKey="y" name="YTD Return" unit="%" tick={{ fontSize: 10 }} label={{ value: "YTD Return", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "var(--muted-foreground)" } }} />
             <ZAxis type="number" dataKey="z" range={[60, 500]} />
-            <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }}
+            <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", fontSize: 12 }}
               formatter={(v: number | string, k: string) => [typeof v === "number" ? v.toFixed(1) : v, k]}
               labelFormatter={() => ""}
               content={({ active, payload }) => active && payload && payload.length ? (

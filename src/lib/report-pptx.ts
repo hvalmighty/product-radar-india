@@ -30,6 +30,16 @@ export interface ReportPptData {
   fixedIncomeMF: { name: string; value: number; ytm: number; duration: number; maturity: number; credit: string }[];
   bondHoldings: { isin: string; name: string; rating: string; quantity: number; value: number }[];
   benchmarks: { assetClass: string; benchmark: string; ret: number }[];
+  performanceSeries?: { label: string; portfolio: number; benchmark: number }[];
+  capitalGains?: {
+    period: string;
+    realised: number;
+    stcg: number;
+    ltcg: number;
+    unrealised: number;
+    indicativeTax: number;
+    lotCount: number;
+  };
   commentary: {
     blendedReturn: number;
     blendedBench: number;
@@ -96,12 +106,14 @@ export function exportReportToPptx(data: ReportPptData) {
   const toc = [
     "1. Executive Summary — KPIs, cashflow, target vs current, asset performance vs benchmark",
     "2. Portfolio Commentary — Performance, Concentration, Risk, Comparative Analysis",
-    "3. Asset Class Performance — Holdings, returns, benchmarks, alpha",
-    "4. Liquidity & Cashflows — Liquidity buckets, upcoming coupons & maturities",
-    "5. Product Holdings — Security-wise breakdown per asset class",
-    "6. Portfolio Drilldown — Top issuers, sector, market cap, credit rating",
-    "7. Mutual Fund Drilldown — AMC summary, overlap matrix, fixed-income analytics",
-    "8. Annexures — Benchmark mapping, bond ISIN list",
+    "3. Performance & Attribution — Indexed portfolio vs benchmark time series",
+    "4. Asset Class Performance — Holdings, returns, benchmarks, alpha",
+    "5. Liquidity & Cashflows — Liquidity buckets, upcoming coupons & maturities",
+    "6. Product Holdings — Security-wise breakdown per asset class",
+    "7. Portfolio Drilldown — Top issuers, sector, market cap, credit rating",
+    "8. Mutual Fund Drilldown — AMC summary, overlap matrix, fixed-income analytics",
+    "9. Capital Gains Intelligence — Tax lots, realised/unrealised gains, indicative tax",
+    "10. Annexures — Benchmark mapping, bond ISIN list",
   ];
   toc.forEach((t, i) => {
     sToc.addText(t, { x: 0.8, y: 1.3 + i * 0.55, w: 11.5, h: 0.5, fontSize: 14, color: DARK });
@@ -171,6 +183,18 @@ export function exportReportToPptx(data: ReportPptData) {
     catAxisLabelRotate: -25,
   });
   addFooter(s3, nextPage());
+
+  if (data.performanceSeries?.length) {
+    const sPerf = pptx.addSlide();
+    addHeader(sPerf, "3. Performance & Attribution — Indexed Growth", data.title);
+    sPerf.addText("Portfolio vs benchmark (starting base: 100)", { x: 0.6, y: 1.0, w: 8, h: 0.35, fontSize: 14, bold: true, color: DARK });
+    sPerf.addChart(pptx.ChartType.line, [
+      { name: "Portfolio", labels: data.performanceSeries.map(p => p.label), values: data.performanceSeries.map(p => Number(p.portfolio.toFixed(2))) },
+      { name: "Benchmark", labels: data.performanceSeries.map(p => p.label), values: data.performanceSeries.map(p => Number(p.benchmark.toFixed(2))) },
+    ], { x: 0.6, y: 1.45, w: 12.1, h: 4.9, chartColors: [ACCENT, MUTED], showLegend: true, legendPos: "b", catAxisLabelFontSize: 9, valAxisLabelFontSize: 9, showValue: false, lineSize: 2, catAxisLabelRotate: -25 });
+    sPerf.addText("Indexed values mirror the selected review period and benchmark setting. Returns are before fees and taxes.", { x: 0.6, y: 6.55, w: 12, h: 0.3, fontSize: 10, color: MUTED });
+    addFooter(sPerf, nextPage());
+  }
 
   // Allocation mix slide
   const sAlloc = pptx.addSlide();
@@ -433,6 +457,23 @@ export function exportReportToPptx(data: ReportPptData) {
   // ============================================================
   // SECTION 8: ANNEXURES
   // ============================================================
+  if (data.capitalGains) {
+    const cg = data.capitalGains;
+    const sCg = pptx.addSlide();
+    addHeader(sCg, `5. Capital Gains Intelligence — ${cg.period}`, data.title);
+    drawKpiCards(sCg, [
+      { label: "Realised Gains", value: fmtMoney(cg.realised), color: cg.realised >= 0 ? POS : NEG },
+      { label: "STCG", value: fmtMoney(cg.stcg), color: WARN },
+      { label: "LTCG", value: fmtMoney(cg.ltcg), color: POS },
+      { label: "Unrealised G/L", value: fmtMoney(cg.unrealised), color: cg.unrealised >= 0 ? POS : NEG },
+      { label: "Indicative Tax", value: fmtMoney(cg.indicativeTax), color: NEG },
+    ], 1.1);
+    sCg.addText("Capital gains summary", { x: 0.6, y: 2.45, w: 5.5, h: 0.35, fontSize: 14, bold: true, color: DARK });
+    sCg.addChart(pptx.ChartType.bar, [{ name: "Gain", labels: ["STCG", "LTCG", "Unrealised"], values: [cg.stcg, cg.ltcg, cg.unrealised].map(v => Number(v.toFixed(0))) }], { x: 0.6, y: 2.85, w: 6.1, h: 3.4, barDir: "col", chartColors: [ACCENT], showLegend: false, showValue: true, catAxisLabelFontSize: 11, valAxisLabelFontSize: 9 });
+    sCg.addText("Tax-lot controls", { x: 7.05, y: 2.45, w: 5.5, h: 0.35, fontSize: 14, bold: true, color: DARK });
+    sCg.addText(`FIFO ledger coverage: ${cg.lotCount} lots\nIndicative tax provision: ${fmtMoney(cg.indicativeTax)}\n\nTax estimates are based on reconstructed acquisition lots and the selected region's indicative rules. Validate cost basis, sale dates, exemptions and filing treatment with a qualified tax advisor.`, { x: 7.05, y: 2.9, w: 5.55, h: 2.5, fontSize: 14, color: MUTED, valign: "top", margin: 0.05 });
+    addFooter(sCg, nextPage());
+  }
   const sAnnA = pptx.addSlide();
   addHeader(sAnnA, "8. Annexure A — Benchmark Mapping", data.title);
   const bmRows: any[][] = [

@@ -538,15 +538,26 @@ function ReportView({ portfolios, title, mode, onBack }: {
   const performanceSeries = useMemo(() => {
     const months = period === "5Y" ? 60 : period === "3Y" ? 36 : 12;
     const start = new Date();
+    const benchAnnual = benchmarkMode === "blended" ? blendedBenchmark : 12.5;
+    // Correlated random walks: benchmark drives a common market factor,
+    // portfolio adds idiosyncratic tracking error → realistic, non-flat lines.
+    let pIdx = 100, bIdx = 100;
     return Array.from({ length: months }, (_, i) => {
       const month = new Date(start.getFullYear(), start.getMonth() - (months - 1 - i), 1);
-      const progress = i / Math.max(1, months - 1);
-      const volatility = seedNum(`${title}-${i}-${period}`, -1.4, 1.4);
-      const portfolio = 100 * (1 + (blendedReturn / 100) * progress + volatility / 100);
-      const benchmark = 100 * (1 + (benchmarkMode === "blended" ? blendedBenchmark : 12.5) / 100 * progress);
-      return { label: month.toLocaleDateString("en-US", { month: "short", year: "2-digit" }), portfolio, benchmark, alpha: portfolio - benchmark };
+      const market = seedNum(`${title}-mkt-${i}-${period}`, -3.4, 3.6);
+      const idio = seedNum(`${title}-idio-${i}-${period}-${benchmarkMode}`, -1.6, 1.7);
+      const cycle = Math.sin((i / months) * Math.PI * 2.4) * 1.1;
+      bIdx *= 1 + (benchAnnual / 12 + market + cycle) / 100;
+      pIdx *= 1 + (blendedReturn / 12 + market * 0.92 + idio + cycle * 0.85) / 100;
+      return {
+        label: month.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        portfolio: Number(pIdx.toFixed(2)),
+        benchmark: Number(bIdx.toFixed(2)),
+        alpha: Number((pIdx - bIdx).toFixed(2)),
+      };
     });
   }, [period, benchmarkMode, blendedBenchmark, blendedReturn, title]);
+
 
   // Bonds for annexure
   const bondHoldings = allHoldings.filter(h => h.type === "Bond" || /Debt/.test(assetClass(h)));

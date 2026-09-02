@@ -274,7 +274,8 @@
 .recharts-cartesian-axis-tick-value { fill: var(--muted-foreground); }
 .recharts-legend-item-text { color: var(--muted-foreground); }
 
-.chart-line-primary .recharts-curve { stroke: var(--primary); }
-.chart-line-muted .recharts-curve { stroke: var(--muted-foreground); }
-.chart-line-info .recharts-curve { stroke: var(--info); }
+.chart-line-primary, .chart-line-primary .recharts-curve { stroke: var(--primary); }
+.chart-line-muted, .chart-line-muted .recharts-curve { stroke: var(--muted-foreground); }
+.chart-line-info, .chart-line-info .recharts-curve { stroke: var(--info); }
+.chart-line-primary .recharts-area-area, .chart-line-info .recharts-area-area { stroke: none; }
 .chart-pie-sep .recharts-sector { stroke: var(--background); }

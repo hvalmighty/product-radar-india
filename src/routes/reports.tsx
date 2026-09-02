@@ -909,7 +909,7 @@ function ReportView({ portfolios, title, mode, onBack }: {
                         <td className="py-2.5 text-right mono-num">{fmtINR(a.value)}</td>
                         <td className="py-2.5 text-right mono-num">{pct(a.pct)}</td>
                         <td className={`py-2.5 text-right mono-num ${clsPct(a.ret)}`}>{pct(a.ret)}</td>
-                        <td className={`py-2.5 text-right mono-num ${clsPct(review1Y)}`}>{pct(reviewReturn)}</td>
+                        <td className={`py-2.5 text-right mono-num ${clsPct(reviewReturn)}`}>{pct(reviewReturn)}</td>
                         <td className="py-2.5 pl-4 text-muted-foreground">{a.bench.name}</td>
                         <td className="py-2.5 text-right mono-num text-muted-foreground">{pct(benchmarkReturn)}</td>
                         <td className={`py-2.5 text-right mono-num font-semibold ${clsPct(alpha)}`}>{alpha >= 0 ? "+" : ""}{alpha.toFixed(1)}%</td>

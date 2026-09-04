@@ -48,7 +48,7 @@ function OnboardingRouter() {
   return <OnboardingPage />;
 }
 
-type StepId = "personal" | "kyc" | "compliance" | "risk" | "goals" | "bank" | "review" | "done";
+type StepId = "personal" | "kyc" | "compliance" | "documents" | "risk" | "goals" | "bank" | "review" | "done";
 
 interface Step {
   id: StepId;

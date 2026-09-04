@@ -367,6 +367,8 @@ export function FaceLivenessCapture({
       if (!navigator.mediaDevices?.getUserMedia) {
         throw Object.assign(new Error("unsupported"), { name: "NotSupportedError" });
       }
+      // Ask the browser for camera permission explicitly first.
+      await checkPermission();
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -380,6 +382,7 @@ export function FaceLivenessCapture({
         // facingMode/resolution hints and report NotFoundError incorrectly.
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
+      setPermission("granted");
       streamRef.current = stream;
       setLive(true);
       // attach after render
@@ -403,6 +406,9 @@ export function FaceLivenessCapture({
       }
     } catch (e) {
       const name = (e as { name?: string })?.name;
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setPermission("denied");
+      }
       setFallback(true);
       setError(
         name === "NotAllowedError" || name === "SecurityError"

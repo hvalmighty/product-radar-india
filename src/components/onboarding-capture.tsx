@@ -287,6 +287,45 @@ export function FaceLivenessCapture({
   const [verifying, setVerifying] = useState(false);
   const [geo, setGeo] = useState<FaceCaptureResult["geo"]>(null);
   const [code] = useState(randomCode);
+  const [fallback, setFallback] = useState(false);
+  const photoRef = useRef<HTMLInputElement | null>(null);
+
+  function usePhoto(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file (JPG or PNG).");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError(`That photo is ${fmtSize(file.size)} — the limit is 5 MB.`);
+      return;
+    }
+    setError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : null;
+      if (!dataUrl) {
+        setError("Could not read that photo — try another one.");
+        return;
+      }
+      setVerifying(true);
+      // ---- SIMULATED VERIFICATION BOUNDARY (uploaded-photo path) ---------
+      setTimeout(() => {
+        setVerifying(false);
+        onResult({
+          selfieDataUrl: dataUrl,
+          frames: 1,
+          capturedAt: new Date().toISOString(),
+          geo,
+          livenessScore: 0,
+          matchScore: 90 + Math.floor(Math.random() * 6),
+          challengeCode: code,
+          prompts: ["Photo uploaded — no live liveness prompts; flagged for manual officer review"],
+        });
+      }, 1200);
+    };
+    reader.onerror = () => setError("Could not read that photo — try another one.");
+    reader.readAsDataURL(file);
+  }
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -302,10 +341,22 @@ export function FaceLivenessCapture({
     setFrames([]);
     setPromptIndex(0);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw Object.assign(new Error("unsupported"), { name: "NotSupportedError" });
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+      } catch (first) {
+        const n = (first as { name?: string })?.name;
+        if (n === "NotAllowedError" || n === "SecurityError") throw first;
+        // Retry with the loosest possible constraint — some devices reject
+        // facingMode/resolution hints and report NotFoundError incorrectly.
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       streamRef.current = stream;
       setLive(true);
       // attach after render
@@ -329,12 +380,15 @@ export function FaceLivenessCapture({
       }
     } catch (e) {
       const name = (e as { name?: string })?.name;
+      setFallback(true);
       setError(
-        name === "NotAllowedError"
-          ? "Camera permission was denied. Allow camera access in your browser and try again."
-          : name === "NotFoundError"
-            ? "No camera was found on this device."
-            : "Could not start the camera on this device.",
+        name === "NotAllowedError" || name === "SecurityError"
+          ? "Camera access was blocked. Allow the camera for this site in your browser settings (it also needs a secure https connection), then try again — or upload a photo instead."
+          : name === "NotFoundError" || name === "OverconstrainedError"
+            ? "No working camera was detected — it may be missing, switched off, or in use by another app (Zoom, Teams, another tab). Close those and retry, or upload a photo instead."
+            : name === "NotSupportedError"
+              ? "This browser does not allow camera access here. Try Chrome or Safari over https — or upload a photo instead."
+              : "Could not start the camera on this device. You can retry or upload a photo instead.",
       );
     } finally {
       setStarting(false);
@@ -402,10 +456,13 @@ export function FaceLivenessCapture({
           />
           <div className="text-xs space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" /> Liveness passed · face matched
+              <CheckCircle2 className="w-4 h-4" />
+              {result.livenessScore > 0 ? "Liveness passed · face matched" : "Photo received · pending officer review"}
             </div>
             <div className="text-muted-foreground">
-              Liveness {result.livenessScore}% · Face match {result.matchScore}% · {result.frames} frames
+              {result.livenessScore > 0
+                ? `Liveness ${result.livenessScore}% · Face match ${result.matchScore}% · ${result.frames} frames`
+                : `Uploaded photo · face match ${result.matchScore}% · no live liveness check`}
             </div>
             <div className="text-muted-foreground">
               Captured {new Date(result.capturedAt).toLocaleString()} · challenge code {result.challengeCode}
@@ -474,7 +531,7 @@ export function FaceLivenessCapture({
       )}
 
       {!live && !verifying && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => void start()}
@@ -482,13 +539,33 @@ export function FaceLivenessCapture({
             className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            Start camera
+            {fallback ? "Retry camera" : "Start camera"}
+          </button>
+          <button
+            type="button"
+            onClick={() => photoRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm border border-border hover:bg-accent"
+          >
+            <Upload className="w-4 h-4" /> Upload a photo instead
           </button>
           <span className="text-[11px] text-muted-foreground">
             {PROMPTS.length} guided prompts · session is time-stamped and geo-tagged
           </span>
         </div>
       )}
+
+      <input
+        ref={photoRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="user"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) usePhoto(f);
+          e.target.value = "";
+        }}
+      />
 
       {error && (
         <p className="text-xs text-destructive flex items-start gap-1">

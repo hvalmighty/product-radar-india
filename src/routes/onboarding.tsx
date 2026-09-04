@@ -296,6 +296,8 @@ interface FormState {
   nomineeRelation: string;
   nomineeOptOut: boolean;
   nomineeShare: number;
+  docs: DocMap;
+  faceCapture: FaceCaptureResult | null;
   agreed: boolean;
 }
 

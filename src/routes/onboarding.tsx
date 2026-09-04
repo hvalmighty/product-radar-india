@@ -17,7 +17,16 @@ import {
   Info,
   FileCheck2,
   AlertTriangle,
+  FolderUp,
 } from "lucide-react";
+import {
+  DocumentSlots,
+  FaceLivenessCapture,
+  missingRequiredDocs,
+  type DocMap,
+  type DocSlot,
+  type FaceCaptureResult,
+} from "@/components/onboarding-capture";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -39,7 +48,7 @@ function OnboardingRouter() {
   return <OnboardingPage />;
 }
 
-type StepId = "personal" | "kyc" | "compliance" | "risk" | "goals" | "bank" | "review" | "done";
+type StepId = "personal" | "kyc" | "compliance" | "documents" | "risk" | "goals" | "bank" | "review" | "done";
 
 interface Step {
   id: StepId;
@@ -53,6 +62,7 @@ const STEPS: Step[] = [
   { id: "personal", title: "Personal Details", short: "Personal", icon: UserCircle2 },
   { id: "kyc", title: "KYC Verification", short: "KYC", icon: ShieldCheck },
   { id: "compliance", title: "Compliance & Declarations", short: "Compliance", icon: FileCheck2 },
+  { id: "documents", title: "Documents & Face Verification", short: "Documents", icon: FolderUp },
   { id: "risk", title: "Risk Profiling & Allocation", short: "Risk", icon: Gauge },
   { id: "goals", title: "Investment Goals (Optional)", short: "Goals", icon: Target, optional: true },
   { id: "bank", title: "Bank & Nominee", short: "Bank", icon: Landmark },
@@ -286,7 +296,106 @@ interface FormState {
   nomineeRelation: string;
   nomineeOptOut: boolean;
   nomineeShare: number;
+  docs: DocMap;
+  faceCapture: FaceCaptureResult | null;
   agreed: boolean;
+}
+
+// -------- India document requirements (SEBI / AMFI / CKYC-KRA) --------
+
+function indiaDocSlots(form: FormState): DocSlot[] {
+  const kycDone = form.kycStatus === "validated";
+  const slots: DocSlot[] = [
+    {
+      id: "pan",
+      label: "PAN card",
+      hint: "Clear colour scan or photo of the front of the card",
+      required: !kycDone,
+      note: "Name and date of birth must match the PAN captured in the KYC step.",
+    },
+    {
+      id: "aadhaar",
+      label: "Aadhaar — masked",
+      hint: "Download the masked e-Aadhaar from UIDAI (first 8 digits hidden)",
+      required: !kycDone,
+      note: "UIDAI prohibits storing a full Aadhaar number — upload the masked copy only.",
+    },
+    {
+      id: "address",
+      label: "Address proof",
+      hint: "Passport, driving licence, voter ID or a utility bill under 3 months old",
+      required: !kycDone,
+    },
+    {
+      id: "bankProof",
+      label: "Bank proof",
+      hint: "Cancelled cheque with printed name, or a bank statement page",
+      required: true,
+      note: "Used to validate the IFSC and account number for redemption payouts.",
+    },
+    {
+      id: "signature",
+      label: "Specimen signature",
+      hint: "Signature on plain white paper, photographed or scanned",
+      required: true,
+    },
+    {
+      id: "photo",
+      label: "Passport photograph",
+      hint: "Recent colour photograph, plain background",
+      required: false,
+    },
+  ];
+
+  if (form.investorCategory === "nri-nre" || form.investorCategory === "nri-nro") {
+    slots.push(
+      {
+        id: "passport",
+        label: "Passport — photo & address pages",
+        hint: "Mandatory for NRI / OCI investors",
+        required: true,
+      },
+      {
+        id: "overseasAddress",
+        label: "Overseas address proof",
+        hint: "Utility bill, driving licence or residence permit from your country of residence",
+        required: true,
+      },
+      {
+        id: "nreNro",
+        label: "NRE / NRO account proof",
+        hint: "Cancelled cheque or statement of the NRE/NRO account funding the investment",
+        required: true,
+        note: "Repatriable investments must be funded from an NRE account.",
+      },
+    );
+  }
+
+  if (form.investorCategory === "minor") {
+    slots.push(
+      { id: "birthCert", label: "Minor's birth certificate", hint: "Or school leaving certificate showing date of birth", required: true },
+      { id: "guardianKyc", label: "Guardian's KYC proof", hint: "Guardian PAN plus relationship proof or court order", required: true },
+    );
+  }
+
+  if (form.investorCategory === "huf") {
+    slots.push(
+      { id: "hufPan", label: "HUF PAN card", required: true },
+      { id: "hufDeed", label: "HUF deed / declaration", hint: "Listing the Karta and all coparceners", required: true },
+    );
+  }
+
+  if (form.taxResidencyOutsideIndia) {
+    slots.push({
+      id: "fatcaProof",
+      label: "Foreign tax residency proof",
+      hint: "Tax residency certificate or a document showing the TIN declared",
+      required: true,
+      note: "Required to support the FATCA / CRS self-certification.",
+    });
+  }
+
+  return slots;
 }
 
 const RISK_QUESTIONS = [
@@ -344,6 +453,8 @@ function OnboardingPage() {
     nomineeRelation: "",
     nomineeOptOut: false,
     nomineeShare: 100,
+    docs: {},
+    faceCapture: null,
     agreed: false,
   });
 
@@ -417,6 +528,13 @@ function OnboardingPage() {
         if (!form.pepStatus) return { ok: false, msg: "Complete the PEP declaration" };
         if (!form.holdingMode) return { ok: false, msg: "Select mode of holding" };
         return { ok: true };
+      case "documents": {
+        const missing = missingRequiredDocs(indiaDocSlots(form), form.docs);
+        if (missing.length) return { ok: false, msg: `Upload required document: ${missing[0]!.label}` };
+        if (form.ipvMode === "video" && !form.faceCapture)
+          return { ok: false, msg: "Complete the video-IPV liveness and face-match capture" };
+        return { ok: true };
+      }
       case "risk":
         if (Object.keys(form.riskAnswers).length < RISK_QUESTIONS.length) return { ok: false, msg: "Answer all risk questions" };
         return { ok: true };
@@ -489,6 +607,7 @@ function OnboardingPage() {
             {current.id === "personal" && <PersonalStep form={form} update={update} updateName={updateName} />}
             {current.id === "kyc" && <KycStep form={form} update={update} />}
             {current.id === "compliance" && <ComplianceStep form={form} update={update} />}
+            {current.id === "documents" && <DocumentsStep form={form} update={update} />}
             {current.id === "risk" && (
               <RiskStep form={form} update={update} score={riskScore} band={riskBand} allocation={suggestedAllocation} />
             )}
@@ -879,8 +998,15 @@ function ComplianceStep({
         <button type="button" disabled={!form.ipvMode || form.ipvDone}
           onClick={() => update("ipvDone", true)}
           className="px-3 h-9 rounded-md text-xs border border-border hover:bg-accent disabled:opacity-40">
-          {form.ipvDone ? "IPV completed ✓" : "Complete IPV"}
+          {form.ipvDone
+            ? form.ipvMode === "video" ? "Scheduled — capture on the next step ✓" : "IPV completed ✓"
+            : form.ipvMode === "video" ? "Schedule video IPV" : "Complete IPV"}
         </button>
+        {form.ipvMode === "video" && (
+          <p className="text-[11px] text-muted-foreground">
+            The recorded, geo-tagged liveness session and face match run on the next step (Documents &amp; Face Verification).
+          </p>
+        )}
       </div>
 
       <div className="rounded-md border border-border p-3 space-y-3">
@@ -928,6 +1054,69 @@ function ComplianceStep({
           <div className="text-[11px] text-amber-600 flex gap-1.5 items-start">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             Enhanced due diligence and compliance sign-off are required before the folio is activated.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DocumentsStep({
+  form,
+  update,
+}: {
+  form: FormState;
+  update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
+}) {
+  const slots = useMemo(() => indiaDocSlots(form), [form]);
+  const requiredCount = slots.filter((s) => s.required).length;
+  const doneCount = slots.filter((s) => s.required && form.docs[s.id]).length;
+  const kycDone = form.kycStatus === "validated";
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground flex gap-2">
+        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <span>
+          {kycDone
+            ? "Your KRA record is KYC Validated, so identity and address proofs are already on file — only the bank and signature proofs are needed."
+            : "Fresh KYC — upload PAN, masked Aadhaar and address proof. Documents stay on this device in the demo; production uploads go to the KRA-linked document vault."}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Required documents</div>
+        <span className="text-xs text-muted-foreground">{doneCount} of {requiredCount} uploaded</span>
+      </div>
+
+      <DocumentSlots slots={slots} docs={form.docs} onChange={(d) => update("docs", d)} />
+
+      <div className="space-y-2">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">
+          Video in-person verification (IPV)
+        </div>
+        {form.ipvMode === "video" ? (
+          <FaceLivenessCapture
+            title="Video IPV — liveness & PAN face match"
+            subtitle="SEBI-compliant video IPV: a recorded, time-stamped and geo-tagged session in which you read a random code aloud and your face is matched against your PAN photograph."
+            readAloud
+            result={form.faceCapture}
+            onResult={(r) => update("faceCapture", r)}
+          />
+        ) : (
+          <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-2">
+            <p>
+              You selected{" "}
+              <span className="font-medium text-foreground">
+                {form.ipvMode === "aadhaar-ekyc" ? "Aadhaar OTP e-KYC" : form.ipvMode === "in-person" ? "In-person verification by an RM" : "no IPV mode"}
+              </span>
+              , so a live face capture is not mandatory. You may still record one to strengthen the audit trail.
+            </p>
+            <FaceLivenessCapture
+              title="Optional liveness capture"
+              result={form.faceCapture}
+              onResult={(r) => update("faceCapture", r)}
+            />
           </div>
         )}
       </div>
@@ -1291,6 +1480,14 @@ function ReviewStep({
           <SummaryRow k="KYC status" v={form.kycStatus ? form.kycStatus.replace("-", " ") : "—"} />
           <SummaryRow k="CKYC no." v={form.ckycNumber || "—"} />
           <SummaryRow k="IPV" v={form.ipvDone ? (form.ipvMode || "done") : "Pending"} />
+          <SummaryRow
+            k="Documents"
+            v={`${Object.keys(form.docs).length} uploaded${missingRequiredDocs(indiaDocSlots(form), form.docs).length ? " · pending items" : " · complete"}`}
+          />
+          <SummaryRow
+            k="Face match"
+            v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%` : "Not captured"}
+          />
           <SummaryRow k="FATCA" v={form.taxResidencyOutsideIndia ? `${form.fatcaCountry} · ${form.fatcaTin}` : "Indian tax resident only"} />
           <SummaryRow k="PEP" v={form.pepStatus === "no" ? "Not a PEP" : form.pepStatus || "—"} />
           <SummaryRow k="Category" v={form.investorCategory || "—"} />

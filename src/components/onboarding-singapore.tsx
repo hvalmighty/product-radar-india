@@ -13,7 +13,16 @@ import {
   Sparkles,
   Info,
   AlertTriangle,
+  FolderUp,
 } from "lucide-react";
+import {
+  DocumentSlots,
+  FaceLivenessCapture,
+  missingRequiredDocs,
+  type DocMap,
+  type DocSlot,
+  type FaceCaptureResult,
+} from "@/components/onboarding-capture";
 
 /**
  * Singapore investor onboarding — modelled on MAS requirements:
@@ -34,6 +43,7 @@ type StepId =
   | "cka"
   | "risk"
   | "bank"
+  | "documents"
   | "review";
 
 const STEPS: { id: StepId; title: string; short: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -44,6 +54,7 @@ const STEPS: { id: StepId; title: string; short: string; icon: React.ComponentTy
   { id: "cka", title: "Knowledge Assessment (CKA / CAR)", short: "CKA/CAR", icon: GraduationCap },
   { id: "risk", title: "Risk Profile & Allocation", short: "Risk", icon: Gauge },
   { id: "bank", title: "Bank, SRS / CPFIS & Payment", short: "Bank", icon: Landmark },
+  { id: "documents", title: "Documents & Identity Verification", short: "Documents", icon: FolderUp },
   { id: "review", title: "Review & Declarations", short: "Review", icon: ClipboardCheck },
 ];
 
@@ -128,6 +139,9 @@ interface SgForm {
   useSrs: boolean;
   useCpfis: boolean;
   declarations: Record<string, boolean>;
+  noSingpass: boolean;
+  docs: DocMap;
+  faceCapture: FaceCaptureResult | null;
 }
 
 const inputCls =
@@ -171,6 +185,9 @@ export function SingaporeOnboarding() {
     useSrs: false,
     useCpfis: false,
     declarations: {},
+    noSingpass: false,
+    docs: {},
+    faceCapture: null,
   });
 
   function update<K extends keyof SgForm>(key: K, value: SgForm[K]) {
@@ -208,7 +225,8 @@ export function SingaporeOnboarding() {
   function canProceed(): { ok: boolean; msg?: string } {
     switch (current?.id) {
       case "singpass":
-        if (!form.singpassRetrieved) return { ok: false, msg: "Retrieve Myinfo data via Singpass to continue" };
+        if (!form.singpassRetrieved && !form.noSingpass)
+          return { ok: false, msg: "Retrieve Myinfo data via Singpass, or choose to continue without Singpass" };
         return { ok: true };
       case "identity":
         if (!form.fullName.trim()) return { ok: false, msg: "Enter full name as per NRIC/FIN" };
@@ -245,6 +263,13 @@ export function SingaporeOnboarding() {
         if (!/^\d{4}$/.test(form.accountLast4)) return { ok: false, msg: "Enter last 4 digits of account" };
         if (!form.payMode) return { ok: false, msg: "Select a funding mode" };
         return { ok: true };
+      case "documents": {
+        const missing = missingRequiredDocs(sgDocSlots(form), form.docs);
+        if (missing.length) return { ok: false, msg: `Upload required document: ${missing[0]!.label}` };
+        if (!form.singpassRetrieved && !form.faceCapture)
+          return { ok: false, msg: "Complete the liveness and face-match capture for non-face-to-face verification" };
+        return { ok: true };
+      }
       case "review": {
         const required = ["accuracy", "crs", "riskdisc", "fees"];
         if (!required.every((k) => form.declarations[k])) return { ok: false, msg: "Accept all declarations to submit" };
@@ -324,6 +349,7 @@ export function SingaporeOnboarding() {
             {current?.id === "cka" && <CkaStep form={form} update={update} passed={ckaPassed} />}
             {current?.id === "risk" && <RiskStep form={form} update={update} score={riskScore} band={riskBand} allocation={allocation} />}
             {current?.id === "bank" && <BankStep form={form} update={update} />}
+            {current?.id === "documents" && <DocumentsStep form={form} update={update} />}
             {current?.id === "review" && (
               <ReviewStep form={form} update={update} band={riskBand.label} allocation={allocation} accredited={isAccredited} ckaPassed={ckaPassed} />
             )}
@@ -472,9 +498,20 @@ function SingpassStep({ form, update }: { form: SgForm; update: <K extends keyof
           </div>
         )}
       </div>
-      <div className="text-center text-xs text-muted-foreground">
-        No Singpass? Continue and capture details manually — certified true copies of NRIC/passport and proof of
-        address will then be required for non-face-to-face verification.
+      <div className="text-center text-xs text-muted-foreground space-y-2">
+        <p>
+          No Singpass? Continue and capture details manually — certified true copies of NRIC/passport and proof of
+          address, plus a live face verification, will then be required for non-face-to-face onboarding.
+        </p>
+        {!form.singpassRetrieved && (
+          <button
+            type="button"
+            onClick={() => update("noSingpass", !form.noSingpass)}
+            className={`text-xs px-3 h-8 rounded-md border ${form.noSingpass ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent"}`}
+          >
+            {form.noSingpass ? "Continuing without Singpass ✓" : "Continue without Singpass"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -893,6 +930,8 @@ function ReviewStep({
           <Row k="Residential status" v={form.residency || "—"} />
           <Row k="Contact" v={form.mobile ? `+65 ${form.mobile}` : "—"} />
           <Row k="Myinfo" v={form.singpassRetrieved ? "Verified via Singpass" : "Manual capture"} />
+          <Row k="Documents" v={`${Object.keys(form.docs).length} uploaded${missingRequiredDocs(sgDocSlots(form), form.docs).length ? " · pending" : " · complete"}`} />
+          <Row k="Face verification" v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%` : form.singpassRetrieved ? "Not required (Singpass verified)" : "Not captured"} />
         </Card>
         <Card title="Due diligence">
           <Row k="Occupation" v={form.occupation || "—"} />
@@ -921,6 +960,133 @@ function ReviewStep({
         {decl.map((d) => (
           <Check key={d.k} checked={!!form.declarations[d.k]} onChange={(v) => update("declarations", { ...form.declarations, [d.k]: v })} label={d.l} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+
+// ------------------------------------------------- documents (MAS / Myinfo)
+
+function sgDocSlots(form: SgForm): DocSlot[] {
+  const slots: DocSlot[] = [];
+  const myinfo = form.singpassRetrieved;
+  const foreigner = form.residency === "foreigner" || form.residency === "employment-pass";
+
+  if (!myinfo) {
+    slots.push(
+      {
+        id: "nric",
+        label: "NRIC / FIN — front and back",
+        hint: "Certified true copy for non-face-to-face onboarding",
+        required: true,
+        note: "Under MAS Notice 626, identity documents must be verified against an independent source when the client is not seen in person.",
+      },
+      {
+        id: "address",
+        label: "Proof of residential address",
+        hint: "Bank or utility statement issued in the last 3 months",
+        required: true,
+      },
+    );
+  }
+
+  if (foreigner) {
+    slots.push(
+      { id: "passport", label: "Passport — biodata page", hint: "Mandatory for foreigners and pass holders", required: true },
+      { id: "pass", label: "Employment Pass / S Pass / Dependant Pass", hint: "Both sides, showing validity dates", required: true },
+    );
+  }
+
+  const edd =
+    form.pep !== "no" ||
+    form.annualIncomeSgd === "300k-1m" ||
+    form.annualIncomeSgd === ">1m" ||
+    form.sourceOfWealth.some((w) => w === "Inheritance / gift" || w === "Sale of property" || w === "Business ownership / dividends");
+
+  if (edd) {
+    slots.push({
+      id: "sow",
+      label: "Source of wealth evidence",
+      hint: "Payslip / CPF statement, sale & purchase agreement, dividend statement or a letter from a lawyer",
+      required: true,
+      note: "Enhanced due diligence triggered by the declared PEP status, income band or source of wealth.",
+    });
+  }
+
+  if (form.classification === "accredited") {
+    slots.push({
+      id: "aiProof",
+      label: "Accredited Investor eligibility proof",
+      hint: "Notice of Assessment, latest 12 months' payslips, or a bank/CDP statement evidencing net financial assets",
+      required: true,
+      note: "SFA s.4A requires documentary evidence before AI opt-in takes effect; status must be re-affirmed annually.",
+    });
+  }
+
+  if (form.useCpfis || form.useSrs) {
+    slots.push({
+      id: "cpfSrs",
+      label: "CPFIS / SRS account statement",
+      hint: "Latest statement from your CPF Investment or SRS operator bank",
+      required: false,
+    });
+  }
+
+  slots.push({
+    id: "signature",
+    label: "Specimen signature",
+    hint: "Signature on plain paper — used for instruction verification",
+    required: false,
+  });
+
+  return slots;
+}
+
+function DocumentsStep({ form, update }: { form: SgForm; update: <K extends keyof SgForm>(k: K, v: SgForm[K]) => void }) {
+  const slots = useMemo(() => sgDocSlots(form), [form]);
+  const requiredCount = slots.filter((s) => s.required).length;
+  const doneCount = slots.filter((s) => s.required && form.docs[s.id]).length;
+
+  return (
+    <div className="space-y-4">
+      <Note>
+        {form.singpassRetrieved
+          ? "Myinfo already delivered government-verified identity and address, so only exception documents are requested here."
+          : "Without Singpass this is a non-face-to-face account opening: identity documents and a live face verification are mandatory under MAS Notice 626."}
+      </Note>
+
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Documents</div>
+        <span className="text-xs text-muted-foreground">{doneCount} of {requiredCount} required uploaded</span>
+      </div>
+
+      {slots.length === 0 ? (
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
+          No documents outstanding — Myinfo covers identity, address and income for this client profile.
+        </div>
+      ) : (
+        <DocumentSlots slots={slots} docs={form.docs} onChange={(d) => update("docs", d)} />
+      )}
+
+      <div className="space-y-2">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Identity proofing</div>
+        {form.singpassRetrieved ? (
+          <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-2">
+            <p>
+              Singpass Face Verification already satisfied the identity-proofing requirement. An additional capture is
+              optional and simply strengthens the audit record.
+            </p>
+            <FaceLivenessCapture title="Optional face capture" result={form.faceCapture} onResult={(r) => update("faceCapture", r)} />
+          </div>
+        ) : (
+          <FaceLivenessCapture
+            title="Face verification — liveness & document match"
+            subtitle="Non-face-to-face identity proofing: a live, time-stamped and geo-tagged capture matched against the NRIC or passport photograph."
+            result={form.faceCapture}
+            onResult={(r) => update("faceCapture", r)}
+          />
+        )}
       </div>
     </div>
   );

@@ -560,26 +560,61 @@ export function FaceLivenessCapture({
       )}
 
       {!live && !verifying && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={starting}
-            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            {fallback ? "Retry camera" : "Start camera"}
-          </button>
-          <button
-            type="button"
-            onClick={() => photoRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm border border-border hover:bg-accent"
-          >
-            <Upload className="w-4 h-4" /> Upload a photo instead
-          </button>
-          <span className="text-[11px] text-muted-foreground">
-            {PROMPTS.length} guided prompts · session is time-stamped and geo-tagged
-          </span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Camera permission:</span>
+            <span
+              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border ${
+                permission === "granted"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  : permission === "denied"
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : "border-border bg-muted text-muted-foreground"
+              }`}
+            >
+              {permission === "granted" && <CheckCircle2 className="w-3 h-3" />}
+              {permission === "denied" && <AlertTriangle className="w-3 h-3" />}
+              {permission === "granted" ? "Allowed" : permission === "denied" ? "Blocked" : permission === "prompt" ? "Not asked yet" : "Unknown"}
+            </span>
+            {permission !== "granted" && (
+              <button
+                type="button"
+                onClick={() => void checkPermission()}
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-border hover:bg-accent"
+              >
+                <RefreshCw className="w-3 h-3" /> Refresh status
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => void start()}
+              disabled={starting}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              {fallback ? "Retry camera" : permission === "granted" ? "Start camera" : "Request camera access"}
+            </button>
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm border border-border hover:bg-accent"
+            >
+              <Upload className="w-4 h-4" /> Upload a photo instead
+            </button>
+            <span className="text-[11px] text-muted-foreground">
+              {PROMPTS.length} guided prompts · session is time-stamped and geo-tagged
+            </span>
+          </div>
+
+          {permission === "denied" && (
+            <p className="text-xs text-muted-foreground">
+              The camera is blocked in this browser. Click the lock/site-settings icon in your address bar, set Camera to Allow,
+              then click <strong>Refresh status</strong> and <strong>Request camera access</strong>. Camera access only works over https or localhost.
+            </p>
+          )}
         </div>
       )}
 

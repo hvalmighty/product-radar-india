@@ -1226,9 +1226,24 @@ function BankStep({
 
       <div className="rounded-md border border-border p-3 space-y-3">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">Nominee</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="text-[11px] text-muted-foreground">
+          SEBI requires every folio to either register a nominee or record a signed opt-out declaration.
+        </div>
+        <label className="flex gap-2 items-start cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={form.nomineeOptOut}
+            onChange={(e) => update("nomineeOptOut", e.target.checked)} />
+          <span className="text-sm">
+            I do not wish to nominate — I understand the folio proceeds will devolve as per succession law
+            and additional documentation will be required from claimants.
+          </span>
+        </label>
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${form.nomineeOptOut ? "opacity-40 pointer-events-none" : ""}`}>
           <Field label="Nominee name">
             <input className={inputCls} value={form.nomineeName} onChange={(e) => update("nomineeName", e.target.value)} placeholder="Full name" />
+          </Field>
+          <Field label="Nominee share (%)">
+            <input type="number" min={1} max={100} className={inputCls} value={form.nomineeShare}
+              onChange={(e) => update("nomineeShare", Number(e.target.value))} />
           </Field>
           <Field label="Nominee relation">
             <select className={inputCls} value={form.nomineeRelation} onChange={(e) => update("nomineeRelation", e.target.value)}>
@@ -1273,6 +1288,12 @@ function ReviewStep({
           <SummaryRow k="Aadhaar" v={form.aadhaarLast4 ? `••••••••${form.aadhaarLast4}` : "—"} />
           <SummaryRow k="Income" v={form.income || "—"} />
           <SummaryRow k="Occupation" v={form.occupation || "—"} />
+          <SummaryRow k="KYC status" v={form.kycStatus ? form.kycStatus.replace("-", " ") : "—"} />
+          <SummaryRow k="CKYC no." v={form.ckycNumber || "—"} />
+          <SummaryRow k="IPV" v={form.ipvDone ? (form.ipvMode || "done") : "Pending"} />
+          <SummaryRow k="FATCA" v={form.taxResidencyOutsideIndia ? `${form.fatcaCountry} · ${form.fatcaTin}` : "Indian tax resident only"} />
+          <SummaryRow k="PEP" v={form.pepStatus === "no" ? "Not a PEP" : form.pepStatus || "—"} />
+          <SummaryRow k="Category" v={form.investorCategory || "—"} />
         </SummaryCard>
         <SummaryCard title="Risk & suggested allocation">
           <SummaryRow k="Profile" v={band} />

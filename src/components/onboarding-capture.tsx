@@ -287,6 +287,45 @@ export function FaceLivenessCapture({
   const [verifying, setVerifying] = useState(false);
   const [geo, setGeo] = useState<FaceCaptureResult["geo"]>(null);
   const [code] = useState(randomCode);
+  const [fallback, setFallback] = useState(false);
+  const photoRef = useRef<HTMLInputElement | null>(null);
+
+  function usePhoto(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file (JPG or PNG).");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError(`That photo is ${fmtSize(file.size)} — the limit is 5 MB.`);
+      return;
+    }
+    setError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : null;
+      if (!dataUrl) {
+        setError("Could not read that photo — try another one.");
+        return;
+      }
+      setVerifying(true);
+      // ---- SIMULATED VERIFICATION BOUNDARY (uploaded-photo path) ---------
+      setTimeout(() => {
+        setVerifying(false);
+        onResult({
+          selfieDataUrl: dataUrl,
+          frames: 1,
+          capturedAt: new Date().toISOString(),
+          geo,
+          livenessScore: 0,
+          matchScore: 90 + Math.floor(Math.random() * 6),
+          challengeCode: code,
+          prompts: ["Photo uploaded — no live liveness prompts; flagged for manual officer review"],
+        });
+      }, 1200);
+    };
+    reader.onerror = () => setError("Could not read that photo — try another one.");
+    reader.readAsDataURL(file);
+  }
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());

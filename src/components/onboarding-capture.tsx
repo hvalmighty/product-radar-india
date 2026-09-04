@@ -456,10 +456,13 @@ export function FaceLivenessCapture({
           />
           <div className="text-xs space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" /> Liveness passed · face matched
+              <CheckCircle2 className="w-4 h-4" />
+              {result.livenessScore > 0 ? "Liveness passed · face matched" : "Photo received · pending officer review"}
             </div>
             <div className="text-muted-foreground">
-              Liveness {result.livenessScore}% · Face match {result.matchScore}% · {result.frames} frames
+              {result.livenessScore > 0
+                ? `Liveness ${result.livenessScore}% · Face match ${result.matchScore}% · ${result.frames} frames`
+                : `Uploaded photo · face match ${result.matchScore}% · no live liveness check`}
             </div>
             <div className="text-muted-foreground">
               Captured {new Date(result.capturedAt).toLocaleString()} · challenge code {result.challengeCode}

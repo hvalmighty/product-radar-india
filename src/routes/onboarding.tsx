@@ -431,6 +431,13 @@ function OnboardingPage() {
         if (!form.pepStatus) return { ok: false, msg: "Complete the PEP declaration" };
         if (!form.holdingMode) return { ok: false, msg: "Select mode of holding" };
         return { ok: true };
+      case "documents": {
+        const missing = missingRequiredDocs(indiaDocSlots(form), form.docs);
+        if (missing.length) return { ok: false, msg: `Upload required document: ${missing[0]!.label}` };
+        if (form.ipvMode === "video" && !form.faceCapture)
+          return { ok: false, msg: "Complete the video-IPV liveness and face-match capture" };
+        return { ok: true };
+      }
       case "risk":
         if (Object.keys(form.riskAnswers).length < RISK_QUESTIONS.length) return { ok: false, msg: "Answer all risk questions" };
         return { ok: true };

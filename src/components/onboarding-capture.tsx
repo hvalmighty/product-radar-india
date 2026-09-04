@@ -341,12 +341,15 @@ export function FaceLivenessCapture({
       }
     } catch (e) {
       const name = (e as { name?: string })?.name;
+      setFallback(true);
       setError(
-        name === "NotAllowedError"
-          ? "Camera permission was denied. Allow camera access in your browser and try again."
-          : name === "NotFoundError"
-            ? "No camera was found on this device."
-            : "Could not start the camera on this device.",
+        name === "NotAllowedError" || name === "SecurityError"
+          ? "Camera access was blocked. Allow the camera for this site in your browser settings (it also needs a secure https connection), then try again — or upload a photo instead."
+          : name === "NotFoundError" || name === "OverconstrainedError"
+            ? "No working camera was detected — it may be missing, switched off, or in use by another app (Zoom, Teams, another tab). Close those and retry, or upload a photo instead."
+            : name === "NotSupportedError"
+              ? "This browser does not allow camera access here. Try Chrome or Safari over https — or upload a photo instead."
+              : "Could not start the camera on this device. You can retry or upload a photo instead.",
       );
     } finally {
       setStarting(false);

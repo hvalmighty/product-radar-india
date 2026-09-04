@@ -295,8 +295,9 @@ export function FaceLivenessCapture({
   // otherwise fall back to a quick getUserMedia probe.
   async function checkPermission() {
     try {
-      if ("permissions" in navigator && (navigator as unknown as { permissions: { query: (o: unknown) => Promise<PermissionStatus> } }).permissions.query) {
-        const status = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<PermissionStatus> } }).permissions.query({ name: "camera" as unknown as PermissionName });
+      const permApi = (navigator as unknown as { permissions?: { query?: unknown } }).permissions;
+      if (typeof permApi?.query === "function") {
+        const status = await (permApi.query as (o: unknown) => Promise<PermissionStatus>)({ name: "camera" as unknown as PermissionName });
         setPermission(status.state as "prompt" | "granted" | "denied");
         status.addEventListener("change", () => setPermission(status.state as "prompt" | "granted" | "denied"), { once: true });
         return status.state as "prompt" | "granted" | "denied";

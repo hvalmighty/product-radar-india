@@ -17,7 +17,16 @@ import {
   Info,
   FileCheck2,
   AlertTriangle,
+  FolderUp,
 } from "lucide-react";
+import {
+  DocumentSlots,
+  FaceLivenessCapture,
+  missingRequiredDocs,
+  type DocMap,
+  type DocSlot,
+  type FaceCaptureResult,
+} from "@/components/onboarding-capture";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({

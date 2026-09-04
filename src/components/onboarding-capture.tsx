@@ -302,10 +302,22 @@ export function FaceLivenessCapture({
     setFrames([]);
     setPromptIndex(0);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      });
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw Object.assign(new Error("unsupported"), { name: "NotSupportedError" });
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+      } catch (first) {
+        const n = (first as { name?: string })?.name;
+        if (n === "NotAllowedError" || n === "SecurityError") throw first;
+        // Retry with the loosest possible constraint — some devices reject
+        // facingMode/resolution hints and report NotFoundError incorrectly.
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       streamRef.current = stream;
       setLive(true);
       // attach after render

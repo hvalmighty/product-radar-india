@@ -607,6 +607,7 @@ function OnboardingPage() {
             {current.id === "personal" && <PersonalStep form={form} update={update} updateName={updateName} />}
             {current.id === "kyc" && <KycStep form={form} update={update} />}
             {current.id === "compliance" && <ComplianceStep form={form} update={update} />}
+            {current.id === "documents" && <DocumentsStep form={form} update={update} />}
             {current.id === "risk" && (
               <RiskStep form={form} update={update} score={riskScore} band={riskBand} allocation={suggestedAllocation} />
             )}

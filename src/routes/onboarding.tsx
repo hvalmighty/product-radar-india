@@ -1480,6 +1480,14 @@ function ReviewStep({
           <SummaryRow k="KYC status" v={form.kycStatus ? form.kycStatus.replace("-", " ") : "—"} />
           <SummaryRow k="CKYC no." v={form.ckycNumber || "—"} />
           <SummaryRow k="IPV" v={form.ipvDone ? (form.ipvMode || "done") : "Pending"} />
+          <SummaryRow
+            k="Documents"
+            v={`${Object.keys(form.docs).length} uploaded${missingRequiredDocs(indiaDocSlots(form), form.docs).length ? " · pending items" : " · complete"}`}
+          />
+          <SummaryRow
+            k="Face match"
+            v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%` : "Not captured"}
+          />
           <SummaryRow k="FATCA" v={form.taxResidencyOutsideIndia ? `${form.fatcaCountry} · ${form.fatcaTin}` : "Indian tax resident only"} />
           <SummaryRow k="PEP" v={form.pepStatus === "no" ? "Not a PEP" : form.pepStatus || "—"} />
           <SummaryRow k="Category" v={form.investorCategory || "—"} />

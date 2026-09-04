@@ -997,8 +997,15 @@ function ComplianceStep({
         <button type="button" disabled={!form.ipvMode || form.ipvDone}
           onClick={() => update("ipvDone", true)}
           className="px-3 h-9 rounded-md text-xs border border-border hover:bg-accent disabled:opacity-40">
-          {form.ipvDone ? "IPV completed ✓" : "Complete IPV"}
+          {form.ipvDone
+            ? form.ipvMode === "video" ? "Scheduled — capture on the next step ✓" : "IPV completed ✓"
+            : form.ipvMode === "video" ? "Schedule video IPV" : "Complete IPV"}
         </button>
+        {form.ipvMode === "video" && (
+          <p className="text-[11px] text-muted-foreground">
+            The recorded, geo-tagged liveness session and face match run on the next step (Documents &amp; Face Verification).
+          </p>
+        )}
       </div>
 
       <div className="rounded-md border border-border p-3 space-y-3">

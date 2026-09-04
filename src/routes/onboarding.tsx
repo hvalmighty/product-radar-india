@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useRegion } from "@/lib/region";
+import { SingaporeOnboarding } from "@/components/onboarding-singapore";
 import {
   UserCircle2,
   ShieldCheck,
@@ -13,6 +15,8 @@ import {
   Sparkles,
   Upload,
   Info,
+  FileCheck2,
+  AlertTriangle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/onboarding")({
@@ -26,10 +30,16 @@ export const Route = createFileRoute("/onboarding")({
       },
     ],
   }),
-  component: OnboardingPage,
+  component: OnboardingRouter,
 });
 
-type StepId = "personal" | "kyc" | "risk" | "goals" | "bank" | "review" | "done";
+function OnboardingRouter() {
+  const { region } = useRegion();
+  if (region === "SG") return <SingaporeOnboarding />;
+  return <OnboardingPage />;
+}
+
+type StepId = "personal" | "kyc" | "compliance" | "risk" | "goals" | "bank" | "review" | "done";
 
 interface Step {
   id: StepId;
@@ -42,6 +52,7 @@ interface Step {
 const STEPS: Step[] = [
   { id: "personal", title: "Personal Details", short: "Personal", icon: UserCircle2 },
   { id: "kyc", title: "KYC Verification", short: "KYC", icon: ShieldCheck },
+  { id: "compliance", title: "Compliance & Declarations", short: "Compliance", icon: FileCheck2 },
   { id: "risk", title: "Risk Profiling & Allocation", short: "Risk", icon: Gauge },
   { id: "goals", title: "Investment Goals (Optional)", short: "Goals", icon: Target, optional: true },
   { id: "bank", title: "Bank & Nominee", short: "Bank", icon: Landmark },
@@ -247,6 +258,22 @@ interface FormState {
   aadhaarVerified: boolean;
   income: "<5L" | "5-10L" | "10-25L" | "25L-1Cr" | ">1Cr" | "";
   occupation: string;
+  // India compliance (SEBI / AMFI / PMLA)
+  investorCategory: "resident" | "nri-nre" | "nri-nro" | "minor" | "huf" | "";
+  kycStatus: "" | "validated" | "registered" | "on-hold" | "new";
+  ckycNumber: string;
+  kraAgency: string;
+  panAadhaarLinked: boolean;
+  ipvMode: "video" | "in-person" | "aadhaar-ekyc" | "";
+  ipvDone: boolean;
+  taxResidencyOutsideIndia: boolean;
+  fatcaCountry: string;
+  fatcaTin: string;
+  birthCity: string;
+  birthCountry: string;
+  pepStatus: "no" | "self" | "related" | "";
+  holdingMode: "single" | "joint-anyone" | "joint-jointly" | "";
+  ucc: string;
   riskAnswers: Record<string, number>;
   goals: Array<{ name: string; horizonYears: number; targetLakh: number; sipMonthly: number }>;
   bankName: string;
@@ -257,6 +284,8 @@ interface FormState {
   accountLast4: string;
   nomineeName: string;
   nomineeRelation: string;
+  nomineeOptOut: boolean;
+  nomineeShare: number;
   agreed: boolean;
 }
 
@@ -288,6 +317,21 @@ function OnboardingPage() {
     aadhaarVerified: false,
     income: "",
     occupation: "",
+    investorCategory: "resident",
+    kycStatus: "",
+    ckycNumber: "",
+    kraAgency: "",
+    panAadhaarLinked: false,
+    ipvMode: "",
+    ipvDone: false,
+    taxResidencyOutsideIndia: false,
+    fatcaCountry: "",
+    fatcaTin: "",
+    birthCity: "",
+    birthCountry: "India",
+    pepStatus: "",
+    holdingMode: "single",
+    ucc: "",
     riskAnswers: {},
     goals: [],
     bankName: "",
@@ -298,6 +342,8 @@ function OnboardingPage() {
     accountLast4: "",
     nomineeName: "",
     nomineeRelation: "",
+    nomineeOptOut: false,
+    nomineeShare: 100,
     agreed: false,
   });
 
@@ -358,6 +404,19 @@ function OnboardingPage() {
         if (!form.income) return { ok: false, msg: "Select annual income" };
         if (!form.occupation) return { ok: false, msg: "Select occupation" };
         return { ok: true };
+      case "compliance":
+        if (!form.investorCategory) return { ok: false, msg: "Select investor category" };
+        if (!form.kycStatus) return { ok: false, msg: "Run the KRA / CKYC status check" };
+        if (form.kycStatus === "on-hold") return { ok: false, msg: "KYC is on hold — re-KYC with a validated email & mobile before proceeding" };
+        if (!form.panAadhaarLinked) return { ok: false, msg: "Confirm PAN–Aadhaar linkage (mandatory for KYC validation)" };
+        if (!form.ipvMode) return { ok: false, msg: "Select an in-person verification mode" };
+        if (!form.ipvDone) return { ok: false, msg: "Complete in-person verification (IPV)" };
+        if (!form.birthCity.trim()) return { ok: false, msg: "Enter place of birth (required for FATCA/CRS)" };
+        if (form.taxResidencyOutsideIndia && (!form.fatcaCountry.trim() || !form.fatcaTin.trim()))
+          return { ok: false, msg: "Enter the foreign tax jurisdiction and TIN" };
+        if (!form.pepStatus) return { ok: false, msg: "Complete the PEP declaration" };
+        if (!form.holdingMode) return { ok: false, msg: "Select mode of holding" };
+        return { ok: true };
       case "risk":
         if (Object.keys(form.riskAnswers).length < RISK_QUESTIONS.length) return { ok: false, msg: "Answer all risk questions" };
         return { ok: true };
@@ -368,7 +427,7 @@ function OnboardingPage() {
         if (!form.bankName.trim()) return { ok: false, msg: "Select bank" };
         if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.toUpperCase())) return { ok: false, msg: "IFSC missing — pick branch" };
         if (!/^\d{4}$/.test(form.accountLast4)) return { ok: false, msg: "Enter last 4 digits of account" };
-        if (!form.nomineeName.trim()) return { ok: false, msg: "Enter nominee name" };
+        if (!form.nomineeOptOut && !form.nomineeName.trim()) return { ok: false, msg: "Enter nominee name or tick the opt-out declaration" };
         return { ok: true };
       case "review":
         if (!form.agreed) return { ok: false, msg: "Accept terms to submit" };

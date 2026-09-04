@@ -1061,6 +1061,69 @@ function ComplianceStep({
   );
 }
 
+function DocumentsStep({
+  form,
+  update,
+}: {
+  form: FormState;
+  update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
+}) {
+  const slots = useMemo(() => indiaDocSlots(form), [form]);
+  const requiredCount = slots.filter((s) => s.required).length;
+  const doneCount = slots.filter((s) => s.required && form.docs[s.id]).length;
+  const kycDone = form.kycStatus === "validated";
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground flex gap-2">
+        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <span>
+          {kycDone
+            ? "Your KRA record is KYC Validated, so identity and address proofs are already on file — only the bank and signature proofs are needed."
+            : "Fresh KYC — upload PAN, masked Aadhaar and address proof. Documents stay on this device in the demo; production uploads go to the KRA-linked document vault."}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Required documents</div>
+        <span className="text-xs text-muted-foreground">{doneCount} of {requiredCount} uploaded</span>
+      </div>
+
+      <DocumentSlots slots={slots} docs={form.docs} onChange={(d) => update("docs", d)} />
+
+      <div className="space-y-2">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">
+          Video in-person verification (IPV)
+        </div>
+        {form.ipvMode === "video" ? (
+          <FaceLivenessCapture
+            title="Video IPV — liveness & PAN face match"
+            subtitle="SEBI-compliant video IPV: a recorded, time-stamped and geo-tagged session in which you read a random code aloud and your face is matched against your PAN photograph."
+            readAloud
+            result={form.faceCapture}
+            onResult={(r) => update("faceCapture", r)}
+          />
+        ) : (
+          <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-2">
+            <p>
+              You selected{" "}
+              <span className="font-medium text-foreground">
+                {form.ipvMode === "aadhaar-ekyc" ? "Aadhaar OTP e-KYC" : form.ipvMode === "in-person" ? "In-person verification by an RM" : "no IPV mode"}
+              </span>
+              , so a live face capture is not mandatory. You may still record one to strengthen the audit trail.
+            </p>
+            <FaceLivenessCapture
+              title="Optional liveness capture"
+              result={form.faceCapture}
+              onResult={(r) => update("faceCapture", r)}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RiskStep({
   form,
   update,

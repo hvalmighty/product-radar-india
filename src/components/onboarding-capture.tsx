@@ -528,7 +528,7 @@ export function FaceLivenessCapture({
       )}
 
       {!live && !verifying && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => void start()}
@@ -536,13 +536,33 @@ export function FaceLivenessCapture({
             className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            Start camera
+            {fallback ? "Retry camera" : "Start camera"}
+          </button>
+          <button
+            type="button"
+            onClick={() => photoRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm border border-border hover:bg-accent"
+          >
+            <Upload className="w-4 h-4" /> Upload a photo instead
           </button>
           <span className="text-[11px] text-muted-foreground">
             {PROMPTS.length} guided prompts · session is time-stamped and geo-tagged
           </span>
         </div>
       )}
+
+      <input
+        ref={photoRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        capture="user"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) usePhoto(f);
+          e.target.value = "";
+        }}
+      />
 
       {error && (
         <p className="text-xs text-destructive flex items-start gap-1">

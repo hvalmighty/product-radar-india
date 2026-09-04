@@ -62,6 +62,7 @@ const STEPS: Step[] = [
   { id: "personal", title: "Personal Details", short: "Personal", icon: UserCircle2 },
   { id: "kyc", title: "KYC Verification", short: "KYC", icon: ShieldCheck },
   { id: "compliance", title: "Compliance & Declarations", short: "Compliance", icon: FileCheck2 },
+  { id: "documents", title: "Documents & Face Verification", short: "Documents", icon: FolderUp },
   { id: "risk", title: "Risk Profiling & Allocation", short: "Risk", icon: Gauge },
   { id: "goals", title: "Investment Goals (Optional)", short: "Goals", icon: Target, optional: true },
   { id: "bank", title: "Bank & Nominee", short: "Bank", icon: Landmark },

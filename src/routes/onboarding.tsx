@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useRegion } from "@/lib/region";
+import { SingaporeOnboarding } from "@/components/onboarding-singapore";
 import {
   UserCircle2,
   ShieldCheck,
@@ -13,6 +15,8 @@ import {
   Sparkles,
   Upload,
   Info,
+  FileCheck2,
+  AlertTriangle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/onboarding")({
@@ -26,10 +30,16 @@ export const Route = createFileRoute("/onboarding")({
       },
     ],
   }),
-  component: OnboardingPage,
+  component: OnboardingRouter,
 });
 
-type StepId = "personal" | "kyc" | "risk" | "goals" | "bank" | "review" | "done";
+function OnboardingRouter() {
+  const { region } = useRegion();
+  if (region === "SG") return <SingaporeOnboarding />;
+  return <OnboardingPage />;
+}
+
+type StepId = "personal" | "kyc" | "compliance" | "risk" | "goals" | "bank" | "review" | "done";
 
 interface Step {
   id: StepId;
@@ -42,6 +52,7 @@ interface Step {
 const STEPS: Step[] = [
   { id: "personal", title: "Personal Details", short: "Personal", icon: UserCircle2 },
   { id: "kyc", title: "KYC Verification", short: "KYC", icon: ShieldCheck },
+  { id: "compliance", title: "Compliance & Declarations", short: "Compliance", icon: FileCheck2 },
   { id: "risk", title: "Risk Profiling & Allocation", short: "Risk", icon: Gauge },
   { id: "goals", title: "Investment Goals (Optional)", short: "Goals", icon: Target, optional: true },
   { id: "bank", title: "Bank & Nominee", short: "Bank", icon: Landmark },
@@ -247,6 +258,22 @@ interface FormState {
   aadhaarVerified: boolean;
   income: "<5L" | "5-10L" | "10-25L" | "25L-1Cr" | ">1Cr" | "";
   occupation: string;
+  // India compliance (SEBI / AMFI / PMLA)
+  investorCategory: "resident" | "nri-nre" | "nri-nro" | "minor" | "huf" | "";
+  kycStatus: "" | "validated" | "registered" | "on-hold" | "new";
+  ckycNumber: string;
+  kraAgency: string;
+  panAadhaarLinked: boolean;
+  ipvMode: "video" | "in-person" | "aadhaar-ekyc" | "";
+  ipvDone: boolean;
+  taxResidencyOutsideIndia: boolean;
+  fatcaCountry: string;
+  fatcaTin: string;
+  birthCity: string;
+  birthCountry: string;
+  pepStatus: "no" | "self" | "related" | "";
+  holdingMode: "single" | "joint-anyone" | "joint-jointly" | "";
+  ucc: string;
   riskAnswers: Record<string, number>;
   goals: Array<{ name: string; horizonYears: number; targetLakh: number; sipMonthly: number }>;
   bankName: string;
@@ -257,6 +284,8 @@ interface FormState {
   accountLast4: string;
   nomineeName: string;
   nomineeRelation: string;
+  nomineeOptOut: boolean;
+  nomineeShare: number;
   agreed: boolean;
 }
 
@@ -288,6 +317,21 @@ function OnboardingPage() {
     aadhaarVerified: false,
     income: "",
     occupation: "",
+    investorCategory: "resident",
+    kycStatus: "",
+    ckycNumber: "",
+    kraAgency: "",
+    panAadhaarLinked: false,
+    ipvMode: "",
+    ipvDone: false,
+    taxResidencyOutsideIndia: false,
+    fatcaCountry: "",
+    fatcaTin: "",
+    birthCity: "",
+    birthCountry: "India",
+    pepStatus: "",
+    holdingMode: "single",
+    ucc: "",
     riskAnswers: {},
     goals: [],
     bankName: "",
@@ -298,6 +342,8 @@ function OnboardingPage() {
     accountLast4: "",
     nomineeName: "",
     nomineeRelation: "",
+    nomineeOptOut: false,
+    nomineeShare: 100,
     agreed: false,
   });
 
@@ -358,6 +404,19 @@ function OnboardingPage() {
         if (!form.income) return { ok: false, msg: "Select annual income" };
         if (!form.occupation) return { ok: false, msg: "Select occupation" };
         return { ok: true };
+      case "compliance":
+        if (!form.investorCategory) return { ok: false, msg: "Select investor category" };
+        if (!form.kycStatus) return { ok: false, msg: "Run the KRA / CKYC status check" };
+        if (form.kycStatus === "on-hold") return { ok: false, msg: "KYC is on hold — re-KYC with a validated email & mobile before proceeding" };
+        if (!form.panAadhaarLinked) return { ok: false, msg: "Confirm PAN–Aadhaar linkage (mandatory for KYC validation)" };
+        if (!form.ipvMode) return { ok: false, msg: "Select an in-person verification mode" };
+        if (!form.ipvDone) return { ok: false, msg: "Complete in-person verification (IPV)" };
+        if (!form.birthCity.trim()) return { ok: false, msg: "Enter place of birth (required for FATCA/CRS)" };
+        if (form.taxResidencyOutsideIndia && (!form.fatcaCountry.trim() || !form.fatcaTin.trim()))
+          return { ok: false, msg: "Enter the foreign tax jurisdiction and TIN" };
+        if (!form.pepStatus) return { ok: false, msg: "Complete the PEP declaration" };
+        if (!form.holdingMode) return { ok: false, msg: "Select mode of holding" };
+        return { ok: true };
       case "risk":
         if (Object.keys(form.riskAnswers).length < RISK_QUESTIONS.length) return { ok: false, msg: "Answer all risk questions" };
         return { ok: true };
@@ -368,7 +427,7 @@ function OnboardingPage() {
         if (!form.bankName.trim()) return { ok: false, msg: "Select bank" };
         if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifsc.toUpperCase())) return { ok: false, msg: "IFSC missing — pick branch" };
         if (!/^\d{4}$/.test(form.accountLast4)) return { ok: false, msg: "Enter last 4 digits of account" };
-        if (!form.nomineeName.trim()) return { ok: false, msg: "Enter nominee name" };
+        if (!form.nomineeOptOut && !form.nomineeName.trim()) return { ok: false, msg: "Enter nominee name or tick the opt-out declaration" };
         return { ok: true };
       case "review":
         if (!form.agreed) return { ok: false, msg: "Accept terms to submit" };
@@ -409,7 +468,8 @@ function OnboardingPage() {
           </div>
           <h1 className="text-2xl font-semibold">Start your mutual fund journey</h1>
           <p className="text-sm text-muted-foreground">
-            A guided 6-step flow — personal details, KYC, risk profile, optional goals, bank and review — in under 5 minutes.
+            SEBI / AMFI compliant journey — personal details, PAN &amp; Aadhaar KYC, CKYC-KRA and FATCA declarations,
+            risk profiling, optional goals, bank &amp; nominee, and review.
           </p>
         </header>
 
@@ -428,6 +488,7 @@ function OnboardingPage() {
           <div className="p-5">
             {current.id === "personal" && <PersonalStep form={form} update={update} updateName={updateName} />}
             {current.id === "kyc" && <KycStep form={form} update={update} />}
+            {current.id === "compliance" && <ComplianceStep form={form} update={update} />}
             {current.id === "risk" && (
               <RiskStep form={form} update={update} score={riskScore} band={riskBand} allocation={suggestedAllocation} />
             )}
@@ -708,6 +769,167 @@ function KycStep({
       <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
         <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
         Drag & drop a signed cancelled cheque or bank statement (optional in demo)
+      </div>
+    </div>
+  );
+}
+
+function ComplianceStep({
+  form,
+  update,
+}: {
+  form: FormState;
+  update: <K extends keyof FormState>(k: K, v: FormState[K]) => void;
+}) {
+  const [checking, setChecking] = useState(false);
+  const kraLabel: Record<string, string> = {
+    validated: "KYC Validated — investible across all AMCs",
+    registered: "KYC Registered — Aadhaar re-validation needed for new AMCs",
+    "on-hold": "KYC On Hold — re-KYC required",
+    new: "No KYC record — fresh KYC will be filed",
+  };
+  function runCheck() {
+    setChecking(true);
+    setTimeout(() => {
+      setChecking(false);
+      update("kycStatus", "validated");
+      update("ckycNumber", "3" + String(Math.abs(hash(form.pan || "PAN")) % 1_000_000_000_000).padStart(13, "0").slice(0, 13));
+      update("kraAgency", "CVL KRA");
+      update("panAadhaarLinked", true);
+    }, 1300);
+  }
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground flex gap-2">
+        <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <span>
+          Mutual fund KYC is governed by SEBI KYC (Registration Agency) Regulations and the PMLA rules. A
+          <strong> KYC Validated</strong> record is portable across every AMC; Registered records need Aadhaar
+          re-validation for a new fund house. Checks here are simulated.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Investor category">
+          <select className={inputCls} value={form.investorCategory}
+            onChange={(e) => update("investorCategory", e.target.value as FormState["investorCategory"])}>
+            <option value="resident">Resident Individual</option>
+            <option value="nri-nre">NRI — repatriable (NRE)</option>
+            <option value="nri-nro">NRI — non-repatriable (NRO)</option>
+            <option value="minor">Minor through guardian</option>
+            <option value="huf">HUF</option>
+          </select>
+        </Field>
+        <Field label="Mode of holding">
+          <select className={inputCls} value={form.holdingMode}
+            onChange={(e) => update("holdingMode", e.target.value as FormState["holdingMode"])}>
+            <option value="single">Single</option>
+            <option value="joint-anyone">Joint — Anyone or Survivor</option>
+            <option value="joint-jointly">Joint — Jointly</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="rounded-md border border-border p-3 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <div className="text-sm font-medium">CKYC / KRA status check</div>
+            <div className="text-[11px] text-muted-foreground">
+              Queries CVL, CAMS, NDML, DOTEX and Karvy KRAs plus the CERSAI CKYC registry against the PAN entered.
+            </div>
+          </div>
+          <button type="button" disabled={checking || form.pan.length !== 10}
+            onClick={runCheck}
+            className="px-3 h-9 rounded-md text-xs bg-primary text-primary-foreground disabled:opacity-40">
+            {form.kycStatus ? "Re-check" : checking ? "Checking…" : "Fetch status"}
+          </button>
+        </div>
+        {form.kycStatus && (
+          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1.5">
+            <SummaryRow k="KYC status" v={kraLabel[form.kycStatus] ?? form.kycStatus} />
+            <SummaryRow k="KRA agency" v={form.kraAgency || "—"} />
+            <SummaryRow k="CKYC identifier" v={form.ckycNumber || "—"} />
+            <SummaryRow k="PAN–Aadhaar linkage" v={form.panAadhaarLinked ? "Linked ✓" : "Not linked"} />
+          </div>
+        )}
+        {!form.panAadhaarLinked && form.kycStatus && (
+          <div className="text-[11px] text-amber-600 flex gap-1.5 items-start">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            An unlinked PAN is treated as inoperative — folio creation and redemption payouts will be blocked.
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border border-border p-3 space-y-3">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">In-person verification (IPV)</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {[
+            { v: "aadhaar-ekyc", l: "Aadhaar OTP e-KYC", d: "₹50,000 per AMC per year limit" },
+            { v: "video", l: "Video IPV", d: "Live, geo-tagged, recorded" },
+            { v: "in-person", l: "In-person by RM", d: "Distributor / AMC official" },
+          ].map((o) => (
+            <button key={o.v} type="button"
+              onClick={() => { update("ipvMode", o.v as FormState["ipvMode"]); update("ipvDone", false); }}
+              className={`text-left px-3 py-2 rounded-md border text-sm ${form.ipvMode === o.v ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-accent"}`}>
+              {o.l}
+              <span className="block text-[10px] opacity-80">{o.d}</span>
+            </button>
+          ))}
+        </div>
+        <button type="button" disabled={!form.ipvMode || form.ipvDone}
+          onClick={() => update("ipvDone", true)}
+          className="px-3 h-9 rounded-md text-xs border border-border hover:bg-accent disabled:opacity-40">
+          {form.ipvDone ? "IPV completed ✓" : "Complete IPV"}
+        </button>
+      </div>
+
+      <div className="rounded-md border border-border p-3 space-y-3">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">FATCA / CRS declaration</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="City of birth">
+            <input className={inputCls} value={form.birthCity} onChange={(e) => update("birthCity", e.target.value)} placeholder="Mumbai" />
+          </Field>
+          <Field label="Country of birth">
+            <input className={inputCls} value={form.birthCountry} onChange={(e) => update("birthCountry", e.target.value)} placeholder="India" />
+          </Field>
+        </div>
+        <label className="flex gap-2 items-start cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={form.taxResidencyOutsideIndia}
+            onChange={(e) => update("taxResidencyOutsideIndia", e.target.checked)} />
+          <span className="text-sm">I am a tax resident of a country other than India</span>
+        </label>
+        {form.taxResidencyOutsideIndia && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Country of tax residence">
+              <input className={inputCls} value={form.fatcaCountry} onChange={(e) => update("fatcaCountry", e.target.value)} placeholder="United States" />
+            </Field>
+            <Field label="Tax Identification Number (TIN)">
+              <input className={inputCls} value={form.fatcaTin} onChange={(e) => update("fatcaTin", e.target.value)} placeholder="TIN / functional equivalent" />
+            </Field>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border border-border p-3 space-y-2">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">PEP declaration (PMLA)</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {[
+            { v: "no", l: "Not a PEP" },
+            { v: "self", l: "I am a PEP" },
+            { v: "related", l: "Related to a PEP" },
+          ].map((o) => (
+            <button key={o.v} type="button" onClick={() => update("pepStatus", o.v as FormState["pepStatus"])}
+              className={`text-sm px-3 py-2 rounded-md border ${form.pepStatus === o.v ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-accent"}`}>
+              {o.l}
+            </button>
+          ))}
+        </div>
+        {form.pepStatus && form.pepStatus !== "no" && (
+          <div className="text-[11px] text-amber-600 flex gap-1.5 items-start">
+            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            Enhanced due diligence and compliance sign-off are required before the folio is activated.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1004,9 +1226,24 @@ function BankStep({
 
       <div className="rounded-md border border-border p-3 space-y-3">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">Nominee</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="text-[11px] text-muted-foreground">
+          SEBI requires every folio to either register a nominee or record a signed opt-out declaration.
+        </div>
+        <label className="flex gap-2 items-start cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={form.nomineeOptOut}
+            onChange={(e) => update("nomineeOptOut", e.target.checked)} />
+          <span className="text-sm">
+            I do not wish to nominate — I understand the folio proceeds will devolve as per succession law
+            and additional documentation will be required from claimants.
+          </span>
+        </label>
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${form.nomineeOptOut ? "opacity-40 pointer-events-none" : ""}`}>
           <Field label="Nominee name">
             <input className={inputCls} value={form.nomineeName} onChange={(e) => update("nomineeName", e.target.value)} placeholder="Full name" />
+          </Field>
+          <Field label="Nominee share (%)">
+            <input type="number" min={1} max={100} className={inputCls} value={form.nomineeShare}
+              onChange={(e) => update("nomineeShare", Number(e.target.value))} />
           </Field>
           <Field label="Nominee relation">
             <select className={inputCls} value={form.nomineeRelation} onChange={(e) => update("nomineeRelation", e.target.value)}>
@@ -1051,6 +1288,12 @@ function ReviewStep({
           <SummaryRow k="Aadhaar" v={form.aadhaarLast4 ? `••••••••${form.aadhaarLast4}` : "—"} />
           <SummaryRow k="Income" v={form.income || "—"} />
           <SummaryRow k="Occupation" v={form.occupation || "—"} />
+          <SummaryRow k="KYC status" v={form.kycStatus ? form.kycStatus.replace("-", " ") : "—"} />
+          <SummaryRow k="CKYC no." v={form.ckycNumber || "—"} />
+          <SummaryRow k="IPV" v={form.ipvDone ? (form.ipvMode || "done") : "Pending"} />
+          <SummaryRow k="FATCA" v={form.taxResidencyOutsideIndia ? `${form.fatcaCountry} · ${form.fatcaTin}` : "Indian tax resident only"} />
+          <SummaryRow k="PEP" v={form.pepStatus === "no" ? "Not a PEP" : form.pepStatus || "—"} />
+          <SummaryRow k="Category" v={form.investorCategory || "—"} />
         </SummaryCard>
         <SummaryCard title="Risk & suggested allocation">
           <SummaryRow k="Profile" v={band} />

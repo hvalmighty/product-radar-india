@@ -356,6 +356,8 @@ function OnboardingPage() {
     nomineeRelation: "",
     nomineeOptOut: false,
     nomineeShare: 100,
+    docs: {},
+    faceCapture: null,
     agreed: false,
   });
 

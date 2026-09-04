@@ -301,6 +301,103 @@ interface FormState {
   agreed: boolean;
 }
 
+// -------- India document requirements (SEBI / AMFI / CKYC-KRA) --------
+
+function indiaDocSlots(form: FormState): DocSlot[] {
+  const kycDone = form.kycStatus === "validated";
+  const slots: DocSlot[] = [
+    {
+      id: "pan",
+      label: "PAN card",
+      hint: "Clear colour scan or photo of the front of the card",
+      required: !kycDone,
+      note: "Name and date of birth must match the PAN captured in the KYC step.",
+    },
+    {
+      id: "aadhaar",
+      label: "Aadhaar — masked",
+      hint: "Download the masked e-Aadhaar from UIDAI (first 8 digits hidden)",
+      required: !kycDone,
+      note: "UIDAI prohibits storing a full Aadhaar number — upload the masked copy only.",
+    },
+    {
+      id: "address",
+      label: "Address proof",
+      hint: "Passport, driving licence, voter ID or a utility bill under 3 months old",
+      required: !kycDone,
+    },
+    {
+      id: "bankProof",
+      label: "Bank proof",
+      hint: "Cancelled cheque with printed name, or a bank statement page",
+      required: true,
+      note: "Used to validate the IFSC and account number for redemption payouts.",
+    },
+    {
+      id: "signature",
+      label: "Specimen signature",
+      hint: "Signature on plain white paper, photographed or scanned",
+      required: true,
+    },
+    {
+      id: "photo",
+      label: "Passport photograph",
+      hint: "Recent colour photograph, plain background",
+      required: false,
+    },
+  ];
+
+  if (form.investorCategory === "nri-nre" || form.investorCategory === "nri-nro") {
+    slots.push(
+      {
+        id: "passport",
+        label: "Passport — photo & address pages",
+        hint: "Mandatory for NRI / OCI investors",
+        required: true,
+      },
+      {
+        id: "overseasAddress",
+        label: "Overseas address proof",
+        hint: "Utility bill, driving licence or residence permit from your country of residence",
+        required: true,
+      },
+      {
+        id: "nreNro",
+        label: "NRE / NRO account proof",
+        hint: "Cancelled cheque or statement of the NRE/NRO account funding the investment",
+        required: true,
+        note: "Repatriable investments must be funded from an NRE account.",
+      },
+    );
+  }
+
+  if (form.investorCategory === "minor") {
+    slots.push(
+      { id: "birthCert", label: "Minor's birth certificate", hint: "Or school leaving certificate showing date of birth", required: true },
+      { id: "guardianKyc", label: "Guardian's KYC proof", hint: "Guardian PAN plus relationship proof or court order", required: true },
+    );
+  }
+
+  if (form.investorCategory === "huf") {
+    slots.push(
+      { id: "hufPan", label: "HUF PAN card", required: true },
+      { id: "hufDeed", label: "HUF deed / declaration", hint: "Listing the Karta and all coparceners", required: true },
+    );
+  }
+
+  if (form.taxResidencyOutsideIndia) {
+    slots.push({
+      id: "fatcaProof",
+      label: "Foreign tax residency proof",
+      hint: "Tax residency certificate or a document showing the TIN declared",
+      required: true,
+      note: "Required to support the FATCA / CRS self-certification.",
+    });
+  }
+
+  return slots;
+}
+
 const RISK_QUESTIONS = [
   { q: "What is your primary investment objective?", opts: ["Capital protection", "Steady income", "Balanced growth", "Aggressive growth"] },
   { q: "How long can you stay invested without needing this money?", opts: ["< 1 year", "1–3 years", "3–7 years", "> 7 years"] },

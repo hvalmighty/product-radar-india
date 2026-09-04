@@ -289,6 +289,28 @@ export function FaceLivenessCapture({
   const [code] = useState(randomCode);
   const [fallback, setFallback] = useState(false);
   const photoRef = useRef<HTMLInputElement | null>(null);
+  const [permission, setPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
+
+  // Browser permission helper: query the Permissions API where supported,
+  // otherwise fall back to a quick getUserMedia probe.
+  async function checkPermission() {
+    try {
+      if ("permissions" in navigator && (navigator as unknown as { permissions: { query: (o: unknown) => Promise<PermissionStatus> } }).permissions.query) {
+        const status = await (navigator as unknown as { permissions: { query: (o: unknown) => Promise<PermissionStatus> } }).permissions.query({ name: "camera" as unknown as PermissionName });
+        setPermission(status.state as "prompt" | "granted" | "denied");
+        status.addEventListener("change", () => setPermission(status.state as "prompt" | "granted" | "denied"), { once: true });
+        return status.state as "prompt" | "granted" | "denied";
+      }
+    } catch {
+      // Permissions API may reject for camera on some browsers.
+    }
+    setPermission("unknown");
+    return "unknown";
+  }
+
+  useEffect(() => {
+    void checkPermission();
+  }, []);
 
   function usePhoto(file: File) {
     if (!file.type.startsWith("image/")) {

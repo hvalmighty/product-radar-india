@@ -371,6 +371,9 @@ export function FaceLivenessCapture({
           matchScore: 90 + Math.floor(Math.random() * 6),
           challengeCode: code,
           prompts: ["Photo uploaded — no live liveness prompts; flagged for manual officer review"],
+          idImageDataUrl: idImage,
+          matchedAgainst: referenceLabel,
+
         });
       }, 1200);
     };

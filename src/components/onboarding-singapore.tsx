@@ -50,6 +50,7 @@ type StepId =
   | "review";
 
 const STEPS: { id: StepId; title: string; short: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "client", title: "Select Client / Prospect", short: "Client", icon: UserSearch },
   { id: "singpass", title: "Singpass Myinfo Retrieval", short: "Singpass", icon: Fingerprint },
   { id: "identity", title: "Identity & Residency", short: "Identity", icon: BadgeCheck },
   { id: "cdd", title: "Customer Due Diligence & Screening", short: "CDD", icon: ShieldCheck },

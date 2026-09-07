@@ -788,6 +788,18 @@ export function ResearchTerminal() {
             <div className="text-[11px] text-muted-foreground mono-num">
               <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : cat === "INS" ? insurance.length : cat === "PMS" ? pmsSchemes.length : cat === "AIF" ? aifSchemes.length : cat === "EQ" ? equityStocks.length : bonds.length} results
             </div>
+            {liveActive && (
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] px-2 py-1 rounded-sm border border-border bg-background">
+                <span className={`w-1.5 h-1.5 rounded-full ${liveLoading ? "bg-warning animate-pulse" : liveCount ? "bg-positive animate-pulse" : "bg-muted-foreground"}`} />
+                <span className="text-muted-foreground">
+                  {liveLoading
+                    ? `Fetching live ${liveSource}…`
+                    : liveCount
+                      ? `Live ${liveSource} · ${liveCount} matched${liveAsOf ? ` · ${new Date(liveAsOf).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}`
+                      : `Live ${liveSource} unavailable — showing indicative data`}
+                </span>
+
+            </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
                 <>
@@ -973,12 +985,12 @@ export function ResearchTerminal() {
                         <td className="px-3 py-2.5 text-center">
                           <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="accent-primary cursor-pointer" />
                         </td>
-                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} />}
+                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} live={liveNavs[(p as MutualFund).id]} />}
                         {cat === "FD" && <FDRow p={p as FixedDeposit} visibleCols={visibleCols[cat]} />}
                         {cat === "INS" && <INSRow p={p as Insurance} visibleCols={visibleCols[cat]} />}
                         {cat === "PMS" && <PMSRow p={p as PMS} visibleCols={visibleCols[cat]} />}
                         {cat === "AIF" && <AIFRow p={p as AIF} visibleCols={visibleCols[cat]} />}
-                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} />}
+                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} live={liveQuotes[(p as EquityStock).ticker]} />}
                         {cat === "BOND" && <BONDRow p={p as Bond} visibleCols={visibleCols[cat]} />}
                       </tr>
                     ))}

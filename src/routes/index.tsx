@@ -798,8 +798,10 @@ export function ResearchTerminal() {
                       ? `Live ${liveSource} · ${liveCount} matched${liveAsOf ? ` · ${new Date(liveAsOf).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}`
                       : `Live ${liveSource} unavailable — showing indicative data`}
                 </span>
+                <button onClick={() => (cat === "MF" ? navQuery.refetch() : quoteQuery.refetch())} className="text-[10px] uppercase tracking-[0.14em] text-primary hover:underline">Refresh</button>
+              </div>
+            )}
 
-            </div>
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
                 <>

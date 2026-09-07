@@ -38,6 +38,7 @@ import {
  */
 
 type StepId =
+  | "client"
   | "singpass"
   | "identity"
   | "cdd"

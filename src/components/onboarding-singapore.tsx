@@ -333,7 +333,16 @@ export function SingaporeOnboarding() {
 
   function canProceed(): { ok: boolean; msg?: string } {
     switch (current?.id) {
+      case "client":
+        if (!form.applicantMode) return { ok: false, msg: "Select an existing prospect or create a new client record" };
+        if (!form.fullName.trim()) return { ok: false, msg: "Enter the client's full name" };
+        if (!/^[STFGM]\d{7}[A-Z]$/i.test(form.nric.trim())) return { ok: false, msg: "Enter a valid NRIC / FIN (e.g. S1234567D)" };
+        if (!/^[89]\d{7}$/.test(form.mobile)) return { ok: false, msg: "Enter an 8-digit SG mobile starting with 8 or 9" };
+        if (!/^\S+@\S+\.\S+$/.test(form.email)) return { ok: false, msg: "Enter a valid email for the Singpass authorisation link" };
+        return { ok: true };
       case "singpass":
+        if (!form.consentSent && !form.noSingpass)
+          return { ok: false, msg: "Send the Singpass authorisation request to this client, or continue without Singpass" };
         if (!form.singpassRetrieved && !form.noSingpass)
           return { ok: false, msg: "Retrieve Myinfo data via Singpass, or choose to continue without Singpass" };
         return { ok: true };

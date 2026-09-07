@@ -257,6 +257,9 @@ export function SingaporeOnboarding() {
   const [stepIndex, setStepIndex] = useState(0);
   const [showError, setShowError] = useState(false);
   const [form, setForm] = useState<SgForm>({
+    applicantMode: "",
+    prospectId: "",
+    consentSent: false,
     singpassRetrieved: false,
     fullName: "",
     aliasName: "",

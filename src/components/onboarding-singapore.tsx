@@ -1263,7 +1263,7 @@ function ReviewStep({
           <Row k="Contact" v={form.mobile ? `+65 ${form.mobile}` : "—"} />
           <Row k="Myinfo" v={form.singpassRetrieved ? "Verified via Singpass" : "Manual capture"} />
           <Row k="Documents" v={`${Object.keys(form.docs).length} uploaded${missingRequiredDocs(sgDocSlots(form), form.docs).length ? " · pending" : " · complete"}`} />
-          <Row k="Face verification" v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%` : form.singpassRetrieved ? "Not required (Singpass verified)" : "Not captured"} />
+          <Row k="Face verification" v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%${form.faceCapture.matchedAgainst ? ` vs ${form.faceCapture.matchedAgainst}` : ""}` : form.singpassRetrieved ? "Not required (Singpass verified)" : "Not captured"} />
         </Card>
         <Card title="Due diligence">
           <Row k="Occupation" v={form.occupation || "—"} />

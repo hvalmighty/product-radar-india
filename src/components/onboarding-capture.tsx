@@ -249,6 +249,10 @@ export interface FaceCaptureResult {
   matchScore: number;
   challengeCode: string;
   prompts: string[];
+  /** Photo-ID image the selfie was matched against, when one was provided/captured. */
+  idImageDataUrl?: string | null;
+  /** Which document the face was matched against, e.g. "NRIC / FIN". */
+  matchedAgainst?: string;
 }
 
 const PROMPTS = [
@@ -262,10 +266,18 @@ function randomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+/** Simulated per-frame similarity — replaced by the provider's face-match SDK. */
+function frameSimilarity(step: number) {
+  return Math.min(99, 82 + step * 4 + Math.floor(Math.random() * 4));
+}
+
 export function FaceLivenessCapture({
   title = "Liveness & face match",
   subtitle,
   readAloud = false,
+  referenceImage = null,
+  referenceLabel = "photo ID",
+  requireIdCapture = false,
   result,
   onResult,
 }: {
@@ -273,9 +285,15 @@ export function FaceLivenessCapture({
   subtitle?: string;
   /** India video-IPV requires the client to read a random code aloud on record. */
   readAloud?: boolean;
+  /** Already-uploaded photo-ID image to match the live face against. */
+  referenceImage?: string | null;
+  referenceLabel?: string;
+  /** Ask the client to hold their photo ID to the camera before the liveness steps. */
+  requireIdCapture?: boolean;
   result: FaceCaptureResult | null;
   onResult: (r: FaceCaptureResult | null) => void;
 }) {
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);

@@ -1054,8 +1054,12 @@ function MFRow({ p, idx, visibleCols, live }: { p: MutualFund; idx: number; visi
           <div className="font-medium text-[12.5px] flex items-center gap-1.5 whitespace-nowrap">
             {p.name}
             {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+            {live && <span className="text-[9px] px-1 py-px rounded-sm bg-positive/15 text-positive uppercase tracking-wider">Live</span>}
           </div>
-          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">
+            {live ? `${live.schemeName || p.name} · NAV ${live.date}` : `${p.id} · ${p.amc} · Bench: ${p.benchmark} · SIP ₹${p.sipMin}`}
+          </div>
+
         </td>
       )}
       {visibleCols.has("subCategory") && (
@@ -1068,7 +1072,16 @@ function MFRow({ p, idx, visibleCols, live }: { p: MutualFund; idx: number; visi
       )}
       {visibleCols.has("fundManager") && <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>}
       {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
-      {visibleCols.has("nav") && <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>}
+      {visibleCols.has("nav") && (
+        <td className="px-3 py-2.5 text-right mono-num">
+          {live ? (
+            <span className="text-positive font-medium" title={`Live AMFI NAV as on ${live.date}`}>{live.nav.toFixed(2)}</span>
+          ) : (
+            p.nav.toFixed(2)
+          )}
+        </td>
+      )}
+
       {visibleCols.has("ytdReturn") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>}
       {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
       {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}

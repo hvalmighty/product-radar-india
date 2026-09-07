@@ -14,6 +14,8 @@ import {
   Info,
   AlertTriangle,
   FolderUp,
+  UserSearch,
+  Send,
 } from "lucide-react";
 import {
   DocumentSlots,
@@ -36,6 +38,7 @@ import {
  */
 
 type StepId =
+  | "client"
   | "singpass"
   | "identity"
   | "cdd"
@@ -47,6 +50,7 @@ type StepId =
   | "review";
 
 const STEPS: { id: StepId; title: string; short: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: "client", title: "Select Client / Prospect", short: "Client", icon: UserSearch },
   { id: "singpass", title: "Singpass Myinfo Retrieval", short: "Singpass", icon: Fingerprint },
   { id: "identity", title: "Identity & Residency", short: "Identity", icon: BadgeCheck },
   { id: "cdd", title: "Customer Due Diligence & Screening", short: "CDD", icon: ShieldCheck },
@@ -66,6 +70,105 @@ const SG_BANKS = [
   { name: "Citibank Singapore", swift: "CITISGSG" },
   { name: "HSBC Singapore", swift: "HSBCSGSG" },
   { name: "Maybank Singapore", swift: "MBBESGS2" },
+];
+
+/** Prospect pipeline — clients the RM can start an application for. */
+interface Prospect {
+  id: string;
+  name: string;
+  nric: string;
+  mobile: string;
+  email: string;
+  source: string;
+  status: string;
+  myinfo: {
+    dob: string;
+    nationality: string;
+    residency: SgForm["residency"];
+    postal: string;
+    address: string;
+    occupation: string;
+    employer: string;
+    annualIncomeSgd: SgForm["annualIncomeSgd"];
+    incomeLabel: string;
+    residencyLabel: string;
+  } | null;
+}
+
+const PROSPECTS: Prospect[] = [
+  {
+    id: "P-1042",
+    name: "Tan Wei Ming",
+    nric: "S8412345D",
+    mobile: "91234567",
+    email: "weiming.tan@example.sg",
+    source: "Referral — DBS Treasures",
+    status: "Meeting done · awaiting KYC",
+    myinfo: {
+      dob: "1984-06-19",
+      nationality: "Singaporean",
+      residency: "citizen",
+      postal: "238823",
+      address: "Blk 12 Orchard Boulevard #14-05, Singapore",
+      occupation: "Employee — Non-Financial",
+      employer: "Keppel Corporation",
+      annualIncomeSgd: "100-300k",
+      incomeLabel: "S$100k – 300k",
+      residencyLabel: "Singapore Citizen",
+    },
+  },
+  {
+    id: "P-1078",
+    name: "Priya Raghavan",
+    nric: "S9007731J",
+    mobile: "98220145",
+    email: "priya.raghavan@example.sg",
+    source: "Website enquiry",
+    status: "New lead",
+    myinfo: {
+      dob: "1990-02-11",
+      nationality: "Singaporean",
+      residency: "pr",
+      postal: "310155",
+      address: "155 Toa Payoh Lorong 1 #09-212, Singapore",
+      occupation: "Professional (Legal / Medical / Accounting)",
+      employer: "Allen & Gledhill LLP",
+      annualIncomeSgd: "300k-1m",
+      incomeLabel: "S$300k – 1m",
+      residencyLabel: "Singapore Permanent Resident",
+    },
+  },
+  {
+    id: "P-1104",
+    name: "Michael Chen Kok Wai",
+    nric: "S7511902A",
+    mobile: "96550021",
+    email: "m.chen@example.sg",
+    source: "Existing client — new entity",
+    status: "AI status to be re-certified",
+    myinfo: {
+      dob: "1975-11-03",
+      nationality: "Singaporean",
+      residency: "citizen",
+      postal: "249715",
+      address: "8 Nassim Hill #05-01, Singapore",
+      occupation: "Self-Employed / Business Owner",
+      employer: "Chen Holdings Pte Ltd",
+      annualIncomeSgd: ">1m",
+      incomeLabel: "Above S$1m",
+      residencyLabel: "Singapore Citizen",
+    },
+  },
+  {
+    id: "P-1130",
+    name: "Aiko Nakamura",
+    nric: "G7842119X",
+    mobile: "87441290",
+    email: "aiko.nakamura@example.com",
+    source: "Corporate relationship",
+    status: "Foreigner — no Singpass",
+    myinfo: null,
+  },
 ];
 
 const OCCUPATIONS = [
@@ -105,6 +208,9 @@ const CKA_QUESTIONS = [
 ] as const;
 
 interface SgForm {
+  applicantMode: "existing" | "new" | "";
+  prospectId: string;
+  consentSent: boolean;
   singpassRetrieved: boolean;
   fullName: string;
   aliasName: string;
@@ -151,6 +257,9 @@ export function SingaporeOnboarding() {
   const [stepIndex, setStepIndex] = useState(0);
   const [showError, setShowError] = useState(false);
   const [form, setForm] = useState<SgForm>({
+    applicantMode: "",
+    prospectId: "",
+    consentSent: false,
     singpassRetrieved: false,
     fullName: "",
     aliasName: "",
@@ -224,7 +333,16 @@ export function SingaporeOnboarding() {
 
   function canProceed(): { ok: boolean; msg?: string } {
     switch (current?.id) {
+      case "client":
+        if (!form.applicantMode) return { ok: false, msg: "Select an existing prospect or create a new client record" };
+        if (!form.fullName.trim()) return { ok: false, msg: "Enter the client's full name" };
+        if (!/^[STFGM]\d{7}[A-Z]$/i.test(form.nric.trim())) return { ok: false, msg: "Enter a valid NRIC / FIN (e.g. S1234567D)" };
+        if (!/^[89]\d{7}$/.test(form.mobile)) return { ok: false, msg: "Enter an 8-digit SG mobile starting with 8 or 9" };
+        if (!/^\S+@\S+\.\S+$/.test(form.email)) return { ok: false, msg: "Enter a valid email for the Singpass authorisation link" };
+        return { ok: true };
       case "singpass":
+        if (!form.consentSent && !form.noSingpass)
+          return { ok: false, msg: "Send the Singpass authorisation request to this client, or continue without Singpass" };
         if (!form.singpassRetrieved && !form.noSingpass)
           return { ok: false, msg: "Retrieve Myinfo data via Singpass, or choose to continue without Singpass" };
         return { ok: true };
@@ -342,6 +460,7 @@ export function SingaporeOnboarding() {
           </div>
 
           <div className="p-5">
+            {current?.id === "client" && <ClientStep form={form} update={update} setForm={setForm} />}
             {current?.id === "singpass" && <SingpassStep form={form} update={update} />}
             {current?.id === "identity" && <IdentityStep form={form} update={update} />}
             {current?.id === "cdd" && <CddStep form={form} update={update} />}
@@ -442,62 +561,275 @@ function Check({ checked, onChange, label, hint }: { checked: boolean; onChange:
 
 // ------------------------------------------------------------------- steps
 
-function SingpassStep({ form, update }: { form: SgForm; update: <K extends keyof SgForm>(k: K, v: SgForm[K]) => void }) {
-  const [loading, setLoading] = useState(false);
-  function retrieve() {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      update("singpassRetrieved", true);
-      update("fullName", "Tan Wei Ming");
-      update("nric", "S8412345D");
-      update("dob", "1984-06-19");
-      update("nationality", "Singaporean");
-      update("residency", "citizen");
-      update("postal", "238823");
-      update("address", "Blk 12 Orchard Boulevard #14-05, Singapore");
-      update("email", "weiming.tan@example.sg");
-      update("mobile", "91234567");
-      update("occupation", "Employee — Non-Financial");
-      update("employer", "Keppel Corporation");
-      update("annualIncomeSgd", "100-300k");
-      update("taxResidencies", [{ country: "Singapore", tin: "S8412345D" }]);
-    }, 1400);
+function ClientStep({
+  form,
+  update,
+  setForm,
+}: {
+  form: SgForm;
+  update: <K extends keyof SgForm>(k: K, v: SgForm[K]) => void;
+  setForm: React.Dispatch<React.SetStateAction<SgForm>>;
+}) {
+  const [query, setQuery] = useState("");
+  const list = PROSPECTS.filter((p) =>
+    [p.name, p.nric, p.email, p.id].join(" ").toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  function selectProspect(p: Prospect) {
+    setForm((f) => ({
+      ...f,
+      applicantMode: "existing",
+      prospectId: p.id,
+      fullName: p.name,
+      nric: p.nric,
+      mobile: p.mobile,
+      email: p.email,
+      // any previously retrieved Myinfo belongs to the old client — reset it
+      consentSent: false,
+      singpassRetrieved: false,
+      noSingpass: false,
+      dob: "",
+      address: "",
+      postal: "",
+      occupation: "",
+      employer: "",
+      annualIncomeSgd: "",
+      taxResidencies: [{ country: "Singapore", tin: "" }],
+    }));
   }
+
+  function startNew() {
+    setForm((f) => ({
+      ...f,
+      applicantMode: "new",
+      prospectId: "",
+      fullName: "",
+      nric: "",
+      mobile: "",
+      email: "",
+      consentSent: false,
+      singpassRetrieved: false,
+      noSingpass: false,
+      dob: "",
+      address: "",
+      postal: "",
+      occupation: "",
+      employer: "",
+      annualIncomeSgd: "",
+      taxResidencies: [{ country: "Singapore", tin: "" }],
+    }));
+  }
+
   return (
     <div className="space-y-4">
       <Note>
-        Myinfo returns government-verified name, NRIC/FIN, date of birth, registered address, notice of assessment
-        income and CPF details, so the client does not re-key or upload documents. Retrieval is simulated here.
+        Pick the client this application is for. Singpass consent is then requested from that specific person — Myinfo
+        only ever returns data for the NRIC/FIN that authorises the request.
       </Note>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <UserSearch className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search prospects by name, NRIC/FIN, email or reference"
+            className={`${inputCls} pl-9`}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={startNew}
+          className={`h-9 px-3 rounded-md border text-sm whitespace-nowrap ${form.applicantMode === "new" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent"}`}
+        >
+          + New client
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {list.map((p) => {
+          const active = form.applicantMode === "existing" && form.prospectId === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => selectProspect(p)}
+              className={`w-full text-left rounded-lg border p-3 transition ${active ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50"}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+                  {p.name.split(" ").slice(0, 2).map((s) => s[0]).join("")}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{p.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {maskNric(p.nric)} · +65 {p.mobile} · {p.email}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[11px] text-muted-foreground">{p.id} · {p.source}</div>
+                  <div className={`text-[11px] ${p.myinfo ? "text-emerald-600" : "text-amber-600"}`}>
+                    {p.myinfo ? "Singpass eligible" : "No Singpass — manual KYC"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-1.5 text-[11px] text-muted-foreground">{p.status}</div>
+            </button>
+          );
+        })}
+        {list.length === 0 && (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            No prospect matches “{query}”. Use “+ New client” to create a record.
+          </div>
+        )}
+      </div>
+
+      {form.applicantMode === "new" && (
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+          <div className="text-sm font-medium">New client record</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Full name (as per NRIC / FIN)">
+              <input className={inputCls} value={form.fullName} onChange={(e) => update("fullName", e.target.value)} />
+            </Field>
+            <Field label="NRIC / FIN">
+              <input className={inputCls} value={form.nric} placeholder="S1234567D"
+                onChange={(e) => update("nric", e.target.value.toUpperCase())} />
+            </Field>
+            <Field label="Mobile (+65)">
+              <input className={inputCls} value={form.mobile} placeholder="91234567"
+                onChange={(e) => update("mobile", e.target.value.replace(/\D/g, "").slice(0, 8))} />
+            </Field>
+            <Field label="Email">
+              <input className={inputCls} value={form.email} onChange={(e) => update("email", e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      )}
+
+      {form.applicantMode === "existing" && form.prospectId && (
+        <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-xs">
+          Application will be opened for <span className="font-medium">{form.fullName}</span> ({maskNric(form.nric)}).
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SingpassStep({ form, update }: { form: SgForm; update: <K extends keyof SgForm>(k: K, v: SgForm[K]) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const record = PROSPECTS.find((p) => p.nric.toUpperCase() === form.nric.trim().toUpperCase());
+  const myinfo = record?.myinfo ?? null;
+
+  function sendConsent() {
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      update("consentSent", true);
+    }, 900);
+  }
+
+  function retrieve() {
+    setLoading(true);
+    setNotFound(false);
+    setTimeout(() => {
+      setLoading(false);
+      if (!myinfo) {
+        setNotFound(true);
+        return;
+      }
+      update("singpassRetrieved", true);
+      update("dob", myinfo.dob);
+      update("nationality", myinfo.nationality);
+      update("residency", myinfo.residency);
+      update("postal", myinfo.postal);
+      update("address", myinfo.address);
+      update("occupation", myinfo.occupation);
+      update("employer", myinfo.employer);
+      update("annualIncomeSgd", myinfo.annualIncomeSgd);
+      update("taxResidencies", [{ country: "Singapore", tin: form.nric.toUpperCase() }]);
+    }, 1400);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Note>
+        Myinfo returns government-verified data only for the person who authorises the request. The authorisation is
+        sent to the selected client; nothing is pre-filled before they consent. Retrieval is simulated here.
+      </Note>
+
+      <div className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+          {(form.fullName || "?").split(" ").slice(0, 2).map((s) => s[0]).join("")}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-medium truncate">{form.fullName || "No client selected"}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {maskNric(form.nric)} · +65 {form.mobile} · {form.email}
+          </div>
+        </div>
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          {form.prospectId ? `Prospect ${form.prospectId}` : "New client record"}
+        </span>
+      </div>
+
       <div className="rounded-lg border border-border bg-muted/20 p-6 text-center space-y-3">
         <div className="mx-auto w-12 h-12 rounded-full bg-rose-500/10 grid place-items-center">
           <Fingerprint className="w-6 h-6 text-rose-500" />
         </div>
-        <div className="text-sm font-medium">Retrieve verified data with Singpass</div>
+        <div className="text-sm font-medium">Request Singpass authorisation from {form.fullName || "the client"}</div>
         <p className="text-xs text-muted-foreground max-w-md mx-auto">
-          The client authorises release of Myinfo fields: NRIC/FIN, name, date of birth, nationality, residential
-          status, registered address, contact, employment and Notice of Assessment income.
+          A Myinfo consent link is sent to the client's registered mobile and email. On approval, Myinfo releases
+          NRIC/FIN, name, date of birth, nationality, residential status, registered address, contact, employment and
+          Notice of Assessment income.
         </p>
-        <button
-          type="button"
-          onClick={retrieve}
-          disabled={loading || form.singpassRetrieved}
-          className="px-4 py-2 rounded-md bg-rose-600 text-white text-sm font-medium disabled:opacity-60"
-        >
-          {form.singpassRetrieved ? "Myinfo data retrieved ✓" : loading ? "Redirecting to Singpass…" : "Retrieve with Singpass"}
-        </button>
-        {form.singpassRetrieved && (
+
+        {!form.consentSent ? (
+          <button
+            type="button"
+            onClick={sendConsent}
+            disabled={sending || !form.fullName}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-rose-600 text-white text-sm font-medium disabled:opacity-60"
+          >
+            <Send className="w-4 h-4" />
+            {sending ? "Sending authorisation…" : "Send Singpass authorisation"}
+          </button>
+        ) : (
+          <>
+            <div className="text-xs text-emerald-600">
+              Authorisation request sent to +65 {form.mobile} and {form.email}.
+            </div>
+            <button
+              type="button"
+              onClick={retrieve}
+              disabled={loading || form.singpassRetrieved}
+              className="px-4 py-2 rounded-md bg-rose-600 text-white text-sm font-medium disabled:opacity-60"
+            >
+              {form.singpassRetrieved ? "Myinfo data retrieved ✓" : loading ? "Waiting for client approval…" : "Retrieve Myinfo data"}
+            </button>
+          </>
+        )}
+
+        {notFound && !form.singpassRetrieved && (
+          <div className="mx-auto max-w-md rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
+            No Myinfo record is available for {maskNric(form.nric)} — this typically means the client has no Singpass
+            (for example a foreigner without a local pass). Continue without Singpass and capture details manually.
+          </div>
+        )}
+
+        {form.singpassRetrieved && myinfo && (
           <div className="text-left mx-auto max-w-md rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-1.5">
             <Row k="Name" v={form.fullName} />
             <Row k="NRIC / FIN" v={maskNric(form.nric)} />
             <Row k="Date of birth" v={form.dob} />
-            <Row k="Residential status" v="Singapore Citizen" />
+            <Row k="Residential status" v={myinfo.residencyLabel} />
             <Row k="Registered address" v={form.address} />
-            <Row k="Assessable income" v="S$100k – 300k" />
+            <Row k="Assessable income" v={myinfo.incomeLabel} />
           </div>
         )}
       </div>
+
       <div className="text-center text-xs text-muted-foreground space-y-2">
         <p>
           No Singpass? Continue and capture details manually — certified true copies of NRIC/passport and proof of

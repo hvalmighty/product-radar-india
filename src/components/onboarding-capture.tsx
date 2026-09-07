@@ -613,27 +613,65 @@ export function FaceLivenessCapture({
           <div className="relative w-full max-w-sm mx-auto aspect-[4/3] rounded-md overflow-hidden bg-black">
             <video ref={videoRef} playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
             <div className="absolute inset-0 border-[3px] border-primary/50 rounded-md pointer-events-none" />
+            {idImage && (
+              <div className="absolute top-2 right-2 text-center">
+                <img
+                  src={idImage}
+                  alt={`Reference ${referenceLabel}`}
+                  className="w-16 h-16 rounded object-cover border-2 border-white/70"
+                />
+                <div className="text-[9px] text-white/90 mt-0.5">{referenceLabel}</div>
+              </div>
+            )}
+            {!needIdShot && runningMatch !== null && (
+              <div className="absolute top-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded">
+                Match with {referenceLabel}: <span className="font-semibold">{runningMatch}%</span>
+              </div>
+            )}
             <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs px-2 py-1.5 text-center">
-              Step {promptIndex + 1} of {PROMPTS.length} — {PROMPTS[promptIndex]}
+              {needIdShot
+                ? "Hold your photo ID (NRIC / FIN or passport) up to the camera, photo side facing you"
+                : `Step ${promptIndex + 1} of ${PROMPTS.length} — ${PROMPTS[promptIndex]}`}
             </div>
           </div>
-          {readAloud && (
+          {readAloud && !needIdShot && (
             <p className="text-xs text-center text-muted-foreground">
               Read this code aloud on camera: <span className="font-mono font-semibold text-foreground">{code}</span>
             </p>
           )}
+          {!needIdShot && runningMatch !== null && (
+            <div className="max-w-sm mx-auto space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">Live similarity with {referenceLabel}</span>
+                <span className={`font-semibold ${runningMatch >= 85 ? "text-emerald-600" : "text-amber-600"}`}>
+                  {runningMatch}%
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full transition-all ${runningMatch >= 85 ? "bg-emerald-500" : "bg-amber-500"}`}
+                  style={{ width: `${runningMatch}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={captureStep}
+              onClick={needIdShot ? captureIdShot : captureStep}
               className="inline-flex items-center gap-1.5 px-4 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Camera className="w-4 h-4" />
-              {promptIndex === PROMPTS.length - 1 ? "Capture & verify" : "Capture step"}
+              {needIdShot
+                ? "Capture photo ID"
+                : promptIndex === PROMPTS.length - 1
+                  ? "Capture & verify"
+                  : "Capture step"}
             </button>
           </div>
         </div>
       )}
+
 
       {verifying && (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-4">

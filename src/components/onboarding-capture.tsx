@@ -308,6 +308,16 @@ export function FaceLivenessCapture({
   const [fallback, setFallback] = useState(false);
   const photoRef = useRef<HTMLInputElement | null>(null);
   const [permission, setPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
+  /** Photo-ID frame captured on camera (used when no document image was uploaded). */
+  const [idShot, setIdShot] = useState<string | null>(null);
+  /** Running similarity readings taken per liveness step. */
+  const [liveScores, setLiveScores] = useState<number[]>([]);
+  const idImage = referenceImage ?? idShot;
+  const needIdShot = requireIdCapture && !referenceImage && !idShot;
+  const runningMatch = liveScores.length
+    ? Math.round(liveScores.reduce((a, b) => a + b, 0) / liveScores.length)
+    : null;
+
 
   // Browser permission helper: query the Permissions API where supported,
   // otherwise fall back to a quick getUserMedia probe.

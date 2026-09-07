@@ -1045,7 +1045,7 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
   );
 }
 
-function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCols: Set<string> }) {
+function MFRow({ p, idx, visibleCols, live }: { p: MutualFund; idx: number; visibleCols: Set<string>; live?: LiveNav }) {
   const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
@@ -1212,7 +1212,7 @@ function AIFRow({ p, visibleCols }: { p: AIF; visibleCols: Set<string> }) {
   );
 }
 
-function EQRow({ p, visibleCols }: { p: EquityStock; visibleCols: Set<string> }) {
+function EQRow({ p, visibleCols, live }: { p: EquityStock; visibleCols: Set<string>; live?: LiveQuote }) {
   const capTone = p.marketCap === "Large Cap" ? "bg-info/15 text-info" : p.marketCap === "Mid Cap" ? "bg-warning/20 text-warning" : "bg-negative/15 text-negative";
   return (
     <>

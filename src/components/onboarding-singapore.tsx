@@ -1263,7 +1263,7 @@ function ReviewStep({
           <Row k="Contact" v={form.mobile ? `+65 ${form.mobile}` : "—"} />
           <Row k="Myinfo" v={form.singpassRetrieved ? "Verified via Singpass" : "Manual capture"} />
           <Row k="Documents" v={`${Object.keys(form.docs).length} uploaded${missingRequiredDocs(sgDocSlots(form), form.docs).length ? " · pending" : " · complete"}`} />
-          <Row k="Face verification" v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%` : form.singpassRetrieved ? "Not required (Singpass verified)" : "Not captured"} />
+          <Row k="Face verification" v={form.faceCapture ? `Passed · liveness ${form.faceCapture.livenessScore}% / match ${form.faceCapture.matchScore}%${form.faceCapture.matchedAgainst ? ` vs ${form.faceCapture.matchedAgainst}` : ""}` : form.singpassRetrieved ? "Not required (Singpass verified)" : "Not captured"} />
         </Card>
         <Card title="Due diligence">
           <Row k="Occupation" v={form.occupation || "—"} />
@@ -1380,6 +1380,12 @@ function DocumentsStep({ form, update }: { form: SgForm; update: <K extends keyo
   const requiredCount = slots.filter((s) => s.required).length;
   const doneCount = slots.filter((s) => s.required && form.docs[s.id]).length;
 
+  // Photo-ID image the live face is matched against: passport biodata page if
+  // present, otherwise the NRIC / FIN copy.
+  const idDoc = form.docs["passport"] ?? form.docs["nric"];
+  const idLabel = form.docs["passport"] ? "Passport photo" : form.docs["nric"] ? "NRIC / FIN photo" : "photo ID";
+  const referenceImage = idDoc?.dataUrl ?? null;
+
   return (
     <div className="space-y-4">
       <Note>
@@ -1409,20 +1415,38 @@ function DocumentsStep({ form, update }: { form: SgForm; update: <K extends keyo
               Singpass Face Verification already satisfied the identity-proofing requirement. An additional capture is
               optional and simply strengthens the audit record.
             </p>
-            <FaceLivenessCapture title="Optional face capture" result={form.faceCapture} onResult={(r) => update("faceCapture", r)} />
+            <FaceLivenessCapture
+              title="Optional face capture"
+              referenceImage={referenceImage}
+              referenceLabel={idLabel}
+              requireIdCapture={!referenceImage}
+              result={form.faceCapture}
+              onResult={(r) => update("faceCapture", r)}
+            />
           </div>
         ) : (
-          <FaceLivenessCapture
-            title="Face verification — liveness & document match"
-            subtitle="Non-face-to-face identity proofing: a live, time-stamped and geo-tagged capture matched against the NRIC or passport photograph."
-            result={form.faceCapture}
-            onResult={(r) => update("faceCapture", r)}
-          />
+          <>
+            <p className="text-xs text-muted-foreground">
+              {referenceImage
+                ? `The live capture is matched against the ${idLabel.toLowerCase()} you uploaded above; the similarity score is shown as you capture.`
+                : "Hold your NRIC / FIN or passport up to the camera first — that photo becomes the reference the live face is matched against."}
+            </p>
+            <FaceLivenessCapture
+              title="Face verification — liveness & document match"
+              subtitle="Non-face-to-face identity proofing: a live, time-stamped and geo-tagged capture matched against the NRIC or passport photograph."
+              referenceImage={referenceImage}
+              referenceLabel={idLabel}
+              requireIdCapture={!referenceImage}
+              result={form.faceCapture}
+              onResult={(r) => update("faceCapture", r)}
+            />
+          </>
         )}
       </div>
     </div>
   );
 }
+
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (

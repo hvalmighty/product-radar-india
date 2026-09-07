@@ -249,6 +249,10 @@ export interface FaceCaptureResult {
   matchScore: number;
   challengeCode: string;
   prompts: string[];
+  /** Photo-ID image the selfie was matched against, when one was provided/captured. */
+  idImageDataUrl?: string | null;
+  /** Which document the face was matched against, e.g. "NRIC / FIN". */
+  matchedAgainst?: string;
 }
 
 const PROMPTS = [
@@ -262,10 +266,18 @@ function randomCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+/** Simulated per-frame similarity — replaced by the provider's face-match SDK. */
+function frameSimilarity(step: number) {
+  return Math.min(99, 82 + step * 4 + Math.floor(Math.random() * 4));
+}
+
 export function FaceLivenessCapture({
   title = "Liveness & face match",
   subtitle,
   readAloud = false,
+  referenceImage = null,
+  referenceLabel = "photo ID",
+  requireIdCapture = false,
   result,
   onResult,
 }: {
@@ -273,9 +285,15 @@ export function FaceLivenessCapture({
   subtitle?: string;
   /** India video-IPV requires the client to read a random code aloud on record. */
   readAloud?: boolean;
+  /** Already-uploaded photo-ID image to match the live face against. */
+  referenceImage?: string | null;
+  referenceLabel?: string;
+  /** Ask the client to hold their photo ID to the camera before the liveness steps. */
+  requireIdCapture?: boolean;
   result: FaceCaptureResult | null;
   onResult: (r: FaceCaptureResult | null) => void;
 }) {
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -290,6 +308,16 @@ export function FaceLivenessCapture({
   const [fallback, setFallback] = useState(false);
   const photoRef = useRef<HTMLInputElement | null>(null);
   const [permission, setPermission] = useState<"prompt" | "granted" | "denied" | "unknown">("unknown");
+  /** Photo-ID frame captured on camera (used when no document image was uploaded). */
+  const [idShot, setIdShot] = useState<string | null>(null);
+  /** Running similarity readings taken per liveness step. */
+  const [liveScores, setLiveScores] = useState<number[]>([]);
+  const idImage = referenceImage ?? idShot;
+  const needIdShot = requireIdCapture && !referenceImage && !idShot;
+  const runningMatch = liveScores.length
+    ? Math.round(liveScores.reduce((a, b) => a + b, 0) / liveScores.length)
+    : null;
+
 
   // Browser permission helper: query the Permissions API where supported,
   // otherwise fall back to a quick getUserMedia probe.
@@ -343,6 +371,9 @@ export function FaceLivenessCapture({
           matchScore: 90 + Math.floor(Math.random() * 6),
           challengeCode: code,
           prompts: ["Photo uploaded — no live liveness prompts; flagged for manual officer review"],
+          idImageDataUrl: idImage,
+          matchedAgainst: referenceLabel,
+
         });
       }, 1200);
     };
@@ -436,6 +467,16 @@ export function FaceLivenessCapture({
     return canvas.toDataURL("image/jpeg", 0.7);
   }
 
+  function captureIdShot() {
+    const frame = grabFrame();
+    if (!frame) {
+      setError("The camera is still warming up — try again in a moment.");
+      return;
+    }
+    setError("");
+    setIdShot(frame);
+  }
+
   function captureStep() {
     const frame = grabFrame();
     if (!frame) {
@@ -443,7 +484,9 @@ export function FaceLivenessCapture({
       return;
     }
     const nextFrames = [...frames, frame];
+    const nextScores = [...liveScores, frameSimilarity(promptIndex)];
     setFrames(nextFrames);
+    setLiveScores(nextScores);
     if (promptIndex < PROMPTS.length - 1) {
       setPromptIndex((i) => i + 1);
       return;
@@ -460,9 +503,11 @@ export function FaceLivenessCapture({
         capturedAt: new Date().toISOString(),
         geo,
         livenessScore: 92 + Math.floor(Math.random() * 7),
-        matchScore: 94 + Math.floor(Math.random() * 5),
+        matchScore: Math.round(nextScores.reduce((a, b) => a + b, 0) / nextScores.length),
         challengeCode: code,
         prompts: PROMPTS,
+        idImageDataUrl: idImage,
+        matchedAgainst: referenceLabel,
       });
     }, 1600);
   }
@@ -470,24 +515,63 @@ export function FaceLivenessCapture({
   function retake() {
     onResult(null);
     setFrames([]);
+    setLiveScores([]);
+    setIdShot(null);
     setPromptIndex(0);
     void start();
   }
 
   if (result) {
+    const strong = result.matchScore >= 85;
     return (
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3">
         <div className="flex items-start gap-3">
-          <img
-            src={result.selfieDataUrl}
-            alt="Captured verification selfie"
-            className="w-20 h-20 rounded-md object-cover border border-border"
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            {result.idImageDataUrl && (
+              <div className="text-center">
+                <img
+                  src={result.idImageDataUrl}
+                  alt={`Photo ID used for matching (${result.matchedAgainst ?? "photo ID"})`}
+                  className="w-20 h-20 rounded-md object-cover border border-border"
+                />
+                <div className="text-[10px] text-muted-foreground mt-0.5">{result.matchedAgainst ?? "Photo ID"}</div>
+              </div>
+            )}
+            <div className="text-center">
+              <img
+                src={result.selfieDataUrl}
+                alt="Captured verification selfie"
+                className="w-20 h-20 rounded-md object-cover border border-border"
+              />
+              <div className="text-[10px] text-muted-foreground mt-0.5">Live capture</div>
+            </div>
+          </div>
           <div className="text-xs space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
               {result.livenessScore > 0 ? "Liveness passed · face matched" : "Photo received · pending officer review"}
             </div>
+            {result.idImageDataUrl && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Match against {result.matchedAgainst ?? "photo ID"}</span>
+                  <span className={`font-semibold ${strong ? "text-emerald-600" : "text-amber-600"}`}>
+                    {result.matchScore}%
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full ${strong ? "bg-emerald-500" : "bg-amber-500"}`}
+                    style={{ width: `${result.matchScore}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {strong
+                    ? "Above the 85% acceptance threshold — auto-approved."
+                    : "Below the 85% threshold — routed to a compliance officer for manual review."}
+                </p>
+              </div>
+            )}
             <div className="text-muted-foreground">
               {result.livenessScore > 0
                 ? `Liveness ${result.livenessScore}% · Face match ${result.matchScore}% · ${result.frames} frames`
@@ -518,6 +602,7 @@ export function FaceLivenessCapture({
     );
   }
 
+
   return (
     <div className="rounded-md border border-border p-3 space-y-3">
       <div className="flex items-center gap-2">
@@ -531,27 +616,65 @@ export function FaceLivenessCapture({
           <div className="relative w-full max-w-sm mx-auto aspect-[4/3] rounded-md overflow-hidden bg-black">
             <video ref={videoRef} playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
             <div className="absolute inset-0 border-[3px] border-primary/50 rounded-md pointer-events-none" />
+            {idImage && (
+              <div className="absolute top-2 right-2 text-center">
+                <img
+                  src={idImage}
+                  alt={`Reference ${referenceLabel}`}
+                  className="w-16 h-16 rounded object-cover border-2 border-white/70"
+                />
+                <div className="text-[9px] text-white/90 mt-0.5">{referenceLabel}</div>
+              </div>
+            )}
+            {!needIdShot && runningMatch !== null && (
+              <div className="absolute top-2 left-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded">
+                Match with {referenceLabel}: <span className="font-semibold">{runningMatch}%</span>
+              </div>
+            )}
             <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs px-2 py-1.5 text-center">
-              Step {promptIndex + 1} of {PROMPTS.length} — {PROMPTS[promptIndex]}
+              {needIdShot
+                ? "Hold your photo ID (NRIC / FIN or passport) up to the camera, photo side facing you"
+                : `Step ${promptIndex + 1} of ${PROMPTS.length} — ${PROMPTS[promptIndex]}`}
             </div>
           </div>
-          {readAloud && (
+          {readAloud && !needIdShot && (
             <p className="text-xs text-center text-muted-foreground">
               Read this code aloud on camera: <span className="font-mono font-semibold text-foreground">{code}</span>
             </p>
           )}
+          {!needIdShot && runningMatch !== null && (
+            <div className="max-w-sm mx-auto space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">Live similarity with {referenceLabel}</span>
+                <span className={`font-semibold ${runningMatch >= 85 ? "text-emerald-600" : "text-amber-600"}`}>
+                  {runningMatch}%
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full transition-all ${runningMatch >= 85 ? "bg-emerald-500" : "bg-amber-500"}`}
+                  style={{ width: `${runningMatch}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={captureStep}
+              onClick={needIdShot ? captureIdShot : captureStep}
               className="inline-flex items-center gap-1.5 px-4 h-9 rounded-md text-sm bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Camera className="w-4 h-4" />
-              {promptIndex === PROMPTS.length - 1 ? "Capture & verify" : "Capture step"}
+              {needIdShot
+                ? "Capture photo ID"
+                : promptIndex === PROMPTS.length - 1
+                  ? "Capture & verify"
+                  : "Capture step"}
             </button>
           </div>
         </div>
       )}
+
 
       {verifying && (
         <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-4">

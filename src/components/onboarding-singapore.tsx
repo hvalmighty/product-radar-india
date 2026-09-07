@@ -460,6 +460,7 @@ export function SingaporeOnboarding() {
           </div>
 
           <div className="p-5">
+            {current?.id === "client" && <ClientStep form={form} update={update} setForm={setForm} />}
             {current?.id === "singpass" && <SingpassStep form={form} update={update} />}
             {current?.id === "identity" && <IdentityStep form={form} update={update} />}
             {current?.id === "cdd" && <CddStep form={form} update={update} />}

@@ -208,6 +208,9 @@ const CKA_QUESTIONS = [
 ] as const;
 
 interface SgForm {
+  applicantMode: "existing" | "new" | "";
+  prospectId: string;
+  consentSent: boolean;
   singpassRetrieved: boolean;
   fullName: string;
   aliasName: string;

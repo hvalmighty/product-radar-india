@@ -464,6 +464,16 @@ export function FaceLivenessCapture({
     return canvas.toDataURL("image/jpeg", 0.7);
   }
 
+  function captureIdShot() {
+    const frame = grabFrame();
+    if (!frame) {
+      setError("The camera is still warming up — try again in a moment.");
+      return;
+    }
+    setError("");
+    setIdShot(frame);
+  }
+
   function captureStep() {
     const frame = grabFrame();
     if (!frame) {
@@ -471,7 +481,9 @@ export function FaceLivenessCapture({
       return;
     }
     const nextFrames = [...frames, frame];
+    const nextScores = [...liveScores, frameSimilarity(promptIndex)];
     setFrames(nextFrames);
+    setLiveScores(nextScores);
     if (promptIndex < PROMPTS.length - 1) {
       setPromptIndex((i) => i + 1);
       return;
@@ -488,9 +500,11 @@ export function FaceLivenessCapture({
         capturedAt: new Date().toISOString(),
         geo,
         livenessScore: 92 + Math.floor(Math.random() * 7),
-        matchScore: 94 + Math.floor(Math.random() * 5),
+        matchScore: Math.round(nextScores.reduce((a, b) => a + b, 0) / nextScores.length),
         challengeCode: code,
         prompts: PROMPTS,
+        idImageDataUrl: idImage,
+        matchedAgainst: referenceLabel,
       });
     }, 1600);
   }
@@ -498,24 +512,63 @@ export function FaceLivenessCapture({
   function retake() {
     onResult(null);
     setFrames([]);
+    setLiveScores([]);
+    setIdShot(null);
     setPromptIndex(0);
     void start();
   }
 
   if (result) {
+    const strong = result.matchScore >= 85;
     return (
       <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3">
         <div className="flex items-start gap-3">
-          <img
-            src={result.selfieDataUrl}
-            alt="Captured verification selfie"
-            className="w-20 h-20 rounded-md object-cover border border-border"
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            {result.idImageDataUrl && (
+              <div className="text-center">
+                <img
+                  src={result.idImageDataUrl}
+                  alt={`Photo ID used for matching (${result.matchedAgainst ?? "photo ID"})`}
+                  className="w-20 h-20 rounded-md object-cover border border-border"
+                />
+                <div className="text-[10px] text-muted-foreground mt-0.5">{result.matchedAgainst ?? "Photo ID"}</div>
+              </div>
+            )}
+            <div className="text-center">
+              <img
+                src={result.selfieDataUrl}
+                alt="Captured verification selfie"
+                className="w-20 h-20 rounded-md object-cover border border-border"
+              />
+              <div className="text-[10px] text-muted-foreground mt-0.5">Live capture</div>
+            </div>
+          </div>
           <div className="text-xs space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
               {result.livenessScore > 0 ? "Liveness passed · face matched" : "Photo received · pending officer review"}
             </div>
+            {result.idImageDataUrl && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Match against {result.matchedAgainst ?? "photo ID"}</span>
+                  <span className={`font-semibold ${strong ? "text-emerald-600" : "text-amber-600"}`}>
+                    {result.matchScore}%
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full ${strong ? "bg-emerald-500" : "bg-amber-500"}`}
+                    style={{ width: `${result.matchScore}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {strong
+                    ? "Above the 85% acceptance threshold — auto-approved."
+                    : "Below the 85% threshold — routed to a compliance officer for manual review."}
+                </p>
+              </div>
+            )}
             <div className="text-muted-foreground">
               {result.livenessScore > 0
                 ? `Liveness ${result.livenessScore}% · Face match ${result.matchScore}% · ${result.frames} frames`
@@ -545,6 +598,7 @@ export function FaceLivenessCapture({
       </div>
     );
   }
+
 
   return (
     <div className="rounded-md border border-border p-3 space-y-3">

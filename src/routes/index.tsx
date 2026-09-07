@@ -396,6 +396,44 @@ export function ResearchTerminal() {
     return arr;
   }, [data, sortKey, sortDir]);
 
+  // ---- Live India feeds (AMFI NAVs + NSE prices) -------------------------
+  const liveFundKeys = useMemo(
+    () =>
+      region === "IN" && cat === "MF"
+        ? (sorted as MutualFund[]).slice(0, 60).map(f => ({ id: f.id, name: f.name }))
+        : [],
+    [region, cat, sorted],
+  );
+  const liveSymbols = useMemo(
+    () => (region === "IN" && cat === "EQ" ? (sorted as EquityStock[]).slice(0, 60).map(s => s.ticker) : []),
+    [region, cat, sorted],
+  );
+
+  const navQuery = useQuery({
+    queryKey: ["india-navs", liveFundKeys.map(f => f.id).join(",")],
+    queryFn: () => getIndiaFundNavs({ data: { funds: liveFundKeys } }),
+    enabled: liveFundKeys.length > 0,
+    staleTime: 15 * 60_000,
+    refetchInterval: 15 * 60_000,
+  });
+
+  const quoteQuery = useQuery({
+    queryKey: ["india-quotes", liveSymbols.join(",")],
+    queryFn: () => getIndiaEquityQuotes({ data: { symbols: liveSymbols } }),
+    enabled: liveSymbols.length > 0,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  const liveNavs = navQuery.data?.entries ?? {};
+  const liveQuotes = quoteQuery.data?.quotes ?? {};
+  const liveActive = region === "IN" && (cat === "MF" || cat === "EQ");
+  const liveLoading = cat === "MF" ? navQuery.isFetching : quoteQuery.isFetching;
+  const liveCount = cat === "MF" ? Object.keys(liveNavs).length : Object.keys(liveQuotes).length;
+  const liveAsOf = cat === "MF" ? navQuery.data?.asOf : quoteQuery.data?.asOf;
+  const liveSource = cat === "MF" ? "AMFI NAV" : "NSE price";
+
+
   const grouped = useMemo(() => {
     if (groupBy === "none") return [{ key: "All Results", items: sorted }];
     const m = new Map<string, any[]>();

@@ -14,6 +14,8 @@ import {
   Info,
   AlertTriangle,
   FolderUp,
+  UserSearch,
+  Send,
 } from "lucide-react";
 import {
   DocumentSlots,

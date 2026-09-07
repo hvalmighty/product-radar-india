@@ -1245,7 +1245,21 @@ function EQRow({ p, visibleCols, live }: { p: EquityStock; visibleCols: Set<stri
           <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span>
         </td>
       )}
-      {visibleCols.has("price") && <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("price") && (
+        <td className="px-3 py-2.5 text-right mono-num">
+          {live ? (
+            <span title={`NSE live · ${new Date(live.time).toLocaleString("en-IN")}`}>
+              <span className="font-medium">{live.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+              <span className={`ml-1.5 text-[10px] ${pctClass(live.changePct)}`}>
+                {live.changePct > 0 ? "+" : ""}{live.changePct.toFixed(2)}%
+              </span>
+            </span>
+          ) : (
+            p.price.toLocaleString("en-IN")
+          )}
+        </td>
+      )}
+
       {visibleCols.has("pe") && <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>}
       {visibleCols.has("pb") && <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>}
       {visibleCols.has("dividendYield") && <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>}

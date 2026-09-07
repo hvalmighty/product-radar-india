@@ -72,6 +72,105 @@ const SG_BANKS = [
   { name: "Maybank Singapore", swift: "MBBESGS2" },
 ];
 
+/** Prospect pipeline — clients the RM can start an application for. */
+interface Prospect {
+  id: string;
+  name: string;
+  nric: string;
+  mobile: string;
+  email: string;
+  source: string;
+  status: string;
+  myinfo: {
+    dob: string;
+    nationality: string;
+    residency: SgForm["residency"];
+    postal: string;
+    address: string;
+    occupation: string;
+    employer: string;
+    annualIncomeSgd: SgForm["annualIncomeSgd"];
+    incomeLabel: string;
+    residencyLabel: string;
+  } | null;
+}
+
+const PROSPECTS: Prospect[] = [
+  {
+    id: "P-1042",
+    name: "Tan Wei Ming",
+    nric: "S8412345D",
+    mobile: "91234567",
+    email: "weiming.tan@example.sg",
+    source: "Referral — DBS Treasures",
+    status: "Meeting done · awaiting KYC",
+    myinfo: {
+      dob: "1984-06-19",
+      nationality: "Singaporean",
+      residency: "citizen",
+      postal: "238823",
+      address: "Blk 12 Orchard Boulevard #14-05, Singapore",
+      occupation: "Employee — Non-Financial",
+      employer: "Keppel Corporation",
+      annualIncomeSgd: "100-300k",
+      incomeLabel: "S$100k – 300k",
+      residencyLabel: "Singapore Citizen",
+    },
+  },
+  {
+    id: "P-1078",
+    name: "Priya Raghavan",
+    nric: "S9007731J",
+    mobile: "98220145",
+    email: "priya.raghavan@example.sg",
+    source: "Website enquiry",
+    status: "New lead",
+    myinfo: {
+      dob: "1990-02-11",
+      nationality: "Singaporean",
+      residency: "pr",
+      postal: "310155",
+      address: "155 Toa Payoh Lorong 1 #09-212, Singapore",
+      occupation: "Professional (Legal / Medical / Accounting)",
+      employer: "Allen & Gledhill LLP",
+      annualIncomeSgd: "300k-1m",
+      incomeLabel: "S$300k – 1m",
+      residencyLabel: "Singapore Permanent Resident",
+    },
+  },
+  {
+    id: "P-1104",
+    name: "Michael Chen Kok Wai",
+    nric: "S7511902A",
+    mobile: "96550021",
+    email: "m.chen@example.sg",
+    source: "Existing client — new entity",
+    status: "AI status to be re-certified",
+    myinfo: {
+      dob: "1975-11-03",
+      nationality: "Singaporean",
+      residency: "citizen",
+      postal: "249715",
+      address: "8 Nassim Hill #05-01, Singapore",
+      occupation: "Self-Employed / Business Owner",
+      employer: "Chen Holdings Pte Ltd",
+      annualIncomeSgd: ">1m",
+      incomeLabel: "Above S$1m",
+      residencyLabel: "Singapore Citizen",
+    },
+  },
+  {
+    id: "P-1130",
+    name: "Aiko Nakamura",
+    nric: "G7842119X",
+    mobile: "87441290",
+    email: "aiko.nakamura@example.com",
+    source: "Corporate relationship",
+    status: "Foreigner — no Singpass",
+    myinfo: null,
+  },
+];
+
 const OCCUPATIONS = [
   "Employee — Financial Services",
   "Employee — Non-Financial",

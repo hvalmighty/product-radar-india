@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { mutualFunds, fixedDeposits, insurance, pmsSchemes, aifSchemes, equityStocks, bonds, type MutualFund, type FixedDeposit, type Insurance, type PMS, type AIF, type EquityStock, type Bond, type Category } from "@/lib/research-data";
 import { getTopBarIndices } from "@/lib/market-data.functions";
+import { getIndiaFundNavs, getIndiaEquityQuotes, type LiveNav, type LiveQuote } from "@/lib/live-india.functions";
+
 import { useRegion, fmtMoney, aumScale } from "@/lib/region";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, SlidersHorizontal, Star, TrendingUp, Layers, Filter, Download, BookmarkPlus, ChevronDown, Activity, X, Trophy, ShoppingCart, CheckCircle2, AlertTriangle, Building2, Network, Globe, Wallet, Columns } from "lucide-react";
 import kfintechLogo from "@/assets/kfintech.png.asset.json";
@@ -396,6 +398,44 @@ export function ResearchTerminal() {
     return arr;
   }, [data, sortKey, sortDir]);
 
+  // ---- Live India feeds (AMFI NAVs + NSE prices) -------------------------
+  const liveFundKeys = useMemo(
+    () =>
+      region === "IN" && cat === "MF"
+        ? (sorted as MutualFund[]).slice(0, 60).map(f => ({ id: f.id, name: f.name }))
+        : [],
+    [region, cat, sorted],
+  );
+  const liveSymbols = useMemo(
+    () => (region === "IN" && cat === "EQ" ? (sorted as EquityStock[]).slice(0, 60).map(s => s.ticker) : []),
+    [region, cat, sorted],
+  );
+
+  const navQuery = useQuery({
+    queryKey: ["india-navs", liveFundKeys.map(f => f.id).join(",")],
+    queryFn: () => getIndiaFundNavs({ data: { funds: liveFundKeys } }),
+    enabled: liveFundKeys.length > 0,
+    staleTime: 15 * 60_000,
+    refetchInterval: 15 * 60_000,
+  });
+
+  const quoteQuery = useQuery({
+    queryKey: ["india-quotes", liveSymbols.join(",")],
+    queryFn: () => getIndiaEquityQuotes({ data: { symbols: liveSymbols } }),
+    enabled: liveSymbols.length > 0,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  const liveNavs = navQuery.data?.entries ?? {};
+  const liveQuotes = quoteQuery.data?.quotes ?? {};
+  const liveActive = region === "IN" && (cat === "MF" || cat === "EQ");
+  const liveLoading = cat === "MF" ? navQuery.isFetching : quoteQuery.isFetching;
+  const liveCount = cat === "MF" ? Object.keys(liveNavs).length : Object.keys(liveQuotes).length;
+  const liveAsOf = cat === "MF" ? navQuery.data?.asOf : quoteQuery.data?.asOf;
+  const liveSource = cat === "MF" ? "AMFI NAV" : "NSE price";
+
+
   const grouped = useMemo(() => {
     if (groupBy === "none") return [{ key: "All Results", items: sorted }];
     const m = new Map<string, any[]>();
@@ -748,6 +788,20 @@ export function ResearchTerminal() {
             <div className="text-[11px] text-muted-foreground mono-num">
               <span className="text-foreground font-medium">{sorted.length}</span> of {cat === "MF" ? mutualFunds.length : cat === "FD" ? fixedDeposits.length : cat === "INS" ? insurance.length : cat === "PMS" ? pmsSchemes.length : cat === "AIF" ? aifSchemes.length : cat === "EQ" ? equityStocks.length : bonds.length} results
             </div>
+            {liveActive && (
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] px-2 py-1 rounded-sm border border-border bg-background">
+                <span className={`w-1.5 h-1.5 rounded-full ${liveLoading ? "bg-warning animate-pulse" : liveCount ? "bg-positive animate-pulse" : "bg-muted-foreground"}`} />
+                <span className="text-muted-foreground">
+                  {liveLoading
+                    ? `Fetching live ${liveSource}…`
+                    : liveCount
+                      ? `Live ${liveSource} · ${liveCount} matched${liveAsOf ? ` · ${new Date(liveAsOf).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}`
+                      : `Live ${liveSource} unavailable — showing indicative data`}
+                </span>
+                <button onClick={() => (cat === "MF" ? navQuery.refetch() : quoteQuery.refetch())} className="text-[10px] uppercase tracking-[0.14em] text-primary hover:underline">Refresh</button>
+              </div>
+            )}
+
             <div className="ml-auto flex items-center gap-2">
               {selected.size > 0 && (
                 <>
@@ -933,12 +987,12 @@ export function ResearchTerminal() {
                         <td className="px-3 py-2.5 text-center">
                           <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="accent-primary cursor-pointer" />
                         </td>
-                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} />}
+                        {cat === "MF" && <MFRow p={p as MutualFund} idx={idx} visibleCols={visibleCols[cat]} live={liveNavs[(p as MutualFund).id]} />}
                         {cat === "FD" && <FDRow p={p as FixedDeposit} visibleCols={visibleCols[cat]} />}
                         {cat === "INS" && <INSRow p={p as Insurance} visibleCols={visibleCols[cat]} />}
                         {cat === "PMS" && <PMSRow p={p as PMS} visibleCols={visibleCols[cat]} />}
                         {cat === "AIF" && <AIFRow p={p as AIF} visibleCols={visibleCols[cat]} />}
-                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} />}
+                        {cat === "EQ" && <EQRow p={p as EquityStock} visibleCols={visibleCols[cat]} live={liveQuotes[(p as EquityStock).ticker]} />}
                         {cat === "BOND" && <BONDRow p={p as Bond} visibleCols={visibleCols[cat]} />}
                       </tr>
                     ))}
@@ -991,7 +1045,7 @@ function Th({ label, k, sortKey, sortDir, onSort, align = "right" }: { label: st
   );
 }
 
-function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCols: Set<string> }) {
+function MFRow({ p, idx, visibleCols, live }: { p: MutualFund; idx: number; visibleCols: Set<string>; live?: LiveNav }) {
   const age = new Date().getFullYear() - p.inceptionYear;
   return (
     <>
@@ -1000,8 +1054,12 @@ function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCol
           <div className="font-medium text-[12.5px] flex items-center gap-1.5 whitespace-nowrap">
             {p.name}
             {p.lockInYears > 0 && <span className="text-[9px] px-1 py-px rounded-sm bg-info/15 text-info uppercase tracking-wider">ELSS</span>}
+            {live && <span className="text-[9px] px-1 py-px rounded-sm bg-positive/15 text-positive uppercase tracking-wider">Live</span>}
           </div>
-          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">{p.id} · {p.amc} · Bench: {p.benchmark} · SIP ₹{p.sipMin}</div>
+          <div className="text-[10px] text-muted-foreground mono-num whitespace-nowrap">
+            {live ? `${live.schemeName || p.name} · NAV ${live.date}` : `${p.id} · ${p.amc} · Bench: ${p.benchmark} · SIP ₹${p.sipMin}`}
+          </div>
+
         </td>
       )}
       {visibleCols.has("subCategory") && (
@@ -1014,7 +1072,16 @@ function MFRow({ p, idx, visibleCols }: { p: MutualFund; idx: number; visibleCol
       )}
       {visibleCols.has("fundManager") && <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">{p.fundManager}</td>}
       {visibleCols.has("aum") && <td className="px-3 py-2.5 text-right mono-num">{p.aum.toLocaleString("en-IN")}</td>}
-      {visibleCols.has("nav") && <td className="px-3 py-2.5 text-right mono-num">{p.nav.toFixed(2)}</td>}
+      {visibleCols.has("nav") && (
+        <td className="px-3 py-2.5 text-right mono-num">
+          {live ? (
+            <span className="text-positive font-medium" title={`Live AMFI NAV as on ${live.date}`}>{live.nav.toFixed(2)}</span>
+          ) : (
+            p.nav.toFixed(2)
+          )}
+        </td>
+      )}
+
       {visibleCols.has("ytdReturn") && <td className={`px-3 py-2.5 text-right mono-num ${pctClass(p.ytdReturn)}`}>{p.ytdReturn > 0 ? "+" : ""}{p.ytdReturn.toFixed(2)}%</td>}
       {visibleCols.has("returns1y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns1y)}`}>{p.returns1y > 0 ? "+" : ""}{p.returns1y.toFixed(2)}%</td>}
       {visibleCols.has("returns3y") && <td className={`px-3 py-2.5 text-right mono-num font-medium ${pctClass(p.returns3y)}`}>{p.returns3y > 0 ? "+" : ""}{p.returns3y.toFixed(2)}%</td>}
@@ -1158,7 +1225,7 @@ function AIFRow({ p, visibleCols }: { p: AIF; visibleCols: Set<string> }) {
   );
 }
 
-function EQRow({ p, visibleCols }: { p: EquityStock; visibleCols: Set<string> }) {
+function EQRow({ p, visibleCols, live }: { p: EquityStock; visibleCols: Set<string>; live?: LiveQuote }) {
   const capTone = p.marketCap === "Large Cap" ? "bg-info/15 text-info" : p.marketCap === "Mid Cap" ? "bg-warning/20 text-warning" : "bg-negative/15 text-negative";
   return (
     <>
@@ -1178,7 +1245,21 @@ function EQRow({ p, visibleCols }: { p: EquityStock; visibleCols: Set<string> })
           <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm font-medium ${capTone}`}>{p.marketCap}</span>
         </td>
       )}
-      {visibleCols.has("price") && <td className="px-3 py-2.5 text-right mono-num">{p.price.toLocaleString("en-IN")}</td>}
+      {visibleCols.has("price") && (
+        <td className="px-3 py-2.5 text-right mono-num">
+          {live ? (
+            <span title={`NSE live · ${new Date(live.time).toLocaleString("en-IN")}`}>
+              <span className="font-medium">{live.price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+              <span className={`ml-1.5 text-[10px] ${pctClass(live.changePct)}`}>
+                {live.changePct > 0 ? "+" : ""}{live.changePct.toFixed(2)}%
+              </span>
+            </span>
+          ) : (
+            p.price.toLocaleString("en-IN")
+          )}
+        </td>
+      )}
+
       {visibleCols.has("pe") && <td className="px-3 py-2.5 text-right mono-num">{p.pe.toFixed(1)}</td>}
       {visibleCols.has("pb") && <td className="px-3 py-2.5 text-right mono-num">{p.pb.toFixed(2)}</td>}
       {visibleCols.has("dividendYield") && <td className="px-3 py-2.5 text-right mono-num">{p.dividendYield.toFixed(2)}</td>}

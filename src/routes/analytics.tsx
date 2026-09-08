@@ -2129,3 +2129,261 @@ function ChipFilter<T extends string>({ label, all, value, onChange, display }: 
     </div>
   );
 }
+
+// ============================================================
+// FIRM-LEVEL FUND EXPOSURE & OVERLAP
+// ============================================================
+type FundAgg = {
+  fund: string;
+  amc: string;
+  assetClass: Holding["assetClass"];
+  value: number;
+  clients: { client: string; id: string; value: number }[];
+  underlyings: { issuer: string; sector: string; weight: number }[];
+};
+
+function useFundAggregates(scope: string) {
+  return useMemo(() => {
+    const ports = scope === "ALL" ? clientPortfolios : clientPortfolios.filter(p => p.id === scope);
+    const m = new Map<string, FundAgg>();
+    for (const p of ports) {
+      for (const h of p.holdings) {
+        if (h.product !== "MF") continue;
+        const cur = m.get(h.security) ?? {
+          fund: h.security, amc: h.amc ?? "—", assetClass: h.assetClass,
+          value: 0, clients: [], underlyings: h.underlyings ?? [],
+        };
+        cur.value += h.value;
+        cur.clients.push({ client: p.client, id: p.id, value: h.value });
+        m.set(h.security, cur);
+      }
+    }
+    const funds = [...m.values()].sort((a, b) => b.value - a.value);
+    const totalMf = funds.reduce((s, f) => s + f.value, 0);
+
+    // Look-through underlying issuer exposure
+    const iss = new Map<string, { issuer: string; sector: string; value: number; funds: Set<string> }>();
+    for (const f of funds) {
+      for (const u of f.underlyings) {
+        if (u.issuer === "Others") continue;
+        const cur = iss.get(u.issuer) ?? { issuer: u.issuer, sector: u.sector, value: 0, funds: new Set<string>() };
+        cur.value += f.value * (u.weight / 100);
+        cur.funds.add(f.fund);
+        iss.set(u.issuer, cur);
+      }
+    }
+    const issuers = [...iss.values()].sort((a, b) => b.value - a.value);
+    return { funds, totalMf, issuers, portfolios: ports };
+  }, [scope]);
+}
+
+/** Pairwise overlap: sum of min(weight) over common named underlyings. */
+function overlapPct(a: FundAgg, b: FundAgg) {
+  if (a.fund === b.fund) return 100;
+  const bw = new Map(b.underlyings.filter(u => u.issuer !== "Others").map(u => [u.issuer, u.weight]));
+  let s = 0;
+  for (const u of a.underlyings) {
+    if (u.issuer === "Others") continue;
+    const w = bw.get(u.issuer);
+    if (w != null) s += Math.min(u.weight, w);
+  }
+  return s;
+}
+
+function FundOverlapModule() {
+  const [scope, setScope] = useState<string>("ALL");
+  const [topN, setTopN] = useState(8);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const { funds, totalMf, issuers, portfolios } = useFundAggregates(scope);
+
+  const top = funds.slice(0, topN);
+  const matrix = useMemo(() => top.map(a => top.map(b => overlapPct(a, b))), [top]);
+
+  const pairs = useMemo(() => {
+    const out: { a: string; b: string; ov: number }[] = [];
+    for (let i = 0; i < top.length; i++)
+      for (let j = i + 1; j < top.length; j++)
+        out.push({ a: top[i].fund, b: top[j].fund, ov: matrix[i]?.[j] ?? 0 });
+    return out.sort((x, y) => y.ov - x.ov).slice(0, 6);
+  }, [top, matrix]);
+
+  const scopeLabel = scope === "ALL" ? "All clients (firm-wide)" : (portfolios[0]?.client ?? "—");
+
+  return (
+    <Panel
+      title="Mutual Fund Exposure & Overlap"
+      subtitle={`Top schemes held ${scope === "ALL" ? "across every client portfolio" : "in this portfolio"}, their look-through underlying holdings, and pairwise overlap — ${scopeLabel}`}
+      right={
+        <div className="flex items-center gap-2">
+          <Select
+            label="Scope"
+            value={scope}
+            onChange={setScope}
+            options={[{ value: "ALL", label: "All clients (firm-wide)" }, ...clientPortfolios.map(p => ({ value: p.id, label: p.client }))]}
+          />
+          <Select
+            label="Top funds"
+            value={String(topN)}
+            onChange={v => setTopN(Number(v))}
+            options={[6, 8, 10, 12].map(n => ({ value: String(n), label: `Top ${n}` }))}
+          />
+        </div>
+      }
+    >
+      <div className="space-y-5">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MiniStat icon={<Briefcase />} label="MF Exposure" value={fmtCr(totalMf)} delta={6.2} />
+          <MiniStat icon={<Layers />} label="Distinct Schemes" value={String(funds.length)} delta={0} suffix="" />
+          <MiniStat icon={<Users />} label="Portfolios in Scope" value={String(portfolios.length)} delta={0} suffix="" />
+          <MiniStat icon={<AlertTriangle />} label="Pairs Overlap >20%" value={String(pairs.filter(p => p.ov > 20).length)} delta={0} suffix="" reverse />
+        </section>
+
+        {/* Top funds table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="text-left p-2 w-6"></th>
+                <th className="text-left p-2">Scheme</th>
+                <th className="text-left p-2">AMC</th>
+                <th className="text-left p-2">Asset Class</th>
+                <th className="text-right p-2">Exposure</th>
+                <th className="text-right p-2">% of MF book</th>
+                <th className="text-right p-2">Clients</th>
+                <th className="text-left p-2 w-40">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top.map(f => {
+                const share = totalMf ? (f.value / totalMf) * 100 : 0;
+                const isOpen = expanded === f.fund;
+                return (
+                  <Fragment key={f.fund}>
+                    <tr className="border-t border-border hover:bg-muted/30 cursor-pointer" onClick={() => setExpanded(isOpen ? null : f.fund)}>
+                      <td className="p-2 text-muted-foreground">{isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}</td>
+                      <td className="p-2 font-medium">{f.fund}</td>
+                      <td className="p-2 text-muted-foreground">{f.amc}</td>
+                      <td className="p-2 text-muted-foreground">{f.assetClass}</td>
+                      <td className="text-right p-2 tabular-nums">{fmtCr(f.value)}</td>
+                      <td className="text-right p-2 tabular-nums font-medium">{share.toFixed(1)}%</td>
+                      <td className="text-right p-2 tabular-nums">{f.clients.length}</td>
+                      <td className="p-2">
+                        <div className="h-1.5 bg-muted rounded"><div className="h-1.5 rounded bg-primary" style={{ width: `${Math.min(100, share * 3)}%` }} /></div>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/20 border-t border-border">
+                        <td></td>
+                        <td colSpan={7} className="p-3">
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Underlying holdings (look-through)</div>
+                              {f.underlyings.length === 0 ? (
+                                <div className="text-[11px] text-muted-foreground">No look-through data for this scheme.</div>
+                              ) : f.underlyings.map(u => (
+                                <div key={u.issuer} className="flex items-center justify-between gap-2 py-0.5">
+                                  <span className="text-[11px]">{u.issuer} <span className="text-muted-foreground">· {u.sector}</span></span>
+                                  <span className="text-[11px] tabular-nums text-muted-foreground">{u.weight.toFixed(1)}% · {fmtCr(f.value * u.weight / 100)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Held by</div>
+                              {f.clients.sort((a, b) => b.value - a.value).map(c => (
+                                <div key={c.id} className="flex items-center justify-between gap-2 py-0.5">
+                                  <button className="text-[11px] text-primary hover:underline" onClick={(e) => { e.stopPropagation(); setScope(c.id); setExpanded(null); }}>{c.client}</button>
+                                  <span className="text-[11px] tabular-nums text-muted-foreground">{fmtCr(c.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Overlap matrix */}
+        <div>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1 mb-2"><Layers className="h-3 w-3" /> Pairwise overlap matrix (% of common underlying weight)</div>
+          {top.length < 2 ? (
+            <div className="text-[11px] text-muted-foreground py-3">Need at least two schemes in scope to compute overlap.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="text-xs">
+                <thead>
+                  <tr>
+                    <th></th>
+                    {top.map(f => (
+                      <th key={f.fund} className="px-1 py-1 text-[9px] font-normal text-muted-foreground -rotate-45 origin-left h-24 align-bottom whitespace-nowrap">{f.fund}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {top.map((row, i) => (
+                    <tr key={row.fund}>
+                      <td className="pr-2 py-1 text-[10px] text-muted-foreground whitespace-nowrap max-w-[220px] truncate">{row.fund}</td>
+                      {matrix[i].map((v, j) => (
+                        <td key={j} className="text-center tabular-nums text-[10px] w-12 h-8"
+                          style={{ background: `rgba(239, 68, 68, ${0.06 + Math.min(1, v / 60) * 0.7})` }}>
+                          {v.toFixed(0)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pairs.length > 0 && (
+            <div className="mt-3 grid md:grid-cols-2 gap-2">
+              {pairs.map(p => (
+                <div key={p.a + p.b} className="flex items-center justify-between border border-border rounded-md px-2.5 py-1.5">
+                  <span className="text-[11px]">{p.a} <span className="text-muted-foreground">vs</span> {p.b}</span>
+                  <span className={classNames("text-[11px] tabular-nums font-semibold", p.ov > 20 ? "text-negative" : p.ov > 10 ? "text-amber-600" : "text-muted-foreground")}>{p.ov.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Look-through issuer exposure */}
+        <div>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1 mb-2"><Search className="h-3 w-3" /> Aggregate look-through exposure to underlying companies</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="text-left p-2">Company</th>
+                  <th className="text-left p-2">Sector</th>
+                  <th className="text-right p-2">Look-through exposure</th>
+                  <th className="text-right p-2">% of MF book</th>
+                  <th className="text-left p-2">Via schemes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {issuers.slice(0, 15).map(i => (
+                  <tr key={i.issuer} className="border-t border-border">
+                    <td className="p-2 font-medium">{i.issuer}</td>
+                    <td className="p-2 text-muted-foreground">{i.sector}</td>
+                    <td className="text-right p-2 tabular-nums">{fmtCr(i.value)}</td>
+                    <td className="text-right p-2 tabular-nums">{totalMf ? (i.value / totalMf * 100).toFixed(2) : "0.00"}%</td>
+                    <td className="p-2 text-[10px] text-muted-foreground">{[...i.funds].join(", ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground italic">
+          Overlap is computed from published scheme underlying weights: the sum of the smaller weight for every company two schemes share. Unnamed residual holdings are excluded, so figures are conservative.
+        </p>
+      </div>
+    </Panel>
+  );
+}

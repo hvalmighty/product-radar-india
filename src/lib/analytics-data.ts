@@ -4,6 +4,7 @@
 // reflects the active region selected in the global switcher.
 
 import { getCurrentRegion, type Region } from "./region";
+import { sampleClientPortfolios } from "./sample-analytics-bridge";
 
 // ----------------------------------------------------------------------------
 // Shared types & constants

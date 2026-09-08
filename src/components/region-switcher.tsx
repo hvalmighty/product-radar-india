@@ -33,9 +33,10 @@ export function RegionSwitcher() {
             <>
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
               <span className="text-base leading-none">{meta.flag}</span>
-              <span className="truncate">{meta.label}</span>
+              <span className="flex-1 min-w-0 truncate">{meta.label}</span>
               <span className="text-[10px] mono-num text-muted-foreground shrink-0">{meta.currency}</span>
               <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+
             </>
           )}
         </button>

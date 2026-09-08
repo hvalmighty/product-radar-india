@@ -7,23 +7,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSidebar } from "@/components/ui/sidebar";
 import { ChevronDown, Check, Globe } from "lucide-react";
 
 export function RegionSwitcher() {
   const { region, setRegion } = useRegion();
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
   const meta = REGION_META[region];
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="inline-flex w-full items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground text-xs font-medium hover:bg-sidebar-accent transition-colors"
+          className={`inline-flex items-center rounded-md border border-sidebar-border bg-sidebar-accent/60 text-sidebar-foreground text-xs font-medium hover:bg-sidebar-accent transition-colors ${
+            collapsed
+              ? "h-8 w-8 shrink-0 justify-center p-0"
+              : "w-full gap-1.5 px-2.5 py-1.5"
+          }`}
           aria-label="Switch region"
+          title={`${meta.label} · ${meta.currency}`}
         >
-          <Globe className="w-3.5 h-3.5 opacity-70" />
-          <span className="text-base leading-none">{meta.flag}</span>
-          <span className="hidden sm:inline">{meta.label}</span>
-          <span className="text-[10px] mono-num text-muted-foreground">{meta.currency}</span>
-          <ChevronDown className="w-3 h-3 opacity-60" />
+          {collapsed ? (
+            <span className="text-lg leading-none">{meta.flag}</span>
+          ) : (
+            <>
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+              <span className="text-base leading-none">{meta.flag}</span>
+              <span className="flex-1 min-w-0 truncate">{meta.label}</span>
+              <span className="text-[10px] mono-num text-muted-foreground shrink-0">{meta.currency}</span>
+              <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+
+            </>
+          )}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -59,3 +74,4 @@ export function RegionSwitcher() {
     </DropdownMenu>
   );
 }
+

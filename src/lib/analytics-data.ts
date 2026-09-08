@@ -226,6 +226,11 @@ const IN_CONFIG: RegionConfig = {
         { security: "Kotak PMS - India Focus", issuer: "Kotak AMC", amc: "Kotak AMC", product: "PMS", assetClass: "Equity", sector: "Diversified", liquidity: "T+30", value: 14.2, fee: 2.0 },
       ],
     },
+    ...sampleClientPortfolios(
+      "IN",
+      ["Anika Mehra","Karthik Iyer","Rohan Bhattacharya","Priya Nair","Vikram Sethi","Sneha Kapoor","Aditya Rao","Meera Joshi"],
+      "Nifty 50 TRI",
+    ),
   ],
 };
 

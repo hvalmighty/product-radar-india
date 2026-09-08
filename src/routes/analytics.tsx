@@ -586,7 +586,11 @@ function BusinessAnalytics() {
         </div>
       </Panel>
 
+      {/* Firm-level fund exposure & overlap */}
+      <FundOverlapModule />
+
       {/* Bottom KPIs */}
+
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MiniStat icon={<Target />}    label="Cross-sell Ratio" value="2.8 prod/client" delta={0.3} suffix="" />
         <MiniStat icon={<Activity />}  label="Avg AUM / RM"     value={fmtCr(kpis.latestAum / RM_INFO.length)} delta={11.4} />
